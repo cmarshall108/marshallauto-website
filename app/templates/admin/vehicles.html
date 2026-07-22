@@ -1,0 +1,89 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Vehicles{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">Vehicles</h2>
+    <a href="{{ url_for('admin.vehicle_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Vehicle</a>
+</div>
+
+<div class="mb-3">
+    <a href="{{ url_for('admin.vehicles') }}" class="btn btn-sm {% if not status %}btn-dark{% else %}btn-outline-secondary{% endif %}">All</a>
+    <a href="{{ url_for('admin.vehicles', status='available') }}" class="btn btn-sm {% if status == 'available' %}btn-success{% else %}btn-outline-secondary{% endif %}">Available</a>
+    <a href="{{ url_for('admin.vehicles', status='pending') }}" class="btn btn-sm {% if status == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}">Pending</a>
+    <a href="{{ url_for('admin.vehicles', status='sold') }}" class="btn btn-sm {% if status == 'sold' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Sold</a>
+</div>
+
+<div class="table-card p-4">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Photo</th>
+                    <th>Vehicle</th>
+                    <th>Price</th>
+                    <th>Mileage</th>
+                    <th>Status</th>
+                    <th>Stock #</th>
+                    <th>Added</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vehicle in pagination.items %}
+                <tr>
+                    <td>
+                        <img src="{{ vehicle.primary_image_url() }}" alt="" class="vehicle-thumb">
+                    </td>
+                    <td>
+                        <strong>{{ vehicle.title }}</strong><br>
+                        <small class="text-muted">VIN: {{ vehicle.vin or 'N/A' }}</small>
+                    </td>
+                    <td>{{ vehicle.display_price | format_price }}</td>
+                    <td>{{ vehicle.mileage | format_mileage }}</td>
+                    <td><span class="badge badge-status bg-{{ 'success' if vehicle.status == 'available' else 'warning' if vehicle.status == 'pending' else 'secondary' }}">{{ vehicle.status | title }}</span></td>
+                    <td>{{ vehicle.stock_number or 'N/A' }}</td>
+                    <td>{{ vehicle.created_at.strftime('%m/%d/%Y') }}</td>
+                    <td>
+                        <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" target="_blank" class="btn btn-sm btn-outline-secondary mb-1"><i class="bi bi-eye"></i></a>
+                        <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-sm btn-primary mb-1"><i class="bi bi-pencil"></i></a>
+                        <form action="{{ url_for('admin.vehicle_delete', id=vehicle.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this vehicle?');">
+                            <button type="submit" class="btn btn-sm btn-danger mb-1"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No vehicles found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center mb-0">
+            {% if pagination.has_prev %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('admin.vehicles', page=pagination.prev_num, status=status) }}">Previous</a></li>
+            {% endif %}
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}
+                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin.vehicles', page=page_num, status=status) }}">{{ page_num }}</a></li>
+                    {% endif %}
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('admin.vehicles', page=pagination.next_num, status=status) }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

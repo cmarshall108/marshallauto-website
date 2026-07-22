@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block meta_title %}{{ site_title }}{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}{{ site_setting.get('meta_description', '') }}{% endblock %}">
+    {% block meta_keywords_block %}
+    <meta name="keywords" content="{{ site_setting.get('meta_keywords', '') }}">
+    {% endblock %}
+    <meta name="robots" content="{% block robots %}index, follow{% endblock %}">
+    <meta name="author" content="{{ business_name }}">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="msapplication-TileColor" content="#0d6efd">
+
+    {% if google_search_console_tag %}
+    {{ google_search_console_tag | safe }}
+    {% endif %}
+
+    <link rel="canonical" href="{% if canonical_override %}{{ canonical_override }}{% else %}{{ canonical_url }}{% endif %}">
+    {% block pagination_rels %}{% endblock %}
+    <link rel="alternate" hreflang="en-us" href="{% if canonical_override %}{{ canonical_override }}{% else %}{{ canonical_url }}{% endif %}">
+    <link rel="alternate" hreflang="x-default" href="{{ site_url }}/">
+
+    <!-- Preconnect / Preload -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="preload" as="image" href="{{ url_for('static', filename='images/logo-icon.png') }}">
+
+    <!-- Open Graph -->
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="{% block og_title %}{{ site_title }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ site_setting.get('meta_description', '') }}{% endblock %}">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{% if canonical_override %}{{ canonical_override }}{% else %}{{ canonical_url }}{% endif %}">
+    <meta property="og:site_name" content="{{ business_name }}">
+    <meta property="og:image" content="{% block og_image %}{{ site_url }}/static/images/og-default.jpg{% endblock %}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    {% if facebook_app_id %}<meta property="fb:app_id" content="{{ facebook_app_id }}">{% endif %}
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    {% if twitter_handle %}<meta name="twitter:site" content="{{ twitter_handle if twitter_handle.startswith('@') else '@' + twitter_handle }}">{% endif %}
+    <meta name="twitter:title" content="{% block twitter_title %}{{ site_title }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ site_setting.get('meta_description', '') }}{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}{{ site_url }}/static/images/og-default.jpg{% endblock %}">
+
+    <!-- Icons / PWA -->
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}" sizes="any" type="image/png">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    {% block structured_data_block %}
+    {% if structured_data %}
+    <script type="application/ld+json">{{ structured_data | tojson | safe }}</script>
+    {% endif %}
+    {% endblock %}
+    {% if structured_vehicle %}
+    <script type="application/ld+json">{{ structured_vehicle | tojson | safe }}</script>
+    {% endif %}
+    {% if structured_local %}
+    <script type="application/ld+json">{{ structured_local | tojson | safe }}</script>
+    {% endif %}
+    {% if structured_website %}
+    <script type="application/ld+json">{{ structured_website | tojson | safe }}</script>
+    {% endif %}
+    {% if breadcrumbs %}
+    <script type="application/ld+json">{{ breadcrumbs | tojson | safe }}</script>
+    {% endif %}
+    {% if structured_faq %}
+    <script type="application/ld+json">{{ structured_faq | tojson | safe }}</script>
+    {% endif %}
+    {% if structured_how_to %}
+    <script type="application/ld+json">{{ structured_how_to | tojson | safe }}</script>
+    {% endif %}
+
+    {% block extra_head %}{% endblock %}
+
+    <!-- Google Tag Manager -->
+    {% if google_tag_id %}
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','{{ google_tag_id }}');</script>
+    {% endif %}
+
+    <!-- Google Analytics 4 (fallback if no GTM) -->
+    {% if google_analytics_id and not google_tag_id %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_analytics_id }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '{{ google_analytics_id }}');
+    </script>
+    {% endif %}
+
+    <!-- Facebook Pixel -->
+    {% if facebook_pixel_id %}
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '{{ facebook_pixel_id }}');
+    fbq('track', 'PageView');
+    </script>
+    {% endif %}
+</head>
+<body>
+    {% if google_tag_id %}
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ google_tag_id }}"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    {% endif %}
+
+    <!-- Top Bar -->
+    <div class="top-bar text-white py-2">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="d-none d-md-block">
+                <small><i class="bi bi-telephone-fill me-1"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="text-white text-decoration-none">{{ business_phone }}</a></small>
+                <small class="ms-3"><i class="bi bi-geo-alt-fill me-1"></i> {{ business_address }}</small>
+            </div>
+            <div>
+                <small>Mon-Fri: 9am-5pm | Sat-Sun: Closed</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="{{ url_for('main.index') }}">
+                <img src="{{ url_for('static', filename='images/logo-icon.png') }}" alt="" width="40" height="40" class="me-2 rounded">
+                <span class="brand-primary">MARSHALL</span> <span class="brand-secondary">AUTO</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.inventory') }}">Inventory</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.financing') }}">Financing</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.sell_your_car') }}">Sell Your Car</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.service_area') }}">Service Area</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.about') }}">About</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.contact') }}">Contact</a></li>
+                    <li class="nav-item ms-lg-3">
+                        <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-telephone-fill me-1"></i> Call Now
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    <footer class="footer text-white pt-5 pb-3">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <h4 class="fw-bold mb-3"><span class="brand-primary">MARSHALL</span> <span class="brand-secondary">AUTO</span></h4>
+                    <p>{{ site_setting.get('about_text', '')[:160] }}...</p>
+                    {% if social_links %}
+                    <div class="d-flex gap-3 fs-5">
+                        {% for network, url in social_links %}
+                        <a href="{{ url }}" class="text-white" target="_blank" rel="noopener noreferrer" aria-label="{{ network|title }}">
+                            <i class="bi bi-{{ 'twitter-x' if network == 'twitter' else network }}"></i>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <h5 class="fw-semibold mb-3">Quick Links</h5>
+                    <ul class="list-unstyled footer-links">
+                        <li><a href="{{ url_for('main.inventory') }}">Inventory</a></li>
+                        <li><a href="{{ url_for('main.financing') }}">Financing</a></li>
+                        <li><a href="{{ url_for('main.sell_your_car') }}">Sell Your Car</a></li>
+                        <li><a href="{{ url_for('main.service_area') }}">Service Area</a></li>
+                        <li><a href="{{ url_for('main.about') }}">About Us</a></li>
+                        <li><a href="{{ url_for('main.contact') }}">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h5 class="fw-semibold mb-3">Business Hours</h5>
+                    <ul class="list-unstyled">
+                        {% for day, hours in business_hours.items() %}
+                        <li class="d-flex justify-content-between"><span>{{ day }}</span> <span>{{ hours }}</span></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h5 class="fw-semibold mb-3">Contact Us</h5>
+                    <p class="mb-1"><i class="bi bi-geo-alt-fill me-2"></i> {{ business_address }}</p>
+                    <p class="mb-1"><i class="bi bi-telephone-fill me-2"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="text-white text-decoration-none">{{ business_phone }}</a></p>
+                    <p class="mb-1"><i class="bi bi-envelope-fill me-2"></i> <a href="mailto:{{ business_email }}" class="text-white text-decoration-none">{{ business_email }}</a></p>
+                </div>
+            </div>
+            <hr class="my-4 border-secondary">
+            <div class="row align-items-center">
+                <div class="col-md-6 text-center text-md-start">
+                    <small>&copy; {{ now.year if now is defined else now().year }} {{ business_name }}. All rights reserved.</small>
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <small><a href="{{ url_for('main.sitemap') }}" class="text-white-50 text-decoration-none">Sitemap</a></small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

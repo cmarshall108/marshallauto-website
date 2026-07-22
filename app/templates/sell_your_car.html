@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-5">
+    <div class="container">
+        <h1 class="fw-bold">Sell Your Car</h1>
+        <p class="text-muted mb-0">Get a fair cash offer in minutes. Fast, easy, and hassle-free.</p>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6">
+                <h2 class="section-title">We Buy Cars, Trucks & SUVs</h2>
+                <p class="text-muted">Whether you're trading in for a vehicle on our lot or just need cash for your car, Marshall Auto LLC makes selling simple. We'll appraise your vehicle fairly and handle all the paperwork.</p>
+                <div class="row g-4 mt-2">
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <div class="feature-icon me-3" style="margin-bottom: 0;"><i class="bi bi-cash-stack"></i></div>
+                            <div>
+                                <h5 class="fw-bold">Fair Offers</h5>
+                                <p class="text-muted small mb-0">Market-based pricing with no low-ball tactics.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <div class="feature-icon me-3" style="margin-bottom: 0;"><i class="bi bi-lightning-charge"></i></div>
+                            <div>
+                                <h5 class="fw-bold">Fast Payment</h5>
+                                <p class="text-muted small mb-0">Get paid quickly once the deal is done.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <div class="feature-icon me-3" style="margin-bottom: 0;"><i class="bi bi-file-earmark-text"></i></div>
+                            <div>
+                                <h5 class="fw-bold">We Handle Paperwork</h5>
+                                <p class="text-muted small mb-0">Title transfer and documentation made easy.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <div class="feature-icon me-3" style="margin-bottom: 0;"><i class="bi bi-car-front"></i></div>
+                            <div>
+                                <h5 class="fw-bold">Any Condition</h5>
+                                <p class="text-muted small mb-0">We buy running and non-running vehicles.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <p class="text-muted">Thinking about trading up? <a href="{{ url_for('main.inventory') }}" class="fw-semibold">Browse our current inventory</a> to find your next vehicle.</p>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card border-0 shadow p-4">
+                    <h4 class="fw-bold mb-3">Request a Free Appraisal</h4>
+                    <form action="{{ url_for('main.contact_submit_ajax') }}" method="POST" data-ajax>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="source" value="sell-your-car">
+                        <div class="mb-3">
+                            <label class="form-label">Your Name</label>
+                            <input type="text" name="name" class="form-control" required>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email" class="form-control" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" name="phone" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Vehicle Year</label>
+                                <input type="number" name="year" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Make & Model</label>
+                                <input type="text" name="vehicle_model" class="form-control">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mileage & Condition</label>
+                            <textarea name="message" class="form-control" rows="3" placeholder="Tell us about your vehicle..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Get My Offer</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

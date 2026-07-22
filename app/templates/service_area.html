@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-5">
+    <div class="container">
+        <h1 class="fw-bold mb-2">Used Car Dealer Serving Central North Carolina</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Service Area</li>
+            </ol>
+        </nav>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row g-5">
+            <div class="col-lg-8">
+                <h2 class="section-title">Quality Used Cars Near You</h2>
+                <p class="lead text-muted">{{ business_name }} is located in {{ business_city }}, {{ business_state }} and proudly serves drivers across central North Carolina. We offer clean title and rebuilt title vehicles, flexible financing, trade-ins, and CarFax reports.</p>
+                <p class="text-muted">Whether you are shopping for a fuel-efficient commuter, a family SUV, or a rugged truck, our inventory is updated regularly. Browse by city below to find vehicles near you.</p>
+
+                <div class="row g-4 mt-2">
+                    {% for city, state in areas %}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title fw-bold">{{ city }}, {{ state }}</h5>
+                                <p class="card-text text-muted small">Used cars, trucks, and SUVs for sale in {{ city }}.</p>
+                                <a href="{{ url_for('main.inventory_by_city', city=city.lower().replace(' ', '-'), state=state.lower()) }}" class="btn btn-sm btn-primary">Browse Inventory</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card border-0 shadow p-4 mb-4">
+                    <h5 class="fw-bold mb-3">Visit Our Dealership</h5>
+                    <p class="mb-1"><i class="bi bi-geo-alt-fill me-2 text-primary"></i> {{ business_address }}</p>
+                    <p class="mb-1"><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
+                    <p class="mb-3"><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
+                    <a href="{{ url_for('main.inventory') }}" class="btn btn-primary w-100 mb-2">View All Inventory</a>
+                    <a href="{{ url_for('main.financing') }}" class="btn btn-outline-primary w-100">Apply for Financing</a>
+                </div>
+
+                <div class="card border-0 shadow p-4">
+                    <h5 class="fw-bold mb-3">Why Buy From Us?</h5>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Huge discounts on rebuilt titles</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Clean title guarantee</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Financing for all credit</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Trade-ins welcome</li>
+                        <li class="mb-0"><i class="bi bi-check-circle-fill text-success me-2"></i> CarFax reports available</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding bg-light-brand">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Rebuilt Title Specialists</h2>
+            <p class="section-subtitle mx-auto">Save thousands on rebuilt title vehicles that have been fully inspected and reconditioned. We serve customers throughout central NC.</p>
+            <a href="{{ url_for('main.inventory', title_status='rebuilt') }}" class="btn btn-primary btn-lg mt-3">Shop Rebuilt Title Inventory</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

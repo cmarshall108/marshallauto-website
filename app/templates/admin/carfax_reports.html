@@ -1,0 +1,69 @@
+{% extends "admin/base.html" %}
+
+{% block title %}CarFax Reports{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">CarFax Reports</h2>
+    <a href="{{ url_for('admin.carfax_report_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add CarFax Report</a>
+</div>
+
+<div class="table-card p-4">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Vehicle</th>
+                    <th>Report Date</th>
+                    <th>Accidents</th>
+                    <th>Owners</th>
+                    <th>Report</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in pagination.items %}
+                <tr>
+                    <td><a href="{{ url_for('admin.vehicle_edit', id=report.vehicle_id) }}">{{ report.vehicle.title }}</a></td>
+                    <td>{{ report.report_date.strftime('%m/%d/%Y') if report.report_date else 'N/A' }}</td>
+                    <td>{{ report.accidents_reported or 0 }}</td>
+                    <td>{{ report.owners_reported or 'N/A' }}</td>
+                    <td>
+                        {% if report.filename %}
+                        <a href="{{ url_for('admin.carfax_report_download', id=report.id) }}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+                        {% else %}
+                        <span class="text-muted">No file</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin.carfax_report_edit', id=report.id) }}" class="btn btn-sm btn-primary"><i class="bi bi-pencil"></i></a>
+                        <form action="{{ url_for('admin.carfax_report_delete', id=report.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this report?');">
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No CarFax reports found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center mb-0">
+            {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.carfax_reports', page=pagination.prev_num) }}">Previous</a></li>{% endif %}
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}<li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.carfax_reports', page=page_num) }}">{{ page_num }}</a></li>{% endif %}
+                {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.carfax_reports', page=pagination.next_num) }}">Next</a></li>{% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

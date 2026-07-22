@@ -1,0 +1,83 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Leads{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">Customer Leads</h2>
+</div>
+
+<div class="table-card p-4">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Contact</th>
+                    <th>Vehicle</th>
+                    <th>Message</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in pagination.items %}
+                <tr class="{% if not lead.is_read %}table-primary{% endif %}">
+                    <td>{{ lead.created_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                    <td class="fw-semibold">{{ lead.name }}</td>
+                    <td>
+                        <a href="mailto:{{ lead.email }}">{{ lead.email }}</a><br>
+                        {% if lead.phone %}<small>{{ lead.phone }}</small>{% endif %}
+                    </td>
+                    <td>
+                        {% if lead.vehicle %}
+                        <a href="{{ url_for('main.vehicle_detail', slug=lead.vehicle.slug) }}" target="_blank">{{ lead.vehicle.title }}</a>
+                        {% else %}
+                        General
+                        {% endif %}
+                    </td>
+                    <td><small>{{ lead.message or '—' }}</small></td>
+                    <td>
+                        {% if lead.is_read %}
+                        <span class="badge bg-secondary">Read</span>
+                        {% else %}
+                        <span class="badge bg-primary">New</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not lead.is_read %}
+                        <form action="{{ url_for('admin.lead_mark_read', id=lead.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
+                        </form>
+                        {% endif %}
+                        <form action="{{ url_for('admin.lead_delete', id=lead.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this lead?');">
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No leads found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center mb-0">
+            {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=pagination.prev_num) }}">Previous</a></li>{% endif %}
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}<li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=page_num) }}">{{ page_num }}</a></li>{% endif %}
+                {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=pagination.next_num) }}">Next</a></li>{% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

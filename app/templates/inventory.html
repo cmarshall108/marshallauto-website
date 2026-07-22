@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% set canonical_override = landing_canonical %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block pagination_rels %}
+{% if page_links.prev %}<link rel="prev" href="{{ page_links.prev }}">{% endif %}
+{% if page_links.next %}<link rel="next" href="{{ page_links.next }}">{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-5">
+    <div class="container">
+        {% if landing_h1 %}
+        <h1 class="fw-bold mb-2">{{ landing_h1 }}</h1>
+        {% else %}
+        <h1 class="fw-bold mb-2">Used Cars, Trucks &amp; SUVs for Sale in {{ business_city }}, {{ business_state }}</h1>
+        {% endif %}
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('main.inventory') }}">Inventory</a></li>
+                {% if landing_h1 %}<li class="breadcrumb-item active" aria-current="page">{{ landing_h1 }}</li>{% else %}<li class="breadcrumb-item active" aria-current="page">All Vehicles</li>{% endif %}
+            </ol>
+        </nav>
+    </div>
+</section>
+
+{% if landing_intro %}
+<section class="py-4">
+    <div class="container">
+        <p class="lead text-muted mb-0">{{ landing_intro }}</p>
+    </div>
+</section>
+{% endif %}
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row g-4">
+            <!-- Filters -->
+            <div class="col-lg-3">
+                <div class="filter-sidebar">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-funnel-fill me-2"></i>Filters</h5>
+                    <form method="GET" action="{{ url_for('main.inventory') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Search</label>
+                            <input type="text" name="q" class="form-control" value="{{ request.args.get('q', '') }}" placeholder="Make, model, year...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Make</label>
+                            <select name="make" class="form-select">
+                                <option value="">All Makes</option>
+                                {% for make in makes %}
+                                <option value="{{ make }}" {% if request.args.get('make') == make %}selected{% endif %}>{{ make }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Body Style</label>
+                            <select name="body_style" class="form-select">
+                                <option value="">All Body Styles</option>
+                                {% for style in body_styles %}
+                                <option value="{{ style }}" {% if request.args.get('body_style') == style %}selected{% endif %}>{{ style }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Title Status</label>
+                            <select name="title_status" class="form-select">
+                                <option value="">All Titles</option>
+                                <option value="clean" {% if title_status == 'clean' %}selected{% endif %}>Clean Title</option>
+                                <option value="rebuilt" {% if title_status == 'rebuilt' %}selected{% endif %}>Rebuilt Title</option>
+                                <option value="salvage" {% if title_status == 'salvage' %}selected{% endif %}>Salvage Title</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Min Price</label>
+                            <input type="number" name="min_price" class="form-control" value="{{ request.args.get('min_price', '') }}" placeholder="e.g. 5000" min="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Max Price</label>
+                            <input type="number" name="max_price" class="form-control" value="{{ request.args.get('max_price', '') }}" placeholder="e.g. 30000" min="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Max Mileage</label>
+                            <input type="number" name="max_mileage" class="form-control" value="{{ request.args.get('max_mileage', '') }}" placeholder="e.g. 50000" min="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Sort By</label>
+                            <select name="sort" class="form-select">
+                                <option value="newest" {% if current_sort == 'newest' %}selected{% endif %}>Newest</option>
+                                <option value="price_asc" {% if current_sort == 'price_asc' %}selected{% endif %}>Price: Low to High</option>
+                                <option value="price_desc" {% if current_sort == 'price_desc' %}selected{% endif %}>Price: High to Low</option>
+                                <option value="mileage_asc" {% if current_sort == 'mileage_asc' %}selected{% endif %}>Mileage: Low to High</option>
+                                <option value="year_desc" {% if current_sort == 'year_desc' %}selected{% endif %}>Year: Newest</option>
+                                <option value="year_asc" {% if current_sort == 'year_asc' %}selected{% endif %}>Year: Oldest</option>
+                            </select>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a href="{{ url_for('main.inventory') }}" class="btn btn-outline-secondary">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div class="col-lg-9">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <p class="mb-0 text-muted">Showing {{ pagination.items | length }} of {{ pagination.total }} vehicles</p>
+                </div>
+
+                {% if pagination.items %}
+                <div class="inventory-grid" itemscope itemtype="https://schema.org/ItemList">
+                    <meta itemprop="name" content="Used Vehicles for Sale at {{ business_name }}">
+                    {% for vehicle in pagination.items %}
+                    <div class="vehicle-card" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <meta itemprop="position" content="{{ loop.index }}">
+                        <meta itemprop="url" content="{{ site_url }}{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}">
+                        <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="text-decoration-none text-dark" itemprop="item" itemscope itemtype="https://schema.org/Car">
+                            <div class="card-img-wrapper">
+                                {% set img = vehicle.primary_image() %}
+                                <img src="{{ vehicle.primary_image_url() }}"
+                                     class="card-img-top"
+                                     alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} {{ vehicle.exterior_color or '' }} for sale in {{ business_city }}, {{ business_state }} at {{ business_name }}"
+                                     width="{{ img.width if img and img.width is defined else 600 }}"
+                                     height="{{ img.height if img and img.height is defined else 400 }}"
+                                     loading="lazy"
+                                     decoding="async"
+                                     itemprop="image">
+                                <span class="badge-condition">{{ vehicle.condition | title }}</span>
+                                {% if vehicle.title_status == 'rebuilt' %}
+                                <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">Rebuilt Title</span>
+                                {% elif vehicle.title_status == 'salvage' %}
+                                <span class="badge bg-danger position-absolute top-0 end-0 m-2">Salvage Title</span>
+                                {% endif %}
+                            </div>
+                            <div class="card-body p-4">
+                                <h5 class="card-title" itemprop="name">{{ vehicle.title }}</h5>
+                                <p class="quick-specs mb-2">
+                                    <i class="bi bi-speedometer2 me-1"></i> <span itemprop="mileageFromOdometer">{{ format_mileage(vehicle.mileage) }}</span>
+                                    {% if vehicle.drivetrain %}<span class="mx-1">|</span><span itemprop="driveWheelConfiguration">{{ vehicle.drivetrain }}</span>{% endif %}
+                                    {% if vehicle.fuel_type %}<span class="mx-1">|</span><span itemprop="fuelType">{{ vehicle.fuel_type }}</span>{% endif %}
+                                </p>
+                                <p class="price mb-0" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                                    <span itemprop="priceCurrency" content="USD"></span>
+                                    <span itemprop="price" content="{{ vehicle.display_price }}">{{ format_price(vehicle.display_price) }}</span>
+                                </p>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Pagination (URLs built in Python — Jinja cannot unpack **kwargs) -->
+                {% if pagination.pages > 1 %}
+                <nav class="mt-5" aria-label="Inventory pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ page_url(pagination.prev_num) }}">Previous</a>
+                        </li>
+                        {% endif %}
+                        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                            {% if page_num %}
+                                {% if page_num == pagination.page %}
+                                <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                                {% else %}
+                                <li class="page-item"><a class="page-link" href="{{ page_url(page_num) }}">{{ page_num }}</a></li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ page_url(pagination.next_num) }}">Next</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-car-front fs-1 text-muted"></i>
+                    <h4 class="mt-3">No vehicles found</h4>
+                    <p class="text-muted">Try adjusting your filters or search criteria.</p>
+                    <a href="{{ url_for('main.inventory') }}" class="btn btn-primary">View All Inventory</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

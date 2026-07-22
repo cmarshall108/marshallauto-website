@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-5">
+    <div class="container">
+        <h1 class="fw-bold">About Marshall Auto, LLC</h1>
+        <p class="text-muted mb-0">Your trusted local used car dealership in Sanford, NC. Clean title and rebuilt title vehicles at honest prices.</p>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-6">
+                <h2 class="section-title">Quality Vehicles, Honest Prices</h2>
+                <p class="lead text-muted">{{ site_setting.get('about_text', '') }}</p>
+                <p class="text-muted">At Marshall Auto, LLC, we believe that buying a used car should be an enjoyable experience. That's why we hand-select every vehicle on our lot, inspect it thoroughly, and provide transparent pricing with no hidden fees.</p>
+                <p class="text-muted">We specialize in both clean title and rebuilt title vehicles. Our rebuilt title inventory offers huge discounts on cars, trucks, and SUVs that have been fully inspected and reconditioned, giving you more value for your money.</p>
+                <p class="text-muted">Whether you're looking for a fuel-efficient commuter, a spacious SUV for your family, or a rugged truck for work, our friendly team is here to help you find the perfect fit. We serve customers throughout central North Carolina — <a href="{{ url_for('main.service_area') }}">see our service area</a>.</p>
+                <div class="row g-3 mt-3">
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-primary fs-4 me-2"></i>
+                            <span class="fw-semibold">Transparent Pricing</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-primary fs-4 me-2"></i>
+                            <span class="fw-semibold">Full Inspections</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-primary fs-4 me-2"></i>
+                            <span class="fw-semibold">CarFax Reports</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-primary fs-4 me-2"></i>
+                            <span class="fw-semibold">Flexible Financing</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-primary fs-4 me-2"></i>
+                            <span class="fw-semibold">Rebuilt Title Specialists</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-primary fs-4 me-2"></i>
+                            <span class="fw-semibold">Huge Discounts</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card border-0 shadow overflow-hidden">
+                    <img src="{{ url_for('static', filename='images/showroom.jpg') }}" alt="Marshall Auto LLC Showroom" class="img-fluid" width="800" height="600" loading="lazy" decoding="async" onerror="this.src='{{ url_for('static', filename='images/vehicle-placeholder.jpg') }}'">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding bg-light-brand">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Our Core Values</h2>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="text-center p-4 bg-white rounded-4 shadow-sm h-100">
+                    <div class="feature-icon"><i class="bi bi-people-fill"></i></div>
+                    <h5 class="fw-bold">Customer First</h5>
+                    <p class="text-muted mb-0">Your needs come first. We listen, advise, and never pressure.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center p-4 bg-white rounded-4 shadow-sm h-100">
+                    <div class="feature-icon"><i class="bi bi-award-fill"></i></div>
+                    <h5 class="fw-bold">Integrity</h5>
+                    <p class="text-muted mb-0">Honest descriptions, clear pricing, and full disclosure.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center p-4 bg-white rounded-4 shadow-sm h-100">
+                    <div class="feature-icon"><i class="bi bi-heart-pulse-fill"></i></div>
+                    <h5 class="fw-bold">Quality</h5>
+                    <p class="text-muted mb-0">Every vehicle is inspected and reconditioned before sale.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

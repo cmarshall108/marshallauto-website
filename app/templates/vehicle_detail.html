@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block meta_keywords_block %}<meta name="keywords" content="{{ meta_keywords }}">{% endblock %}
+{% block og_title %}{{ meta_title }}{% endblock %}
+{% block og_description %}{{ meta_description }}{% endblock %}
+{% block robots %}{{ robots_content or 'index, follow' }}{% endblock %}
+{% block og_image %}{{ og_image_absolute or vehicle.primary_image_url(absolute=True) }}{% endblock %}
+{% block og_type %}product{% endblock %}
+{% block twitter_title %}{{ meta_title }}{% endblock %}
+{% block twitter_description %}{{ meta_description }}{% endblock %}
+{% block twitter_image %}{{ og_image_absolute or vehicle.primary_image_url(absolute=True) }}{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('main.inventory') }}">Inventory</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ vehicle.title }}</li>
+            </ol>
+        </nav>
+    </div>
+</section>
+
+<section class="section-padding pt-4">
+    <div class="container">
+        <div class="row g-4">
+            <!-- Gallery -->
+            <div class="col-lg-7">
+                <div class="vehicle-gallery mb-3">
+                    {% set primary = vehicle.primary_image() %}
+                    <img id="main-gallery-image"
+                         src="{{ vehicle.primary_image_url() }}"
+                         alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} {{ vehicle.exterior_color or '' }} for sale in {{ business_city }}, {{ business_state }} at {{ business_name }}"
+                         width="{{ primary.width if primary and primary.width else 800 }}"
+                         height="{{ primary.height if primary and primary.height else 600 }}"
+                         fetchpriority="high">
+                </div>
+                {% set gallery_images = vehicle.ordered_images() %}
+                {% if gallery_images|length > 1 %}
+                <div class="thumbnail-list d-flex gap-2 flex-wrap">
+                    {% for image in gallery_images %}
+                    <img src="{{ image.url }}" data-full="{{ image.url }}" class="{% if loop.first %}active{% endif %}" alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} - view {{ loop.index }} at {{ business_name }} in {{ business_city }}, {{ business_state }}" width="100" height="75" loading="lazy" decoding="async">
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Vehicle Summary -->
+            <div class="col-lg-5">
+                <div class="card border-0 shadow p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="badge bg-secondary">{{ vehicle.condition | title }}</span>
+                            {% if vehicle.title_status == 'rebuilt' %}
+                            <span class="badge bg-warning text-dark">Rebuilt Title</span>
+                            {% elif vehicle.title_status == 'salvage' %}
+                            <span class="badge bg-danger">Salvage Title</span>
+                            {% else %}
+                            <span class="badge bg-success">Clean Title</span>
+                            {% endif %}
+                        </div>
+                        <span class="text-muted">Stock #{{ vehicle.stock_number or vehicle.id }}</span>
+                    </div>
+                    <h1 class="h2 fw-bold mb-1">{{ vehicle.title }} for Sale</h1>
+                    <p class="vehicle-price mb-3">{{ vehicle.display_price | format_price }}</p>
+
+                    <div class="row g-2 mb-4 text-center">
+                        <div class="col-4 border-end">
+                            <div class="fw-bold">{{ vehicle.mileage | format_mileage }}</div>
+                            <small class="text-muted">Mileage</small>
+                        </div>
+                        <div class="col-4 border-end">
+                            <div class="fw-bold">{{ vehicle.fuel_type or 'N/A' }}</div>
+                            <small class="text-muted">Fuel</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-bold">{{ vehicle.drivetrain or 'N/A' }}</div>
+                            <small class="text-muted">Drivetrain</small>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 mb-3">
+                        <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-telephone-fill me-2"></i>Call About This Car
+                        </a>
+                        <button class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#contactModal">
+                            <i class="bi bi-envelope-fill me-2"></i>Request More Info
+                        </button>
+                    </div>
+
+                    <p class="text-muted small mb-0"><i class="bi bi-shield-check me-1 text-success"></i> Clean title guarantee &amp; CarFax available</p>
+                </div>
+
+                <!-- Contact Modal -->
+                <div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title fw-bold">Request More Info</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form action="{{ url_for('main.contact_submit_ajax') }}" method="POST" data-ajax>
+                                    {{ form.hidden_tag() }}
+                                    <input type="hidden" name="source" value="vehicle_detail">
+                                    <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="vd-name">Name</label>
+                                        <input type="text" id="vd-name" name="name" class="form-control" required maxlength="128" autocomplete="name">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="vd-email">Email</label>
+                                        <input type="email" id="vd-email" name="email" class="form-control" required maxlength="128" autocomplete="email">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="vd-phone">Phone</label>
+                                        <input type="tel" id="vd-phone" name="phone" class="form-control" maxlength="32" autocomplete="tel">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="vd-message">Message</label>
+                                        <textarea id="vd-message" name="message" class="form-control" rows="3" maxlength="5000">I'm interested in {{ vehicle.title }}.</textarea>
+                                    </div>
+                                    <div class="d-none" aria-hidden="true">
+                                        <label for="vd-honeypot">Website</label>
+                                        <input type="text" id="vd-honeypot" name="honeypot" tabindex="-1" autocomplete="off" value="">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Send Message</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Details Tabs -->
+        <div class="row mt-5">
+            <div class="col-lg-8">
+                <ul class="nav nav-tabs" id="vehicleTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="features-tab" data-bs-toggle="tab" data-bs-target="#features" type="button" role="tab" aria-controls="features" aria-selected="false">Features</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service" type="button" role="tab" aria-controls="service" aria-selected="false">Service History</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="carfax-tab" data-bs-toggle="tab" data-bs-target="#carfax" type="button" role="tab" aria-controls="carfax" aria-selected="false">CarFax</button>
+                    </li>
+                </ul>
+                <div class="tab-content p-4 border border-top-0 bg-white mb-4" id="vehicleTabsContent">
+                    <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+                        <h4 class="fw-bold mb-3">Vehicle Description</h4>
+                        <p>{{ vehicle.description or 'No description available.' }}</p>
+                        <h5 class="fw-bold mt-4 mb-3">Specifications</h5>
+                        <dl class="row specs-table">
+                            <dt class="col-sm-4">VIN</dt>
+                            <dd class="col-sm-8">{{ vehicle.vin or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Stock #</dt>
+                            <dd class="col-sm-8">{{ vehicle.stock_number or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Year</dt>
+                            <dd class="col-sm-8">{{ vehicle.year }}</dd>
+                            <dt class="col-sm-4">Make</dt>
+                            <dd class="col-sm-8">{{ vehicle.make }}</dd>
+                            <dt class="col-sm-4">Model</dt>
+                            <dd class="col-sm-8">{{ vehicle.model }}</dd>
+                            <dt class="col-sm-4">Trim</dt>
+                            <dd class="col-sm-8">{{ vehicle.trim or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Body Style</dt>
+                            <dd class="col-sm-8">{{ vehicle.body_style or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Title Status</dt>
+                            <dd class="col-sm-8">{{ (vehicle.title_status or 'clean').replace('_', ' ') | title }}</dd>
+                            <dt class="col-sm-4">Exterior Color</dt>
+                            <dd class="col-sm-8">{{ vehicle.exterior_color or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Interior Color</dt>
+                            <dd class="col-sm-8">{{ vehicle.interior_color or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Engine</dt>
+                            <dd class="col-sm-8">{{ vehicle.engine or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Transmission</dt>
+                            <dd class="col-sm-8">{{ vehicle.transmission or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Drivetrain</dt>
+                            <dd class="col-sm-8">{{ vehicle.drivetrain or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Fuel Type</dt>
+                            <dd class="col-sm-8">{{ vehicle.fuel_type or 'N/A' }}</dd>
+                            <dt class="col-sm-4">MPG</dt>
+                            <dd class="col-sm-8">{{ vehicle.mpg_city or '--' }} City / {{ vehicle.mpg_highway or '--' }} Hwy</dd>
+                        </dl>
+                    </div>
+                    <div class="tab-pane fade" id="features" role="tabpanel" aria-labelledby="features-tab">
+                        <h4 class="fw-bold mb-3">Features &amp; Options</h4>
+                        {% if vehicle.feature_list %}
+                        <div>
+                            {% for feature in vehicle.feature_list %}
+                            <span class="feature-tag">{{ feature }}</span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No features listed for this vehicle.</p>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="service" role="tabpanel" aria-labelledby="service-tab">
+                        <h4 class="fw-bold mb-3">Service History</h4>
+                        {% if vehicle.service_records %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Service</th>
+                                        <th>Mileage</th>
+                                        <th>Provider</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in vehicle.service_records %}
+                                    <tr>
+                                        <td>{{ record.service_date.strftime('%m/%d/%Y') if record.service_date else 'N/A' }}</td>
+                                        <td>{{ record.service_type }}</td>
+                                        <td>{{ record.mileage_at_service | format_mileage if record.mileage_at_service else 'N/A' }}</td>
+                                        <td>{{ record.provider or 'N/A' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">Service records coming soon.</p>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="carfax" role="tabpanel" aria-labelledby="carfax-tab">
+                        <h4 class="fw-bold mb-3">CarFax History Report</h4>
+                        {% if vehicle.carfax_reports %}
+                            {% for report in vehicle.carfax_reports %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <p><strong>Report Date:</strong> {{ report.report_date.strftime('%m/%d/%Y') if report.report_date else 'N/A' }}</p>
+                                    <p><strong>Accidents Reported:</strong> {{ report.accidents_reported or 0 }}</p>
+                                    <p><strong>Previous Owners:</strong> {{ report.owners_reported or 'N/A' }}</p>
+                                    <p>{{ report.summary or '' }}</p>
+                                    {% if report.file_url %}
+                                    <a href="{{ report.file_url }}" target="_blank" rel="noopener" class="btn btn-primary">
+                                        <i class="bi bi-file-earmark-pdf me-1"></i> View CarFax Report
+                                    </a>
+                                    {% endif %}
+                                    {% if report.report_url %}
+                                    <a href="{{ report.report_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary{% if report.file_url %} ms-2{% endif %}">External Report</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                        <p class="text-muted">CarFax report coming soon. Contact us for details.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow p-4 mb-4">
+                    <h5 class="fw-bold mb-3">Have Questions?</h5>
+                    <p class="text-muted">Our team is ready to help you with financing, trade-ins, and test drives.</p>
+                    <p><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
+                    <p><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
+                    <a href="{{ url_for('main.financing') }}" class="btn btn-primary w-100 mb-2">Get Pre-Approved</a>
+                    <a href="{{ url_for('main.inventory', make=vehicle.make) }}" class="btn btn-outline-primary w-100 mb-2">More {{ vehicle.make }} Vehicles</a>
+                    {% if vehicle.body_style %}
+                    <a href="{{ url_for('main.inventory', body_style=vehicle.body_style) }}" class="btn btn-outline-primary w-100">Browse {{ vehicle.body_style }}s</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Related Vehicles -->
+        {% if related %}
+        <div class="mt-5">
+            <h2 class="fw-bold mb-4 h3">Similar Vehicles</h2>
+            <div class="inventory-grid" itemscope itemtype="https://schema.org/ItemList">
+                <meta itemprop="name" content="Similar Vehicles to {{ vehicle.title }}">
+                {% for rv in related %}
+                <div class="vehicle-card" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                    <meta itemprop="position" content="{{ loop.index }}">
+                    <meta itemprop="url" content="{{ site_url }}{{ url_for('main.vehicle_detail', slug=rv.slug) }}">
+                    <a href="{{ url_for('main.vehicle_detail', slug=rv.slug) }}" class="text-decoration-none text-dark">
+                        <div class="card-img-wrapper">
+                            {% set img = rv.primary_image() %}
+                            <img src="{{ rv.primary_image_url() }}" class="card-img-top" alt="{{ rv.year }} {{ rv.make }} {{ rv.model }} {{ rv.trim or '' }} for sale in {{ business_city }}, {{ business_state }}" width="{{ img.width if img and img.width else 600 }}" height="{{ img.height if img and img.height else 400 }}" loading="lazy" decoding="async">
+                            <span class="badge-condition">{{ rv.condition | title }}</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <h5 class="card-title">{{ rv.title }}</h5>
+                            <p class="quick-specs mb-2">
+                                <i class="bi bi-speedometer2 me-1"></i> {{ rv.mileage | format_mileage }}
+                            </p>
+                            <p class="price mb-0">{{ rv.display_price | format_price }}</p>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

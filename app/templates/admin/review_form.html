@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">{{ title }}</h2>
+    <a href="{{ url_for('admin.reviews') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<form method="POST" class="card border-0 shadow p-4">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Author Name *</label>
+            {{ form.author_name(class="form-control") }}
+            {% if form.author_name.errors %}<div class="text-danger small">{{ form.author_name.errors[0] }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Rating *</label>
+            {{ form.rating(class="form-select") }}
+            {% if form.rating.errors %}<div class="text-danger small">{{ form.rating.errors[0] }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Review Title</label>
+            {{ form.title(class="form-control") }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Source</label>
+            {{ form.source(class="form-control", placeholder="e.g. Google, Facebook, In-Store") }}
+        </div>
+        <div class="col-12">
+            <label class="form-label">Review Body *</label>
+            {{ form.body(class="form-control", rows="5") }}
+            {% if form.body.errors %}<div class="text-danger small">{{ form.body.errors[0] }}</div>{% endif %}
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.is_approved(class="form-check-input") }}
+                <label class="form-check-label" for="{{ form.is_approved.id }}">Approved (visible on site)</label>
+            </div>
+            <div class="form-check mt-2">
+                {{ form.is_featured(class="form-check-input") }}
+                <label class="form-check-label" for="{{ form.is_featured.id }}">Featured on homepage</label>
+            </div>
+        </div>
+    </div>
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary btn-lg">Save Review</button>
+        <a href="{{ url_for('admin.reviews') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+    </div>
+</form>
+{% endblock %}
