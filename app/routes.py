@@ -326,7 +326,7 @@ def index():
         ("Do you offer financing for used cars?",
          f"Yes, {current_app.config['BUSINESS_NAME']} works with multiple lenders to offer competitive financing options for all credit situations."),
         ("Does every vehicle come with a CarFax report?",
-         "We provide clean title guarantees and CarFax history reports are available on qualifying vehicles."),
+         "CarFax history reports are available on qualifying vehicles. Contact us for details on a specific car."),
         ("Can I trade in my current vehicle?",
          "Yes, we accept trade-ins and will give you a fair market value toward your next vehicle purchase."),
         ("What are rebuilt title cars?",
@@ -401,8 +401,8 @@ def _city_landing_faqs(city_name, state_name):
          f"{biz} in {home_city} serves {city_name} shoppers with inspected used cars, trucks, and SUVs. "
          f"Call {phone} to schedule a visit, test drive, or delivery options."),
         (f"Does {biz} offer financing for buyers in {city_name}?",
-         f"Yes. We work with multiple lenders and can pre-approve {city_name}-area buyers for clean title "
-         f"and rebuilt title vehicles. Apply online or call {phone}."),
+         f"Yes. We work with multiple lenders and can pre-approve {city_name}-area buyers for our "
+         f"clean and rebuilt title inventory. Apply online or call {phone}."),
         (f"Can I get a rebuilt title car delivered near {city_name}?",
          f"Many customers from {city_name} purchase rebuilt title vehicles at a discount. Contact us to "
          f"confirm availability, inspection details, and pickup or delivery arrangements."),

@@ -202,7 +202,7 @@ def _ensure_default_settings():
         'site_tagline': 'Quality Used Cars You Can Trust',
         'meta_description': 'Marshall Auto, LLC is your trusted used car dealer in Sanford, NC offering quality pre-owned vehicles, financing, CarFax reports, and full service history.',
         'meta_keywords': 'used cars Sanford NC, used car dealer Sanford, pre-owned vehicles, car dealership, auto sales, financing, CarFax, Marshall Auto LLC',
-        'about_text': 'Marshall Auto, LLC is a family-owned used car dealership in Sanford, NC committed to transparent pricing, quality vehicles, and exceptional customer service. Every vehicle on our lot is inspected and comes with a clean title guarantee.',
+        'about_text': 'Marshall Auto, LLC is a family-owned used car dealership in Sanford, NC committed to transparent pricing, quality vehicles, and exceptional customer service. Every vehicle on our lot is inspected, and CarFax history reports are available on qualifying vehicles.',
         'home_hero_title': 'Find Your Next Ride at Marshall Auto, LLC',
         'home_hero_subtitle': 'Browse our hand-picked inventory of quality used cars, trucks, and SUVs in Sanford, NC. Financing available.',
         'google_search_console': '',
