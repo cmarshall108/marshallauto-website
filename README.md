@@ -44,6 +44,8 @@ Edit `.env` and set at least `SECRET_KEY` and `ADMIN_PASSWORD`.
 python run.py
 ```
 
+source .venv/bin/activate
+
 The website will be available at `http://127.0.0.1:8080` and the admin panel at `http://127.0.0.1:8080/admin`.
 
 > **Note for macOS users:** Port 5000 is used by macOS AirPlay Receiver, so the development server defaults to port 8080.

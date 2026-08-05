@@ -32,7 +32,8 @@ class Config:
 
     # Uploads
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
-    MAX_CONTENT_LENGTH = 32 * 1024 * 1024  # 32MB
+    # Total request body size (all images in one form submit). Default 256MB for bulk vehicle photos.
+    MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 256 * 1024 * 1024))
     ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     ALLOWED_PDF_EXTENSIONS = {'pdf'}
     IMAGE_WIDTHS = {

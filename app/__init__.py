@@ -96,8 +96,27 @@ def create_app(config_class=None):
 
     # Error handlers
     from app.routes import internal_server_error, page_not_found
+    from werkzeug.exceptions import RequestEntityTooLarge
+
     app.register_error_handler(404, page_not_found)
     app.register_error_handler(500, internal_server_error)
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def request_entity_too_large(e):
+        from flask import flash, redirect, request, url_for
+        limit_mb = int(app.config.get('MAX_CONTENT_LENGTH', 0) / (1024 * 1024))
+        message = (
+            f'Upload too large. Maximum total size is {limit_mb}MB per request. '
+            'Try fewer photos at a time, or compress the images first.'
+        )
+        # Prefer a flash + redirect back to the admin form when possible
+        if request.path.startswith('/admin'):
+            flash(message, 'danger')
+            referrer = request.referrer
+            if referrer:
+                return redirect(referrer)
+            return redirect(url_for('admin.dashboard'))
+        return message, 413
 
     # Health check (no DB dependency for basic liveness)
     @app.get('/healthz')

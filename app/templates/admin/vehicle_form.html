@@ -135,7 +135,11 @@
         <div class="col-12">
             <label class="form-label">Upload Images</label>
             {{ form.images(class="form-control", accept="image/*", multiple=True) }}
-            <div class="form-text">Upload multiple photos. First image will be primary by default.</div>
+            <div class="form-text">
+                Upload multiple photos. First image will be primary by default.
+                Large batches: keep each submit under {{ (config.MAX_CONTENT_LENGTH // (1024 * 1024)) }}MB total
+                (you can upload more photos later by editing the vehicle).
+            </div>
         </div>
 
         {% if vehicle and vehicle.images %}
