@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block meta_title %}{{ site_title }}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}{{ site_setting.get('meta_description', '') }}{% endblock %}">
     {% block meta_keywords_block %}
@@ -135,13 +135,21 @@
 
     <!-- Top Bar -->
     <div class="top-bar text-white py-2">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div class="d-none d-md-block">
-                <small><i class="bi bi-telephone-fill me-1"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="text-white text-decoration-none">{{ business_phone }}</a></small>
-                <small class="ms-3"><i class="bi bi-geo-alt-fill me-1"></i> {{ business_address }}</small>
+        <div class="container">
+            <div class="top-bar-desktop d-none d-lg-flex justify-content-between align-items-center">
+                <div>
+                    <small><i class="bi bi-telephone-fill me-1"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="text-white text-decoration-none">{{ business_phone }}</a></small>
+                    <small class="ms-3"><i class="bi bi-geo-alt-fill me-1"></i> {{ business_address }}</small>
+                </div>
+                <div>
+                    <small>Mon-Fri: 9am-5pm | Sat-Sun: Closed</small>
+                </div>
             </div>
-            <div>
-                <small>Mon-Fri: 9am-5pm | Sat-Sun: Closed</small>
+            <div class="top-bar-mobile d-lg-none">
+                <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="text-white text-decoration-none">
+                    <small><i class="bi bi-telephone-fill me-1"></i>{{ business_phone }}</small>
+                </a>
+                <small class="text-white-50">Mon–Fri 9–5</small>
             </div>
         </div>
     </div>
@@ -153,7 +161,7 @@
                 <img src="{{ url_for('static', filename='images/logo-icon.png') }}" alt="" width="40" height="40" class="me-2 rounded">
                 <span class="brand-primary">MARSHALL</span> <span class="brand-secondary">AUTO</span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="mainNav">
@@ -245,6 +253,35 @@
             </div>
         </div>
     </footer>
+
+    <!-- Mobile sticky CTA -->
+    <div class="mobile-cta-bar d-lg-none" role="navigation" aria-label="Quick actions">
+        <div class="container-fluid px-0">
+            <div class="row g-2">
+                <div class="col-4">
+                    <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-telephone-fill"></i>
+                        <span class="label-full ms-1">Call</span>
+                        <span class="label-short ms-1">Call</span>
+                    </a>
+                </div>
+                <div class="col-4">
+                    <a href="sms:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-secondary w-100">
+                        <i class="bi bi-chat-dots-fill"></i>
+                        <span class="label-full ms-1">Text</span>
+                        <span class="label-short ms-1">Text</span>
+                    </a>
+                </div>
+                <div class="col-4">
+                    <a href="{{ url_for('main.inventory') }}" class="btn btn-outline-light w-100">
+                        <i class="bi bi-car-front-fill"></i>
+                        <span class="label-full ms-1">Inventory</span>
+                        <span class="label-short ms-1">Cars</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

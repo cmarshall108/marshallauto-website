@@ -335,6 +335,16 @@ a:hover {
     height: 100%;
 }
 
+.map-embed {
+    height: 400px;
+}
+
+.map-embed iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 /* Forms */
 .form-control,
 .form-select {
@@ -446,6 +456,98 @@ a:hover {
     font-size: 0.75rem;
 }
 
+/* Mobile sticky call bar */
+.mobile-cta-bar {
+    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1040;
+    background: rgba(26, 26, 46, 0.97);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.65rem 0.85rem calc(0.65rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.mobile-cta-bar .btn {
+    padding: 0.7rem 0.75rem;
+    font-size: 0.92rem;
+    border-radius: 10px;
+}
+
+/* bottom padding applied only on small screens where the bar is visible */
+
+/* Inventory filter collapse (mobile) */
+.inventory-filter-toggle {
+    display: none;
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.inventory-filter-toggle .bi {
+    transition: transform 0.2s ease;
+}
+
+.inventory-filter-toggle[aria-expanded="true"] .bi-chevron-down {
+    transform: rotate(180deg);
+}
+
+/* Horizontal scroll tabs on small screens */
+.nav-tabs-scroll {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.25rem;
+}
+
+.nav-tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.nav-tabs-scroll .nav-link {
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+/* Gallery thumbs: swipeable row on mobile */
+.thumbnail-list {
+    -webkit-overflow-scrolling: touch;
+}
+
+.thumbnail-list.is-scrollable {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: 0.35rem;
+}
+
+.thumbnail-list.is-scrollable img {
+    flex: 0 0 auto;
+}
+
+/* Touch-friendly form controls */
+@media (hover: none) and (pointer: coarse) {
+    .btn,
+    .nav-link,
+    .page-link,
+    .form-control,
+    .form-select {
+        min-height: 44px;
+    }
+
+    .vehicle-card:hover {
+        transform: none;
+        box-shadow: var(--box-shadow);
+    }
+
+    .vehicle-card:hover .card-img-top {
+        transform: none;
+    }
+}
+
 /* Responsive */
 @media (max-width: 991.98px) {
     .admin-sidebar {
@@ -453,22 +555,350 @@ a:hover {
         width: 100%;
         min-height: auto;
     }
+
     .admin-content {
         margin-left: 0;
+        padding: 1.25rem;
     }
+
+    .hero-section {
+        min-height: auto;
+        padding: 3.5rem 0;
+    }
+
     .hero-section h1 {
         font-size: 2.2rem;
+    }
+
+    .navbar-collapse {
+        padding: 0.75rem 0 1rem;
+        border-top: 1px solid #eef1f5;
+        margin-top: 0.75rem;
+    }
+
+    .navbar-nav .nav-link {
+        padding: 0.75rem 0.5rem;
+        margin: 0;
+        border-radius: 8px;
+    }
+
+    .navbar-nav .nav-link:hover,
+    .navbar-nav .nav-link.active {
+        background-color: rgba(13, 110, 253, 0.08);
+    }
+
+    .navbar-nav .nav-item.ms-lg-3 {
+        margin-left: 0 !important;
+        margin-top: 0.5rem;
+    }
+
+    .navbar-nav .btn {
+        width: 100%;
+    }
+
+    .inventory-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1.15rem;
+    }
+
+    .inventory-filter-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .filter-sidebar {
+        margin-bottom: 0.5rem;
+        padding: 1.15rem;
+    }
+
+    .vehicle-gallery img {
+        max-height: 380px;
+    }
+
+    .vehicle-price {
+        font-size: 1.7rem;
+    }
+
+    .mobile-cta-bar {
+        display: block;
+    }
+
+    body.has-mobile-cta {
+        padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    }
+
+    .top-bar .top-bar-mobile {
+        display: flex !important;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .top-bar .top-bar-desktop {
+        display: none !important;
+    }
+
+    /* Keep inventory filters visible on tablet/desktop even if collapse is closed */
+    #inventoryFilters.collapse:not(.show) {
+        display: none;
+    }
+}
+
+@media (min-width: 992px) {
+    #inventoryFilters.collapse {
+        display: block !important;
+        height: auto !important;
+        visibility: visible !important;
     }
 }
 
 @media (max-width: 767.98px) {
+    .top-bar {
+        font-size: 0.78rem;
+    }
+
+    .navbar {
+        padding-top: 0.65rem;
+        padding-bottom: 0.65rem;
+    }
+
+    .navbar-brand {
+        font-size: 1.2rem;
+    }
+
+    .navbar-brand img {
+        width: 34px;
+        height: 34px;
+    }
+
     .hero-section {
-        min-height: 500px;
+        min-height: auto;
+        padding: 2.5rem 0 2.75rem;
+        text-align: center;
     }
+
     .hero-section h1 {
-        font-size: 1.9rem;
+        font-size: 1.75rem;
+        line-height: 1.2;
     }
+
+    .hero-section p {
+        font-size: 1rem;
+    }
+
+    .hero-section .d-flex.flex-wrap {
+        justify-content: center;
+    }
+
+    .hero-section .btn-lg,
+    .cta-section .btn-lg {
+        width: 100%;
+    }
+
+    .search-box {
+        padding: 1.15rem;
+        text-align: left;
+    }
+
     .section-padding {
-        padding: 3rem 0;
+        padding: 2.5rem 0;
     }
+
+    .section-title {
+        font-size: 1.55rem;
+    }
+
+    .section-subtitle {
+        font-size: 1rem;
+    }
+
+    .cta-section {
+        padding: 2.75rem 0;
+    }
+
+    .inventory-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .vehicle-card .card-img-wrapper {
+        height: 210px;
+    }
+
+    .vehicle-card .card-body {
+        padding: 1rem !important;
+    }
+
+    .vehicle-card .card-title {
+        font-size: 1.05rem;
+    }
+
+    .vehicle-card .price {
+        font-size: 1.2rem;
+    }
+
+    .vehicle-gallery {
+        border-radius: 10px;
+    }
+
+    .vehicle-gallery img {
+        max-height: 280px;
+        min-height: 220px;
+    }
+
+    .thumbnail-list img {
+        width: 72px;
+        height: 54px;
+    }
+
+    .vehicle-price {
+        font-size: 1.55rem;
+    }
+
+    .breadcrumb {
+        font-size: 0.85rem;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .breadcrumb-item + .breadcrumb-item {
+        padding-left: 0.4rem;
+    }
+
+    .breadcrumb-item + .breadcrumb-item::before {
+        padding-right: 0.4rem;
+    }
+
+    .card.p-4,
+    .contact-info-card,
+    .login-card {
+        padding: 1.15rem !important;
+    }
+
+    .stat-card {
+        padding: 1.1rem;
+    }
+
+    .stat-card .stat-value {
+        font-size: 1.55rem;
+    }
+
+    .admin-content {
+        padding: 1rem;
+    }
+
+    .admin-content .table-responsive {
+        margin-left: -0.25rem;
+        margin-right: -0.25rem;
+    }
+
+    .admin-content .table {
+        font-size: 0.9rem;
+    }
+
+    .vehicle-thumb {
+        width: 56px;
+        height: 42px;
+    }
+
+    .footer {
+        text-align: center;
+    }
+
+    .footer .d-flex.gap-3 {
+        justify-content: center;
+    }
+
+    .footer-links {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.35rem 1rem;
+        text-align: left;
+        max-width: 320px;
+        margin: 0 auto;
+    }
+
+    .pagination {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .pagination .page-link {
+        padding: 0.45rem 0.7rem;
+    }
+
+    /* Stack vehicle quick stats cleanly */
+    .vehicle-quick-stats .col-4 {
+        border-right: 0 !important;
+    }
+
+    .vehicle-quick-stats .col-4:not(:last-child) {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 0.65rem;
+        margin-bottom: 0.65rem;
+
+    .map-embed {
+        height: 260px;
+    }
+    }
+
+    h1.fw-bold,
+    h1.h2 {
+        font-size: 1.55rem;
+    }
+
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .hero-section h1 {
+        font-size: 1.55rem;
+    }
+
+    .btn-lg {
+        font-size: 1rem;
+        padding: 0.7rem 1rem;
+    }
+
+    .mobile-cta-bar .row {
+        --bs-gutter-x: 0.5rem;
+    }
+
+    .mobile-cta-bar .btn span.label-full {
+        display: none;
+    }
+
+    .mobile-cta-bar .btn span.label-short {
+        display: inline;
+    }
+}
+
+@media (min-width: 576px) {
+    .mobile-cta-bar .btn span.label-short {
+        display: none;
+    }
+}
+
+/* Prevent horizontal overflow from wide content */
+html,
+body {
+    overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
 }
