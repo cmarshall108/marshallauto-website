@@ -2,7 +2,7 @@ import os
 from functools import wraps
 
 from flask import (
-    Blueprint, abort, current_app, flash, redirect, render_template,
+    Blueprint, abort, current_app, flash, jsonify, redirect, render_template,
     request, send_from_directory, url_for,
 )
 from flask_login import current_user, login_required, login_user, logout_user
@@ -22,6 +22,7 @@ from app.utils import (
     client_ip, is_safe_redirect, rate_limit_exceeded,
     save_uploaded_image, save_uploaded_pdf,
 )
+from app.vehicle_catalog import build_vehicle_catalog, suggest_field
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 
@@ -282,6 +283,51 @@ def vehicle_image_delete(id):
     return redirect(url_for('admin.vehicle_edit', id=vehicle_id))
 
 
+@admin_bp.route('/api/vehicle-catalog')
+@login_required
+def vehicle_catalog_api():
+    """Full suggestion catalog for the vehicle add/edit form (static + inventory)."""
+    return jsonify(_vehicle_suggestion_catalog())
+
+
+@admin_bp.route('/api/vehicle-suggestions')
+@login_required
+def vehicle_suggestions_api():
+    """Filtered typeahead values for a single vehicle form field."""
+    field = (request.args.get('field') or '').strip().lower()
+    query = (request.args.get('q') or '').strip()
+    make = (request.args.get('make') or '').strip()
+    model = (request.args.get('model') or '').strip()
+    try:
+        limit = int(request.args.get('limit', 25))
+    except (TypeError, ValueError):
+        limit = 25
+
+    allowed = {
+        'make', 'model', 'trim', 'body_style', 'transmission', 'drivetrain',
+        'fuel_type', 'engine', 'exterior_color', 'interior_color', 'features',
+    }
+    if field not in allowed:
+        return jsonify({'field': field, 'suggestions': []}), 400
+
+    catalog = _vehicle_suggestion_catalog()
+    suggestions = suggest_field(
+        catalog,
+        field=field,
+        query=query,
+        make=make,
+        model=model,
+        limit=limit,
+    )
+    return jsonify({
+        'field': field,
+        'q': query,
+        'make': make,
+        'model': model,
+        'suggestions': suggestions,
+    })
+
+
 # ------------------------------ SERVICE RECORDS ------------------------------
 
 @admin_bp.route('/service-records')
@@ -507,6 +553,65 @@ def settings():
 
 
 # ------------------------------ HELPERS ------------------------------
+
+def _vehicle_suggestion_catalog():
+    """Build make/model/trim/etc suggestions from catalog + existing inventory."""
+    def distinct_col(column):
+        rows = (
+            db.session.query(column)
+            .filter(column.isnot(None), column != '')
+            .distinct()
+            .all()
+        )
+        return [r[0] for r in rows if r and r[0]]
+
+    feature_values = []
+    for (raw,) in db.session.query(Vehicle.features).filter(
+        Vehicle.features.isnot(None), Vehicle.features != ''
+    ).all():
+        for part in str(raw).split(','):
+            part = part.strip()
+            if part:
+                feature_values.append(part)
+
+    make_model_pairs = [
+        (m, mo)
+        for m, mo in db.session.query(Vehicle.make, Vehicle.model)
+        .filter(Vehicle.make.isnot(None), Vehicle.model.isnot(None))
+        .distinct()
+        .all()
+        if m and mo
+    ]
+    make_model_trim_triples = [
+        (m, mo, t)
+        for m, mo, t in db.session.query(Vehicle.make, Vehicle.model, Vehicle.trim)
+        .filter(
+            Vehicle.make.isnot(None),
+            Vehicle.model.isnot(None),
+            Vehicle.trim.isnot(None),
+            Vehicle.trim != '',
+        )
+        .distinct()
+        .all()
+        if m and mo and t
+    ]
+
+    return build_vehicle_catalog({
+        'make': distinct_col(Vehicle.make),
+        'model': distinct_col(Vehicle.model),
+        'trim': distinct_col(Vehicle.trim),
+        'body_style': distinct_col(Vehicle.body_style),
+        'transmission': distinct_col(Vehicle.transmission),
+        'drivetrain': distinct_col(Vehicle.drivetrain),
+        'fuel_type': distinct_col(Vehicle.fuel_type),
+        'engine': distinct_col(Vehicle.engine),
+        'exterior_color': distinct_col(Vehicle.exterior_color),
+        'interior_color': distinct_col(Vehicle.interior_color),
+        'features': feature_values,
+        'make_model_pairs': make_model_pairs,
+        'make_model_trim_triples': make_model_trim_triples,
+    })
+
 
 def _vehicle_from_form(form):
     return Vehicle(

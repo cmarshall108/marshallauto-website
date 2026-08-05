@@ -8,111 +8,117 @@
     <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
 </div>
 
-<form method="POST" enctype="multipart/form-data" class="card border-0 shadow p-4">
+<form method="POST" enctype="multipart/form-data" class="card border-0 shadow p-4" id="vehicle-form"
+      data-catalog-url="{{ url_for('admin.vehicle_catalog_api') }}">
     {{ form.hidden_tag() }}
+    <div class="alert alert-light border small mb-3">
+        <i class="bi bi-lightning-charge text-primary me-1"></i>
+        Start typing in <strong>Make</strong>, <strong>Model</strong>, <strong>Trim</strong>, colors, body style, fuel, transmission, engine, or features for suggestions.
+        Values cascade (make → model → trim) and anything you type is still accepted.
+    </div>
     <div class="row g-3">
         <!-- Identification -->
         <div class="col-md-3">
-            <label class="form-label">Year *</label>
-            {{ form.year(class="form-control") }}
+            <label class="form-label" for="year">Year *</label>
+            {{ form.year(class="form-control", id="year", inputmode="numeric") }}
             {% if form.year.errors %}<div class="text-danger small">{{ form.year.errors[0] }}</div>{% endif %}
         </div>
         <div class="col-md-3">
-            <label class="form-label">Make *</label>
-            {{ form.make(class="form-control") }}
+            <label class="form-label" for="make">Make *</label>
+            {{ form.make(class="form-control", id="make", placeholder="e.g. Toyota", autocomplete="off") }}
             {% if form.make.errors %}<div class="text-danger small">{{ form.make.errors[0] }}</div>{% endif %}
         </div>
         <div class="col-md-3">
-            <label class="form-label">Model *</label>
-            {{ form.model(class="form-control") }}
+            <label class="form-label" for="model">Model *</label>
+            {{ form.model(class="form-control", id="model", placeholder="e.g. Camry", autocomplete="off") }}
             {% if form.model.errors %}<div class="text-danger small">{{ form.model.errors[0] }}</div>{% endif %}
         </div>
         <div class="col-md-3">
-            <label class="form-label">Trim</label>
-            {{ form.trim(class="form-control") }}
+            <label class="form-label" for="trim">Trim</label>
+            {{ form.trim(class="form-control", id="trim", placeholder="e.g. XLE", autocomplete="off") }}
         </div>
 
         <div class="col-md-4">
-            <label class="form-label">VIN</label>
-            {{ form.vin(class="form-control") }}
+            <label class="form-label" for="vin">VIN</label>
+            {{ form.vin(class="form-control", id="vin", maxlength="17", autocomplete="off") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Stock Number</label>
-            {{ form.stock_number(class="form-control") }}
+            <label class="form-label" for="stock_number">Stock Number</label>
+            {{ form.stock_number(class="form-control", id="stock_number", autocomplete="off") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Status</label>
-            {{ form.status(class="form-select") }}
+            <label class="form-label" for="status">Status</label>
+            {{ form.status(class="form-select", id="status") }}
         </div>
 
         <!-- Pricing -->
         <div class="col-md-4">
-            <label class="form-label">Price *</label>
-            {{ form.price(class="form-control", step="0.01") }}
+            <label class="form-label" for="price">Price *</label>
+            {{ form.price(class="form-control", id="price", step="0.01") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Sale Price (optional)</label>
-            {{ form.sale_price(class="form-control", step="0.01") }}
+            <label class="form-label" for="sale_price">Sale Price (optional)</label>
+            {{ form.sale_price(class="form-control", id="sale_price", step="0.01") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Mileage *</label>
-            {{ form.mileage(class="form-control") }}
+            <label class="form-label" for="mileage">Mileage *</label>
+            {{ form.mileage(class="form-control", id="mileage") }}
         </div>
 
         <div class="col-md-4">
-            <label class="form-label">Condition</label>
-            {{ form.condition(class="form-select") }}
+            <label class="form-label" for="condition">Condition</label>
+            {{ form.condition(class="form-select", id="condition") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Title Status</label>
-            {{ form.title_status(class="form-select") }}
+            <label class="form-label" for="title_status">Title Status</label>
+            {{ form.title_status(class="form-select", id="title_status") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Body Style</label>
-            {{ form.body_style(class="form-control") }}
+            <label class="form-label" for="body_style">Body Style</label>
+            {{ form.body_style(class="form-control", id="body_style", placeholder="e.g. SUV", autocomplete="off") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">Drivetrain</label>
-            {{ form.drivetrain(class="form-select") }}
+            <label class="form-label" for="drivetrain">Drivetrain</label>
+            {{ form.drivetrain(class="form-select", id="drivetrain") }}
         </div>
 
         <div class="col-md-3">
-            <label class="form-label">Exterior Color</label>
-            {{ form.exterior_color(class="form-control") }}
+            <label class="form-label" for="exterior_color">Exterior Color</label>
+            {{ form.exterior_color(class="form-control", id="exterior_color", placeholder="e.g. Pearl White", autocomplete="off") }}
         </div>
         <div class="col-md-3">
-            <label class="form-label">Interior Color</label>
-            {{ form.interior_color(class="form-control") }}
+            <label class="form-label" for="interior_color">Interior Color</label>
+            {{ form.interior_color(class="form-control", id="interior_color", placeholder="e.g. Black", autocomplete="off") }}
         </div>
         <div class="col-md-3">
-            <label class="form-label">Fuel Type</label>
-            {{ form.fuel_type(class="form-control") }}
+            <label class="form-label" for="fuel_type">Fuel Type</label>
+            {{ form.fuel_type(class="form-control", id="fuel_type", placeholder="e.g. Gasoline", autocomplete="off") }}
         </div>
         <div class="col-md-3">
-            <label class="form-label">Transmission</label>
-            {{ form.transmission(class="form-control") }}
+            <label class="form-label" for="transmission">Transmission</label>
+            {{ form.transmission(class="form-control", id="transmission", placeholder="e.g. 8-Speed Automatic", autocomplete="off") }}
         </div>
 
         <div class="col-md-4">
-            <label class="form-label">Engine</label>
-            {{ form.engine(class="form-control") }}
+            <label class="form-label" for="engine">Engine</label>
+            {{ form.engine(class="form-control", id="engine", placeholder="e.g. 2.5L I4", autocomplete="off") }}
         </div>
         <div class="col-md-2">
-            <label class="form-label">MPG City</label>
-            {{ form.mpg_city(class="form-control") }}
+            <label class="form-label" for="mpg_city">MPG City</label>
+            {{ form.mpg_city(class="form-control", id="mpg_city") }}
         </div>
         <div class="col-md-2">
-            <label class="form-label">MPG Hwy</label>
-            {{ form.mpg_highway(class="form-control") }}
+            <label class="form-label" for="mpg_highway">MPG Hwy</label>
+            {{ form.mpg_highway(class="form-control", id="mpg_highway") }}
         </div>
 
         <div class="col-12">
-            <label class="form-label">Description</label>
-            {{ form.description(class="form-control", rows="4") }}
+            <label class="form-label" for="description">Description</label>
+            {{ form.description(class="form-control", id="description", rows="4") }}
         </div>
         <div class="col-12">
-            <label class="form-label">Features (comma-separated)</label>
-            {{ form.features(class="form-control", rows="3", placeholder="e.g. Leather Seats, Sunroof, Backup Camera") }}
+            <label class="form-label" for="features">Features (comma-separated)</label>
+            {{ form.features(class="form-control", id="features", rows="3", placeholder="e.g. Leather Seats, Sunroof, Backup Camera", autocomplete="off") }}
         </div>
 
         <!-- SEO -->
@@ -168,4 +174,8 @@
         <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
     </div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin-vehicle-form.js') }}"></script>
 {% endblock %}
