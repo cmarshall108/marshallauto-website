@@ -32,30 +32,55 @@
             <div class="col-lg-7">
                 {% set gallery_images = vehicle.ordered_images() %}
                 {% set primary = vehicle.primary_image() %}
-                <div class="vehicle-gallery mb-3{% if gallery_images|length > 1 %} has-nav{% endif %}"
+                {% set gallery_count = gallery_images|length %}
+                <div class="vehicle-gallery mb-3{% if gallery_count > 1 %} has-nav{% endif %}"
                      id="vehicle-gallery"
-                     {% if gallery_images|length > 1 %}tabindex="0" role="region" aria-roledescription="carousel" aria-label="{{ vehicle.title }} photo gallery"{% endif %}>
-                    <img id="main-gallery-image"
-                         src="{{ vehicle.primary_image_url() }}"
-                         alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} {{ vehicle.exterior_color or '' }} for sale in {{ business_city }}, {{ business_state }} at {{ business_name }}"
-                         width="{{ primary.width if primary and primary.width else 800 }}"
-                         height="{{ primary.height if primary and primary.height else 600 }}"
-                         fetchpriority="high"
-                         draggable="false">
-                    {% if gallery_images|length > 1 %}
+                     {% if gallery_count > 1 %}
+                     tabindex="0"
+                     role="region"
+                     aria-roledescription="carousel"
+                     aria-label="{{ vehicle.title }} photo gallery. Swipe left or right to change photos."
+                     data-gallery-count="{{ gallery_count }}"
+                     {% endif %}>
+                    <div class="gallery-stage" id="gallery-stage">
+                        <img id="main-gallery-image"
+                             src="{{ vehicle.primary_image_url() }}"
+                             alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} {{ vehicle.exterior_color or '' }} for sale in {{ business_city }}, {{ business_state }} at {{ business_name }}"
+                             width="{{ primary.width if primary and primary.width else 800 }}"
+                             height="{{ primary.height if primary and primary.height else 600 }}"
+                             fetchpriority="high"
+                             draggable="false">
+                    </div>
+                    {% if gallery_count > 1 %}
                     <button type="button" class="gallery-nav gallery-nav-prev" id="gallery-prev" aria-label="Previous photo">
                         <i class="bi bi-chevron-left" aria-hidden="true"></i>
                     </button>
                     <button type="button" class="gallery-nav gallery-nav-next" id="gallery-next" aria-label="Next photo">
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                     </button>
-                    <div class="gallery-counter" id="gallery-counter" aria-live="polite">1 / {{ gallery_images|length }}</div>
+                    <div class="gallery-counter" id="gallery-counter" aria-live="polite">1 / {{ gallery_count }}</div>
+                    <div class="gallery-swipe-hint d-lg-none" id="gallery-swipe-hint" aria-hidden="true">
+                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Swipe for more photos
+                    </div>
                     {% endif %}
                 </div>
-                {% if gallery_images|length > 1 %}
+                {% if gallery_count > 1 %}
                 <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable" role="list" aria-label="Photo thumbnails">
                     {% for image in gallery_images %}
-                    <img src="{{ image.url }}" data-full="{{ image.url }}" class="{% if loop.first %}active{% endif %}" alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} - view {{ loop.index }} at {{ business_name }} in {{ business_city }}, {{ business_state }}" width="100" height="75" loading="lazy" decoding="async" role="listitem" tabindex="0" data-index="{{ loop.index0 }}">
+                    <button type="button"
+                            class="thumbnail-btn{% if loop.first %} active{% endif %}"
+                            data-full="{{ image.url }}"
+                            data-index="{{ loop.index0 }}"
+                            aria-label="Show photo {{ loop.index }} of {{ gallery_count }}"
+                            aria-current="{% if loop.first %}true{% else %}false{% endif %}">
+                        <img src="{{ image.url }}"
+                             alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} - view {{ loop.index }} at {{ business_name }} in {{ business_city }}, {{ business_state }}"
+                             width="100"
+                             height="75"
+                             loading="lazy"
+                             decoding="async"
+                             draggable="false">
+                    </button>
                     {% endfor %}
                 </div>
                 {% endif %}

@@ -283,6 +283,7 @@ a:hover {
     background: #0f172a;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .vehicle-gallery:focus {
@@ -290,34 +291,64 @@ a:hover {
     outline-offset: 2px;
 }
 
+.vehicle-gallery:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.gallery-stage {
+    width: 100%;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
 .vehicle-gallery img#main-gallery-image {
     width: 100%;
     max-height: 500px;
     object-fit: cover;
     display: block;
-    transition: opacity 0.15s ease;
+    -webkit-user-drag: none;
+    user-select: none;
+    will-change: transform;
+    transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .vehicle-gallery.has-nav {
     cursor: grab;
+}
+
+.vehicle-gallery.has-nav .gallery-stage {
+    /* Allow vertical page scroll; JS locks axis once a horizontal swipe is detected */
     touch-action: pan-y;
+    cursor: inherit;
 }
 
 .vehicle-gallery.has-nav.is-dragging {
     cursor: grabbing;
 }
 
-.vehicle-gallery.has-nav img#main-gallery-image {
-    pointer-events: none;
+.vehicle-gallery.has-nav.is-dragging .gallery-stage,
+.vehicle-gallery.has-nav.is-swiping-x .gallery-stage {
+    touch-action: none;
+}
+
+.vehicle-gallery.has-nav.is-dragging img#main-gallery-image,
+.vehicle-gallery.has-nav.is-swiping-x img#main-gallery-image {
+    transition: none;
+}
+
+.vehicle-gallery.has-nav.is-changing img#main-gallery-image {
+    opacity: 0.72;
 }
 
 .gallery-nav {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    z-index: 2;
+    z-index: 3;
     width: 44px;
     height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     border: 0;
     border-radius: 50%;
     background: rgba(15, 23, 42, 0.72);
@@ -327,6 +358,8 @@ a:hover {
     justify-content: center;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .gallery-nav:hover,
@@ -358,8 +391,8 @@ a:hover {
     position: absolute;
     right: 0.75rem;
     bottom: 0.75rem;
-    z-index: 2;
-    padding: 0.3rem 0.65rem;
+    z-index: 3;
+    padding: 0.35rem 0.7rem;
     border-radius: 999px;
     background: rgba(15, 23, 42, 0.72);
     color: #fff;
@@ -369,21 +402,64 @@ a:hover {
     pointer-events: none;
 }
 
-.thumbnail-list img {
-    width: 80px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 8px;
-    cursor: pointer;
-    border: 2px solid transparent;
+.gallery-swipe-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 0.75rem;
+    transform: translateX(-50%);
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    pointer-events: none;
+    white-space: nowrap;
+    animation: gallery-hint-fade 4.5s ease forwards;
 }
 
-.thumbnail-list img:focus-visible {
+.gallery-swipe-hint.is-hidden {
+    display: none;
+}
+
+@keyframes gallery-hint-fade {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; visibility: hidden; }
+}
+
+.thumbnail-list .thumbnail-btn {
+    flex: 0 0 auto;
+    width: 80px;
+    height: 60px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    background: transparent;
+    cursor: pointer;
+    line-height: 0;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.thumbnail-list .thumbnail-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+}
+
+.thumbnail-list .thumbnail-btn:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
 
-.thumbnail-list img.active {
+.thumbnail-list .thumbnail-btn.active {
     border-color: var(--primary);
 }
 
@@ -649,10 +725,16 @@ a:hover {
     flex-wrap: nowrap !important;
     overflow-x: auto;
     padding-bottom: 0.35rem;
+    -ms-overflow-style: none;
 }
 
+.thumbnail-list.is-scrollable::-webkit-scrollbar {
+    display: none;
+}
+
+.thumbnail-list.is-scrollable .thumbnail-btn,
 .thumbnail-list.is-scrollable img {
-    flex: 0 0 auto;#main-gallery-image
+    flex: 0 0 auto;
 }
 
 /* Touch-friendly form controls */
@@ -661,8 +743,16 @@ a:hover {
     .nav-link,
     .page-link,
     .form-control,
-    .form-select {
+    .form-select,
+    .gallery-nav,
+    .thumbnail-list .thumbnail-btn {
         min-height: 44px;
+    }
+
+    .gallery-nav {
+        width: 48px;
+        min-width: 48px;
+        height: 48px;
     }
 
     .vehicle-card:hover {
@@ -739,8 +829,13 @@ a:hover {
         padding: 1.15rem;
     }
 
-    .vehicle-gallery img {
+    .vehicle-gallery img#main-gallery-image {
         max-height: 380px;
+    }
+
+    .gallery-nav {
+        width: 48px;
+        height: 48px;
     }
 
     .vehicle-price {
@@ -871,21 +966,23 @@ a:hover {
     }
 
     .vehicle-gallery img#main-gallery-image {
-        max-height: 280px;
+        max-height: min(62vw, 320px);
         min-height: 220px;
+        aspect-ratio: 4 / 3;
     }
 
     .gallery-nav {
-        width: 40px;
-        height: 40px;
+        width: 46px;
+        height: 46px;
+        background: rgba(15, 23, 42, 0.78);
     }
 
     .gallery-nav-prev {
-        left: 0.5rem;
+        left: 0.45rem;
     }
 
     .gallery-nav-next {
-        right: 0.5rem;
+        right: 0.45rem;
     }
 
     .gallery-counter {
@@ -894,9 +991,27 @@ a:hover {
         font-size: 0.75rem;
     }
 
-    .thumbnail-list img {
-        width: 72px;
-        height: 54px;
+    .gallery-swipe-hint {
+        bottom: 2.55rem;
+        font-size: 0.72rem;
+    }
+
+    .thumbnail-list .thumbnail-btn {
+        width: 76px;
+        height: 58px;
+        min-width: 76px;
+        min-height: 58px;
+    }
+
+    .thumbnail-list.is-scrollable {
+        margin-inline: -0.15rem;
+        padding-inline: 0.15rem;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+    }
+
+    .thumbnail-list.is-scrollable .thumbnail-btn {
+        scroll-snap-align: start;
     }
 
     .vehicle-price {
