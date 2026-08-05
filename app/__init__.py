@@ -164,6 +164,22 @@ def _ensure_schema_columns(app):
                     conn.execute(text('ALTER TABLE reviews ADD COLUMN source VARCHAR(64)'))
                 if 'is_featured' not in cols:
                     conn.execute(text('ALTER TABLE reviews ADD COLUMN is_featured BOOLEAN DEFAULT 0 NOT NULL'))
+        if 'leads' in tables:
+            cols = {c['name'] for c in inspector.get_columns('leads')}
+            with db.engine.begin() as conn:
+                for col, ddl in [
+                    ('utm_source', 'ALTER TABLE leads ADD COLUMN utm_source VARCHAR(128)'),
+                    ('utm_medium', 'ALTER TABLE leads ADD COLUMN utm_medium VARCHAR(128)'),
+                    ('utm_campaign', 'ALTER TABLE leads ADD COLUMN utm_campaign VARCHAR(128)'),
+                    ('utm_term', 'ALTER TABLE leads ADD COLUMN utm_term VARCHAR(128)'),
+                    ('utm_content', 'ALTER TABLE leads ADD COLUMN utm_content VARCHAR(128)'),
+                    ('gclid', 'ALTER TABLE leads ADD COLUMN gclid VARCHAR(255)'),
+                    ('fbclid', 'ALTER TABLE leads ADD COLUMN fbclid VARCHAR(255)'),
+                    ('landing_path', 'ALTER TABLE leads ADD COLUMN landing_path VARCHAR(512)'),
+                    ('referrer', 'ALTER TABLE leads ADD COLUMN referrer VARCHAR(512)'),
+                ]:
+                    if col not in cols:
+                        conn.execute(text(ddl))
     except Exception as e:
         app.logger.warning('Schema ensure skipped: %s', e)
 
@@ -191,6 +207,8 @@ def _ensure_default_settings():
         'home_hero_subtitle': 'Browse our hand-picked inventory of quality used cars, trucks, and SUVs in Sanford, NC. Financing available.',
         'google_search_console': '',
         'google_analytics_id': '',
+        'google_tag_id': '',
+        'facebook_pixel_id': '',
         'facebook_app_id': '',
         'twitter_handle': '',
         'instagram_url': '',

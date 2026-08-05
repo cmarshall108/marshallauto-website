@@ -103,6 +103,16 @@ class SiteSettingForm(FlaskForm):
         description='Paste the full meta tag or just the content token.',
     )
     google_analytics_id = StringField('Google Analytics 4 Measurement ID', validators=[Optional(), Length(max=32)])
+    google_tag_id = StringField(
+        'Google Tag Manager Container ID',
+        validators=[Optional(), Length(max=32)],
+        description='e.g. GTM-XXXXXXX. When set, GTM loads instead of the direct GA4 snippet.',
+    )
+    facebook_pixel_id = StringField(
+        'Facebook / Meta Pixel ID',
+        validators=[Optional(), Length(max=64)],
+        description='Numeric Pixel ID for Meta ads conversion tracking.',
+    )
     facebook_app_id = StringField('Facebook App ID', validators=[Optional(), Length(max=64)])
     twitter_handle = StringField('Twitter / X Handle', validators=[Optional(), Length(max=64)])
     instagram_url = StringField('Instagram URL', validators=[Optional(), Length(max=512)])

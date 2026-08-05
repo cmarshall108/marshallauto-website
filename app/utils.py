@@ -357,13 +357,24 @@ def _service_areas_schema():
 
 def structured_data_local_business():
     social = _business_social_links()
+    site = current_app.config['SITE_URL'].rstrip('/')
+    logo_url = f"{site}/static/images/logo-icon.png"
     data = {
         "@context": "https://schema.org",
         "@type": "AutoDealer",
+        "@id": f"{site}/#dealership",
         "name": current_app.config['BUSINESS_NAME'],
-        "url": current_app.config['SITE_URL'],
-        "logo": f"{current_app.config['SITE_URL']}/static/images/logo-icon.png",
-        "image": f"{current_app.config['SITE_URL']}/static/images/og-default.jpg",
+        "url": site,
+        "logo": {
+            "@type": "ImageObject",
+            "url": logo_url,
+            "width": 512,
+            "height": 512,
+        },
+        "image": [
+            f"{site}/static/images/og-default.jpg",
+            logo_url,
+        ],
         "telephone": current_app.config['BUSINESS_PHONE'],
         "email": current_app.config['BUSINESS_EMAIL'],
         "address": {
@@ -431,28 +442,79 @@ def aggregate_rating_data():
 
 
 def structured_data_website():
+    site = current_app.config['SITE_URL'].rstrip('/')
     return {
         "@context": "https://schema.org",
         "@type": "WebSite",
+        "@id": f"{site}/#website",
         "name": current_app.config['BUSINESS_NAME'],
-        "url": current_app.config['SITE_URL'],
+        "url": site,
+        "inLanguage": "en-US",
         "potentialAction": {
             "@type": "SearchAction",
             "target": {
                 "@type": "EntryPoint",
-                "urlTemplate": f"{current_app.config['SITE_URL']}/inventory?q={{search_term_string}}"
+                "urlTemplate": f"{site}/inventory?q={{search_term_string}}"
             },
             "query-input": "required name=search_term_string"
         },
         "publisher": {
             "@type": "AutoDealer",
+            "@id": f"{site}/#dealership",
             "name": current_app.config['BUSINESS_NAME'],
             "logo": {
                 "@type": "ImageObject",
-                "url": f"{current_app.config['SITE_URL']}/static/images/logo-icon.png"
+                "url": f"{site}/static/images/logo-icon.png",
+                "width": 512,
+                "height": 512,
             }
         }
     }
+
+
+def structured_data_item_list(vehicles, name, list_url=None):
+    """JSON-LD ItemList for inventory / featured vehicle grids."""
+    site = current_app.config['SITE_URL'].rstrip('/')
+    elements = []
+    for idx, vehicle in enumerate(vehicles or [], start=1):
+        img = vehicle.primary_image()
+        image_url = img.absolute_url if img else f"{site}/static/images/vehicle-placeholder.jpg"
+        elements.append({
+            "@type": "ListItem",
+            "position": idx,
+            "url": f"{site}/inventory/{vehicle.slug}",
+            "item": {
+                "@type": "Car",
+                "name": vehicle.title,
+                "url": f"{site}/inventory/{vehicle.slug}",
+                "image": image_url,
+                "brand": {"@type": "Brand", "name": vehicle.make},
+                "model": vehicle.model,
+                "vehicleModelDate": str(vehicle.year),
+                "mileageFromOdometer": {
+                    "@type": "QuantitativeValue",
+                    "value": vehicle.mileage,
+                    "unitCode": "SMI",
+                },
+                "offers": {
+                    "@type": "Offer",
+                    "priceCurrency": "USD",
+                    "price": str(vehicle.display_price),
+                    "availability": "https://schema.org/InStock",
+                    "url": f"{site}/inventory/{vehicle.slug}",
+                },
+            },
+        })
+    data = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": name,
+        "numberOfItems": len(elements),
+        "itemListElement": elements,
+    }
+    if list_url:
+        data['url'] = list_url
+    return data
 
 
 def structured_data_breadcrumb(items):

@@ -39,13 +39,30 @@
             {{ form.google_search_console(class="form-control", placeholder="<meta name='google-site-verification' content='...'>") }}
             <div class="form-text">Paste the full meta tag provided by Google Search Console.</div>
         </div>
-        <div class="col-md-6">
+        <div class="col-12">
+            <hr class="my-2">
+            <h5 class="fw-bold mb-1">Analytics &amp; Tracking</h5>
+            <p class="text-muted small mb-3">Prefer GTM for production. Direct GA4 loads only when GTM is empty. Values here override <code>.env</code>.</p>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Google Tag Manager ID</label>
+            {{ form.google_tag_id(class="form-control", placeholder="GTM-XXXXXXX") }}
+            {% if form.google_tag_id.description %}<div class="form-text">{{ form.google_tag_id.description }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
             <label class="form-label">Google Analytics 4 Measurement ID</label>
             {{ form.google_analytics_id(class="form-control", placeholder="G-XXXXXXXXXX") }}
+            <div class="form-text">Used when GTM is not set (fallback snippet).</div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Facebook / Meta Pixel ID</label>
+            {{ form.facebook_pixel_id(class="form-control", placeholder="1234567890") }}
+            {% if form.facebook_pixel_id.description %}<div class="form-text">{{ form.facebook_pixel_id.description }}</div>{% endif %}
         </div>
         <div class="col-md-6">
             <label class="form-label">Facebook App ID</label>
             {{ form.facebook_app_id(class="form-control") }}
+            <div class="form-text">Used for Open Graph <code>fb:app_id</code> only.</div>
         </div>
         <div class="col-md-6">
             <label class="form-label">Twitter / X Handle</label>

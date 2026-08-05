@@ -6,7 +6,7 @@
         <loc>{{ page.loc }}</loc>
         {% if page.lastmod %}<lastmod>{{ page.lastmod }}</lastmod>{% endif %}
         <priority>{{ page.priority }}</priority>
-        <changefreq>weekly</changefreq>
+        <changefreq>{{ page.changefreq or 'weekly' }}</changefreq>
         {% for img in page.images or [] %}
         <image:image>
             <image:loc>{{ img.loc }}</image:loc>

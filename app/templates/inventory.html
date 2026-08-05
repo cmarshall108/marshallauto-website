@@ -4,6 +4,7 @@
 
 {% block meta_title %}{{ meta_title }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
+{% block robots %}{{ robots_content or 'index, follow' }}{% endblock %}
 
 {% block pagination_rels %}
 {% if page_links.prev %}<link rel="prev" href="{{ page_links.prev }}">{% endif %}
@@ -208,4 +209,36 @@
         </div>
     </div>
 </section>
+
+{% if landing_faqs %}
+<section class="section-padding bg-light-brand">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-4 text-center">Frequently Asked Questions</h2>
+                <div class="accordion" id="landingFaqAccordion">
+                    {% for question, answer in landing_faqs %}
+                    <div class="accordion-item">
+                        <h3 class="accordion-header" id="landing-faq-h-{{ loop.index }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#landing-faq-{{ loop.index }}"
+                                    aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                                    aria-controls="landing-faq-{{ loop.index }}">
+                                {{ question }}
+                            </button>
+                        </h3>
+                        <div id="landing-faq-{{ loop.index }}"
+                             class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                             aria-labelledby="landing-faq-h-{{ loop.index }}"
+                             data-bs-parent="#landingFaqAccordion">
+                            <div class="accordion-body text-muted">{{ answer }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

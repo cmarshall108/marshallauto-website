@@ -15,7 +15,8 @@ from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_price,
     notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
     structured_data_breadcrumb, structured_data_faq, structured_data_how_to,
-    structured_data_local_business, structured_data_vehicle, structured_data_website,
+    structured_data_item_list, structured_data_local_business,
+    structured_data_vehicle, structured_data_website,
 )
 
 main = Blueprint('main', __name__)
@@ -127,7 +128,8 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
                       min_price=None, max_price=None, max_mileage=None, search=None,
                       sort='newest', landing_h1=None, landing_intro=None,
                       landing_meta_title=None, landing_meta_description=None,
-                      landing_breadcrumb=None, landing_canonical=None):
+                      landing_breadcrumb=None, landing_canonical=None,
+                      landing_faqs=None):
     """Shared inventory rendering helper."""
     query = _build_inventory_query(
         make, model, body_style, title_status,
@@ -183,6 +185,33 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
     if not landing_canonical and has_filters and request.endpoint == 'main.inventory':
         canonical_override = url_for('main.inventory', _external=True)
 
+    robots_content = 'index, follow'
+    if page and page > 1:
+        if has_filters and request.endpoint == 'main.inventory' and not landing_canonical:
+            robots_content = 'noindex, follow'
+
+    list_name = landing_h1 or f"Used Vehicles at {biz}"
+    list_url = landing_canonical or url_for('main.inventory', _external=True)
+    structured_item_list = structured_data_item_list(
+        pagination.items, name=list_name, list_url=list_url,
+    ) if pagination.items else None
+
+    structured_faq = structured_data_faq(landing_faqs) if landing_faqs else None
+
+    analytics_inventory = {
+        'search': search or '',
+        'make': make or '',
+        'body_style': body_style or '',
+        'title_status': title_status or '',
+        'min_price': min_price,
+        'max_price': max_price,
+        'max_mileage': max_mileage,
+        'sort': sort or 'newest',
+        'total': pagination.total,
+        'page': page,
+        'has_filters': bool(has_filters),
+    }
+
     return render_template(
         'inventory.html',
         pagination=pagination,
@@ -196,6 +225,8 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         format_mileage=format_mileage,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
+        structured_item_list=structured_item_list,
+        structured_faq=structured_faq,
         breadcrumbs=breadcrumbs,
         meta_title=meta_title,
         meta_description=meta_description,
@@ -203,6 +234,10 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         landing_intro=landing_intro,
         landing_canonical=landing_canonical,
         canonical_override=canonical_override,
+        robots_content=robots_content,
+        page_type='inventory',
+        analytics_inventory=analytics_inventory,
+        landing_faqs=landing_faqs or [],
     )
 
 
@@ -210,7 +245,18 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
 def inject_globals():
     gsc_raw = SiteSetting.get('google_search_console', '') or ''
     gsc = sanitize_gsc_tag(gsc_raw)
-    analytics_id = SiteSetting.get('google_analytics_id', '') or current_app.config['GOOGLE_ANALYTICS_ID']
+    analytics_id = (
+        SiteSetting.get('google_analytics_id', '')
+        or current_app.config.get('GOOGLE_ANALYTICS_ID', '')
+    )
+    google_tag_id = (
+        SiteSetting.get('google_tag_id', '')
+        or current_app.config.get('GOOGLE_TAG_ID', '')
+    )
+    facebook_pixel_id = (
+        SiteSetting.get('facebook_pixel_id', '')
+        or current_app.config.get('FACEBOOK_PIXEL_ID', '')
+    )
     facebook_app_id = SiteSetting.get('facebook_app_id', '') or current_app.config['FACEBOOK_APP_ID']
     twitter_handle = SiteSetting.get('twitter_handle', '') or current_app.config['TWITTER_HANDLE']
 
@@ -239,15 +285,18 @@ def inject_globals():
         'site_title': SiteSetting.get('site_title', current_app.config['BUSINESS_NAME']),
         'site_tagline': SiteSetting.get('site_tagline', ''),
         'site_setting': SiteSetting,
-        'google_tag_id': current_app.config['GOOGLE_TAG_ID'],
+        'google_tag_id': google_tag_id,
         'google_analytics_id': analytics_id,
         'google_search_console_tag': gsc,
-        'facebook_pixel_id': current_app.config['FACEBOOK_PIXEL_ID'],
+        'facebook_pixel_id': facebook_pixel_id,
         'facebook_app_id': facebook_app_id,
         'twitter_handle': twitter_handle,
         'social_links': social,
         'now': _utcnow(),
         'canonical_url': _canonical_url() if request.endpoint else current_app.config['SITE_URL'],
+        'page_type': 'other',
+        'analytics_vehicle': None,
+        'analytics_inventory': None,
     }
 
 
@@ -299,6 +348,12 @@ def index():
     )
     aggregate = aggregate_rating_data()
 
+    structured_item_list = structured_data_item_list(
+        featured,
+        name=f"Featured Vehicles at {current_app.config['BUSINESS_NAME']}",
+        list_url=current_app.config['SITE_URL'],
+    ) if featured else None
+
     return render_template(
         'index.html',
         featured=featured,
@@ -309,9 +364,11 @@ def index():
         structured_local=structured_local,
         structured_website=structured_website,
         structured_faq=structured_faq,
+        structured_item_list=structured_item_list,
         breadcrumbs=breadcrumbs,
         meta_title=SiteSetting.get('site_title'),
         meta_description=SiteSetting.get('meta_description'),
+        page_type='home',
     )
 
 
@@ -335,6 +392,23 @@ def inventory():
     )
 
 
+def _city_landing_faqs(city_name, state_name):
+    biz = current_app.config['BUSINESS_NAME']
+    phone = current_app.config['BUSINESS_PHONE']
+    home_city = current_app.config['BUSINESS_CITY']
+    return [
+        (f"Where can I buy used cars near {city_name}, {state_name}?",
+         f"{biz} in {home_city} serves {city_name} shoppers with inspected used cars, trucks, and SUVs. "
+         f"Call {phone} to schedule a visit, test drive, or delivery options."),
+        (f"Does {biz} offer financing for buyers in {city_name}?",
+         f"Yes. We work with multiple lenders and can pre-approve {city_name}-area buyers for clean title "
+         f"and rebuilt title vehicles. Apply online or call {phone}."),
+        (f"Can I get a rebuilt title car delivered near {city_name}?",
+         f"Many customers from {city_name} purchase rebuilt title vehicles at a discount. Contact us to "
+         f"confirm availability, inspection details, and pickup or delivery arrangements."),
+    ]
+
+
 @main.route('/inventory/used-cars-for-sale-in-<city>-<state>')
 def inventory_by_city(city, state):
     """Local SEO landing page: used cars in a specific city."""
@@ -346,17 +420,20 @@ def inventory_by_city(city, state):
     page = request.args.get('page', 1, type=int)
     sort = request.args.get('sort', 'newest')
     city_name, state_name = area
+    biz = current_app.config['BUSINESS_NAME']
+    home_city = current_app.config['BUSINESS_CITY']
     canonical = url_for('main.inventory_by_city', city=city, state=state, _external=True)
     h1 = f"Used Cars, Trucks & SUVs for Sale in {city_name}, {state_name}"
     intro = (
-        f"Browse quality used vehicles for sale in {city_name}, {state_name}. "
-        f"{current_app.config['BUSINESS_NAME']} serves the {city_name} area with financing, "
-        f"trade-ins, CarFax reports, and huge discounts on rebuilt title cars."
+        f"Looking for used cars for sale in {city_name}, {state_name}? {biz} in nearby {home_city} "
+        f"helps {city_name} drivers find reliable pre-owned vehicles with transparent pricing, financing, "
+        f"trade-ins, CarFax reports, and deep discounts on rebuilt title inventory. Browse online or visit "
+        f"our lot — we regularly work with customers throughout the {city_name} area."
     )
-    meta_title = f"Used Cars for Sale in {city_name}, {state_name} | {current_app.config['BUSINESS_NAME']}"
+    meta_title = f"Used Cars for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
-        f"Shop used cars, trucks, and SUVs for sale in {city_name}, {state_name}. "
-        f"Financing available. Visit {current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']} or browse online."
+        f"Shop used cars, trucks, and SUVs for sale near {city_name}, {state_name}. "
+        f"Financing, trade-ins, and rebuilt title discounts at {biz} in {home_city}. Browse inventory online."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
@@ -368,46 +445,130 @@ def inventory_by_city(city, state):
         landing_h1=h1, landing_intro=intro,
         landing_meta_title=meta_title, landing_meta_description=meta_description,
         landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+        landing_faqs=_city_landing_faqs(city_name, state_name),
     )
 
 
-@main.route('/inventory/used-<make>-for-sale-in-<city>-<state>')
-def inventory_by_make_city(make, city, state):
-    """Local SEO landing page: used [make] in a specific city."""
-    slug = f"{city.lower()}-{state.lower()}"
-    area = _service_area_map().get(slug)
-    make_name = make.replace('-', ' ').title()
+BODY_STYLE_SLUG_MAP = {
+    'suvs': 'SUV', 'suv': 'SUV',
+    'trucks': 'Truck', 'truck': 'Truck',
+    'sedans': 'Sedan', 'sedan': 'Sedan',
+    'coupes': 'Coupe', 'coupe': 'Coupe',
+    'vans': 'Van', 'van': 'Van',
+    'hatchbacks': 'Hatchback', 'hatchback': 'Hatchback',
+    'wagons': 'Wagon', 'wagon': 'Wagon',
+    'convertibles': 'Convertible', 'convertible': 'Convertible',
+}
+
+BODY_STYLE_PLURAL_SLUG = {
+    'SUV': 'suvs', 'Truck': 'trucks', 'Sedan': 'sedans', 'Coupe': 'coupes',
+    'Van': 'vans', 'Hatchback': 'hatchbacks', 'Wagon': 'wagons', 'Convertible': 'convertibles',
+}
+
+
+@main.route('/inventory/used-<slug>-for-sale-in-<city>-<state>')
+def inventory_by_make_or_body_city(slug, city, state):
+    """Local SEO landing: used [make] OR used [body style] in a city.
+
+    Body-style slugs (suvs, trucks, ...) take precedence over make names so the
+    shared URL pattern does not collide.
+    """
+    area_slug = f"{city.lower()}-{state.lower()}"
+    area = _service_area_map().get(area_slug)
+    page = request.args.get('page', 1, type=int)
+    sort = request.args.get('sort', 'newest')
+
+    # --- Body style branch ---
+    body_style = BODY_STYLE_SLUG_MAP.get(slug.lower())
+    if body_style:
+        if not area:
+            return redirect(url_for('main.inventory', body_style=body_style))
+        available = _available_body_styles()
+        if body_style not in available:
+            match = next((b for b in available if b and b.lower() == body_style.lower()), None)
+            if not match:
+                return redirect(url_for('main.inventory_by_city', city=city, state=state))
+            body_style = match
+        city_name, state_name = area
+        biz = current_app.config['BUSINESS_NAME']
+        plural_slug = BODY_STYLE_PLURAL_SLUG.get(body_style, slug.lower())
+        display_plural = 'SUVs' if body_style == 'SUV' else (
+            body_style if body_style.endswith('s') else body_style + 's'
+        )
+        canonical = url_for(
+            'main.inventory_by_make_or_body_city',
+            slug=plural_slug, city=city, state=state, _external=True,
+        )
+        h1 = f"Used {display_plural} for Sale in {city_name}, {state_name}"
+        intro = (
+            f"Browse used {display_plural.lower()} for sale near {city_name}, {state_name}. "
+            f"{biz} offers inspected pre-owned {display_plural.lower()} with financing options, trade-ins, "
+            f"and CarFax reports — plus rebuilt title deals when available."
+        )
+        meta_title = f"Used {display_plural} for Sale in {city_name}, {state_name} | {biz}"
+        meta_description = (
+            f"Shop used {display_plural.lower()} for sale near {city_name}, {state_name}. "
+            f"Financing available at {biz}. View photos, prices, and apply online today."
+        )
+        breadcrumb = structured_data_breadcrumb([
+            ("Home", current_app.config['SITE_URL']),
+            ("Used Cars for Sale", url_for('main.inventory', _external=True)),
+            (f"Used {display_plural} in {city_name}", canonical),
+        ])
+        faqs = [
+            (f"What used {display_plural.lower()} do you have near {city_name}?",
+             f"Our inventory changes often. Filter by body style online or call {current_app.config['BUSINESS_PHONE']} "
+             f"for the latest {display_plural.lower()} available to {city_name} shoppers."),
+        ]
+        return _render_inventory(
+            page=page, body_style=body_style, sort=sort,
+            landing_h1=h1, landing_intro=intro,
+            landing_meta_title=meta_title, landing_meta_description=meta_description,
+            landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+            landing_faqs=faqs,
+        )
+
+    # --- Make branch ---
+    make_name = slug.replace('-', ' ').title()
     if not area:
         return redirect(url_for('main.inventory', make=make_name))
 
-    page = request.args.get('page', 1, type=int)
-    sort = request.args.get('sort', 'newest')
     city_name, state_name = area
+    biz = current_app.config['BUSINESS_NAME']
     canonical = url_for(
-        'main.inventory_by_make_city',
-        make=make.lower().replace(' ', '-'),
+        'main.inventory_by_make_or_body_city',
+        slug=slug.lower().replace(' ', '-'),
         city=city, state=state, _external=True,
     )
     h1 = f"Used {make_name} for Sale in {city_name}, {state_name}"
     intro = (
-        f"Find a used {make_name} for sale in {city_name}, {state_name}. "
-        f"{current_app.config['BUSINESS_NAME']} offers inspected {make_name} vehicles with financing and trade-in options."
+        f"Shop used {make_name} vehicles for sale near {city_name}, {state_name}. "
+        f"{biz} stocks inspected {make_name} cars, trucks, and SUVs with financing, trade-in options, "
+        f"and competitive pricing — including rebuilt title {make_name} models at a discount when available."
     )
-    meta_title = f"Used {make_name} for Sale in {city_name}, {state_name} | {current_app.config['BUSINESS_NAME']}"
+    meta_title = f"Used {make_name} for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
-        f"Shop used {make_name} cars, trucks, and SUVs for sale in {city_name}, {state_name}. "
-        f"Huge discounts on rebuilt title {make_name} vehicles. Apply for financing online."
+        f"Shop used {make_name} cars, trucks, and SUVs for sale near {city_name}, {state_name}. "
+        f"Huge discounts on rebuilt title {make_name} vehicles. Apply for financing online at {biz}."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
         ("Used Cars for Sale", url_for('main.inventory', _external=True)),
         (f"Used {make_name} in {city_name}, {state_name}", canonical)
     ])
+    faqs = [
+        (f"Do you have used {make_name} inventory for {city_name} buyers?",
+         f"Yes. Browse our current {make_name} listings online or call {current_app.config['BUSINESS_PHONE']} "
+         f"and we will help {city_name} shoppers find the right match."),
+        (f"Can I finance a used {make_name} from {biz}?",
+         "Absolutely. We work with multiple lenders for a range of credit situations. Start online or in person."),
+    ]
     return _render_inventory(
         page=page, make=make_name, sort=sort,
         landing_h1=h1, landing_intro=intro,
         landing_meta_title=meta_title, landing_meta_description=meta_description,
         landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+        landing_faqs=faqs,
     )
 
 
@@ -422,27 +583,38 @@ def inventory_rebuilt_by_city(city, state):
     page = request.args.get('page', 1, type=int)
     sort = request.args.get('sort', 'newest')
     city_name, state_name = area
+    biz = current_app.config['BUSINESS_NAME']
     canonical = url_for('main.inventory_rebuilt_by_city', city=city, state=state, _external=True)
     h1 = f"Rebuilt Title Cars for Sale in {city_name}, {state_name}"
     intro = (
-        f"Save big on rebuilt title cars, trucks, and SUVs for sale in {city_name}, {state_name}. "
-        f"Every rebuilt title vehicle at {current_app.config['BUSINESS_NAME']} is fully inspected and ready for the road."
+        f"Save big on rebuilt title cars, trucks, and SUVs near {city_name}, {state_name}. "
+        f"Every rebuilt title vehicle at {biz} is inspected and road-ready after proper repairs and "
+        f"state requirements. Ideal for budget-conscious buyers in the {city_name} area who want more car for less."
     )
-    meta_title = f"Rebuilt Title Cars for Sale in {city_name}, {state_name} | {current_app.config['BUSINESS_NAME']}"
+    meta_title = f"Rebuilt Title Cars for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
-        f"Huge discounts on rebuilt title cars for sale in {city_name}, {state_name}. "
-        f"Browse inspected rebuilt title vehicles with financing available at {current_app.config['BUSINESS_NAME']}."
+        f"Huge discounts on rebuilt title cars for sale near {city_name}, {state_name}. "
+        f"Browse inspected rebuilt title vehicles with financing available at {biz}."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
         ("Used Cars for Sale", url_for('main.inventory', _external=True)),
         (f"Rebuilt Title Cars in {city_name}, {state_name}", canonical)
     ])
+    faqs = [
+        (f"Are rebuilt title cars legal to drive in {city_name}, {state_name}?",
+         "Yes. Rebuilt title vehicles that have passed required inspections are fully road-legal. "
+         "We explain title history and help you review CarFax details before you buy."),
+        (f"Why buy a rebuilt title car near {city_name}?",
+         "Rebuilt title vehicles typically cost 20–40% less than comparable clean-title cars, "
+         "making them a strong value option when properly inspected."),
+    ]
     return _render_inventory(
         page=page, title_status='rebuilt', sort=sort,
         landing_h1=h1, landing_intro=intro,
         landing_meta_title=meta_title, landing_meta_description=meta_description,
         landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+        landing_faqs=faqs,
     )
 
 
@@ -474,6 +646,7 @@ def service_area():
             f"{current_app.config['BUSINESS_NAME']} serves Sanford, Chapel Hill, Durham, Raleigh, Cary, Apex, "
             f"Fayetteville, and surrounding NC communities with quality used cars and financing."
         ),
+        page_type='service_area',
     )
 
 
@@ -534,6 +707,21 @@ def vehicle_detail(slug):
 
     og_image = vehicle.primary_image_url(absolute=True)
 
+    analytics_vehicle = {
+        'id': vehicle.id,
+        'title': vehicle.title,
+        'year': vehicle.year,
+        'make': vehicle.make,
+        'model': vehicle.model,
+        'trim': vehicle.trim or '',
+        'price': float(vehicle.display_price) if vehicle.display_price is not None else 0,
+        'stock_number': vehicle.stock_number or '',
+        'body_style': vehicle.body_style or '',
+        'title_status': vehicle.title_status or '',
+        'mileage': vehicle.mileage,
+        'slug': vehicle.slug,
+    }
+
     return render_template(
         'vehicle_detail.html',
         vehicle=vehicle,
@@ -549,7 +737,30 @@ def vehicle_detail(slug):
         page_links={},
         format_price=format_price,
         format_mileage=format_mileage,
+        page_type='vehicle_detail',
+        analytics_vehicle=analytics_vehicle,
     )
+
+
+def _attribution_from_request():
+    """Capture marketing attribution params (no PII)."""
+    def clip(key, maxlen=128):
+        val = (request.form.get(key) or request.args.get(key) or '').strip()
+        return val[:maxlen] if val else None
+
+    referrer = (request.headers.get('Referer') or '')[:512] or None
+    landing = (request.form.get('landing_path') or request.path or '')[:512] or None
+    return {
+        'utm_source': clip('utm_source'),
+        'utm_medium': clip('utm_medium'),
+        'utm_campaign': clip('utm_campaign'),
+        'utm_term': clip('utm_term'),
+        'utm_content': clip('utm_content'),
+        'gclid': clip('gclid', 255),
+        'fbclid': clip('fbclid', 255),
+        'landing_path': landing,
+        'referrer': referrer,
+    }
 
 
 def _create_lead_from_form(form, source='contact'):
@@ -558,6 +769,7 @@ def _create_lead_from_form(form, source='contact'):
         exists = db.session.get(Vehicle, vehicle_id)
         if not exists:
             vehicle_id = None
+    attr = _attribution_from_request()
     lead = Lead(
         name=(form.name.data or '').strip()[:128],
         email=(form.email.data or '').strip()[:128],
@@ -565,6 +777,15 @@ def _create_lead_from_form(form, source='contact'):
         message=(form.message.data or '').strip() or None,
         vehicle_id=vehicle_id,
         source=(source or 'contact')[:64],
+        utm_source=attr['utm_source'],
+        utm_medium=attr['utm_medium'],
+        utm_campaign=attr['utm_campaign'],
+        utm_term=attr['utm_term'],
+        utm_content=attr['utm_content'],
+        gclid=attr['gclid'],
+        fbclid=attr['fbclid'],
+        landing_path=attr['landing_path'],
+        referrer=attr['referrer'],
     )
     db.session.add(lead)
     db.session.commit()
@@ -607,6 +828,7 @@ def contact():
             f"or visit us in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} "
             f"to schedule a test drive or appraisal."
         ),
+        page_type='contact',
     )
 
 
@@ -624,8 +846,12 @@ def contact_submit_ajax():
         if form.honeypot.data:
             return jsonify({'success': True, 'message': 'Thank you! We will be in touch soon.'})
         source = (request.form.get('source') or 'ajax')[:64]
-        _create_lead_from_form(form, source=source)
-        return jsonify({'success': True, 'message': 'Thank you! We will be in touch soon.'})
+        lead = _create_lead_from_form(form, source=source)
+        return jsonify({
+            'success': True,
+            'message': 'Thank you! We will be in touch soon.',
+            'lead_id': lead.id,
+        })
     return jsonify({'success': False, 'errors': form.errors}), 400
 
 
@@ -646,6 +872,7 @@ def about():
             f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} offering quality "
             f"pre-owned vehicles, financing, and transparent pricing."
         ),
+        page_type='about',
     )
 
 
@@ -690,6 +917,7 @@ def financing():
             f"Get approved for used car financing at {current_app.config['BUSINESS_NAME']} in "
             f"{current_app.config['BUSINESS_CITY']}. Bad credit, no credit, and first-time buyer programs available. Apply today."
         ),
+        page_type='financing',
     )
 
 
@@ -718,6 +946,7 @@ def sell_your_car():
             f"Sell your car to {current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']}, "
             f"{current_app.config['BUSINESS_STATE']}. Get a fair cash offer, fast payment, and hassle-free paperwork. Trade-ins welcome."
         ),
+        page_type='sell_your_car',
     )
 
 
@@ -753,48 +982,88 @@ def sitemap():
         .order_by(Vehicle.updated_at.desc())
         .all()
     )
+    latest_vehicle_mod = None
+    if vehicles:
+        latest_vehicle_mod = max(
+            (v.updated_at for v in vehicles if v.updated_at),
+            default=None,
+        )
+    inventory_lastmod = (
+        latest_vehicle_mod.strftime('%Y-%m-%d') if latest_vehicle_mod else _utcnow().strftime('%Y-%m-%d')
+    )
     today = _utcnow().strftime('%Y-%m-%d')
     pages = [
-        {'loc': url_for('main.index', _external=True), 'priority': '1.00', 'lastmod': today},
-        {'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'lastmod': today},
-        {'loc': url_for('main.about', _external=True), 'priority': '0.80', 'lastmod': today},
-        {'loc': url_for('main.financing', _external=True), 'priority': '0.80', 'lastmod': today},
-        {'loc': url_for('main.sell_your_car', _external=True), 'priority': '0.80', 'lastmod': today},
-        {'loc': url_for('main.contact', _external=True), 'priority': '0.80', 'lastmod': today},
-        {'loc': url_for('main.service_area', _external=True), 'priority': '0.80', 'lastmod': today},
+        {'loc': url_for('main.index', _external=True), 'priority': '1.00', 'changefreq': 'daily', 'lastmod': inventory_lastmod},
+        {'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'changefreq': 'daily', 'lastmod': inventory_lastmod},
+        {'loc': url_for('main.about', _external=True), 'priority': '0.70', 'changefreq': 'monthly', 'lastmod': today},
+        {'loc': url_for('main.financing', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
+        {'loc': url_for('main.sell_your_car', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
+        {'loc': url_for('main.contact', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
+        {'loc': url_for('main.service_area', _external=True), 'priority': '0.80', 'changefreq': 'weekly', 'lastmod': today},
     ]
 
-    top_makes = _available_makes()[:10]
+    top_makes = _available_makes()[:8]
+    body_styles = _available_body_styles()
+    body_style_slug_map = {
+        'SUV': 'suvs', 'Truck': 'trucks', 'Sedan': 'sedans', 'Coupe': 'coupes',
+        'Van': 'vans', 'Hatchback': 'hatchbacks', 'Wagon': 'wagons', 'Convertible': 'convertibles',
+    }
+    primary_cities = {
+        c.lower() for c in (
+            current_app.config.get('BUSINESS_CITY', ''),
+            'Raleigh', 'Durham', 'Chapel Hill', 'Cary', 'Fayetteville',
+        )
+    }
+
     for city, state in current_app.config.get('SERVICE_AREAS', []):
         city_slug = city.lower().replace(' ', '-')
         state_slug = state.lower()
         pages.append({
             'loc': url_for('main.inventory_by_city', city=city_slug, state=state_slug, _external=True),
             'priority': '0.75',
-            'lastmod': today
+            'changefreq': 'daily',
+            'lastmod': inventory_lastmod,
         })
         pages.append({
             'loc': url_for('main.inventory_rebuilt_by_city', city=city_slug, state=state_slug, _external=True),
             'priority': '0.70',
-            'lastmod': today
+            'changefreq': 'daily',
+            'lastmod': inventory_lastmod,
         })
-        for make in top_makes:
+        for style in body_styles:
+            style_slug = body_style_slug_map.get(style)
+            if not style_slug:
+                continue
             pages.append({
                 'loc': url_for(
-                    'main.inventory_by_make_city',
-                    make=make.lower().replace(' ', '-'),
+                    'main.inventory_by_make_or_body_city',
+                    slug=style_slug,
                     city=city_slug, state=state_slug, _external=True,
                 ),
                 'priority': '0.65',
-                'lastmod': today
+                'changefreq': 'weekly',
+                'lastmod': inventory_lastmod,
             })
+        if city.lower() in primary_cities or city_slug in {c.replace(' ', '-') for c in primary_cities}:
+            for make in top_makes:
+                pages.append({
+                    'loc': url_for(
+                        'main.inventory_by_make_or_body_city',
+                        slug=make.lower().replace(' ', '-'),
+                        city=city_slug, state=state_slug, _external=True,
+                    ),
+                    'priority': '0.60',
+                    'changefreq': 'weekly',
+                    'lastmod': inventory_lastmod,
+                })
 
     for vehicle in vehicles:
         images = vehicle.ordered_images()[:5]
         pages.append({
             'loc': url_for('main.vehicle_detail', slug=vehicle.slug, _external=True),
             'priority': '0.70',
-            'lastmod': vehicle.updated_at.strftime('%Y-%m-%d') if vehicle.updated_at else None,
+            'changefreq': 'weekly',
+            'lastmod': vehicle.updated_at.strftime('%Y-%m-%d') if vehicle.updated_at else inventory_lastmod,
             'images': [{'loc': img.absolute_url, 'caption': vehicle.title} for img in images]
         })
     response = make_response(render_template('sitemap.xml', pages=pages))

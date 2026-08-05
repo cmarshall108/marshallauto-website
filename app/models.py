@@ -301,6 +301,32 @@ class Review(db.Model):
 
     @property
     def structured_data(self):
+        if self.vehicle_id and self.vehicle:
+            item_reviewed = {
+                "@type": "Car",
+                "name": self.vehicle.title,
+                "brand": {"@type": "Brand", "name": self.vehicle.make},
+                "model": self.vehicle.model,
+                "vehicleModelDate": str(self.vehicle.year),
+                "url": f"{current_app.config['SITE_URL']}/inventory/{self.vehicle.slug}",
+            }
+            if self.vehicle.vin:
+                item_reviewed['vehicleIdentificationNumber'] = self.vehicle.vin
+        else:
+            item_reviewed = {
+                "@type": "AutoDealer",
+                "name": current_app.config['BUSINESS_NAME'],
+                "image": f"{current_app.config['SITE_URL']}/static/images/logo-icon.png",
+                "url": current_app.config['SITE_URL'],
+                "address": {
+                    "@type": "PostalAddress",
+                    "streetAddress": current_app.config['BUSINESS_ADDRESS'],
+                    "addressLocality": current_app.config['BUSINESS_CITY'],
+                    "addressRegion": current_app.config['BUSINESS_STATE'],
+                    "postalCode": current_app.config['BUSINESS_ZIP'],
+                    "addressCountry": "US"
+                }
+            }
         return {
             "@type": "Review",
             "author": {"@type": "Person", "name": self.author_name},
@@ -312,19 +338,7 @@ class Review(db.Model):
             },
             "reviewBody": self.content,
             "name": self.title or f"Review by {self.author_name}",
-            "itemReviewed": {
-                "@type": "AutoDealer",
-                "name": current_app.config['BUSINESS_NAME'],
-                "image": f"{current_app.config['SITE_URL']}/static/images/logo-icon.png",
-                "address": {
-                    "@type": "PostalAddress",
-                    "streetAddress": current_app.config['BUSINESS_ADDRESS'],
-                    "addressLocality": current_app.config['BUSINESS_CITY'],
-                    "addressRegion": current_app.config['BUSINESS_STATE'],
-                    "postalCode": current_app.config['BUSINESS_ZIP'],
-                    "addressCountry": "US"
-                }
-            }
+            "itemReviewed": item_reviewed,
         }
 
 
@@ -340,5 +354,15 @@ class Lead(db.Model):
     vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True)
     source = db.Column(db.String(64), default='contact', nullable=False)
     is_read = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    # Attribution (optional marketing params captured at submit)
+    utm_source = db.Column(db.String(128), nullable=True)
+    utm_medium = db.Column(db.String(128), nullable=True)
+    utm_campaign = db.Column(db.String(128), nullable=True)
+    utm_term = db.Column(db.String(128), nullable=True)
+    utm_content = db.Column(db.String(128), nullable=True)
+    gclid = db.Column(db.String(255), nullable=True)
+    fbclid = db.Column(db.String(255), nullable=True)
+    landing_path = db.Column(db.String(512), nullable=True)
+    referrer = db.Column(db.String(512), nullable=True)
 
     vehicle = db.relationship('Vehicle', backref=db.backref('leads', lazy='dynamic'))
