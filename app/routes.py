@@ -241,63 +241,125 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
     )
 
 
-@main.context_processor
+class _EmptySiteSettings:
+    """Shim used when SiteSetting/DB is unavailable (e.g. mid-500)."""
+
+    @staticmethod
+    def get(key, default=''):
+        return default
+
+
 def inject_globals():
-    gsc_raw = SiteSetting.get('google_search_console', '') or ''
-    gsc = sanitize_gsc_tag(gsc_raw)
-    analytics_id = (
-        SiteSetting.get('google_analytics_id', '')
-        or current_app.config.get('GOOGLE_ANALYTICS_ID', '')
-    )
-    google_tag_id = (
-        SiteSetting.get('google_tag_id', '')
-        or current_app.config.get('GOOGLE_TAG_ID', '')
-    )
-    facebook_pixel_id = (
-        SiteSetting.get('facebook_pixel_id', '')
-        or current_app.config.get('FACEBOOK_PIXEL_ID', '')
-    )
-    facebook_app_id = SiteSetting.get('facebook_app_id', '') or current_app.config['FACEBOOK_APP_ID']
-    twitter_handle = SiteSetting.get('twitter_handle', '') or current_app.config['TWITTER_HANDLE']
+    """Template globals for all pages, including app-level error handlers.
 
-    social = []
-    for key, conf in [
-        ('facebook_url', 'FACEBOOK_URL'),
-        ('instagram_url', 'INSTAGRAM_URL'),
-        ('youtube_url', 'YOUTUBE_URL'),
-    ]:
-        val = SiteSetting.get(key, '') or current_app.config.get(conf, '')
-        if val:
-            social.append((key.replace('_url', ''), val))
+    Registered on the Flask app (not only the blueprint) so 404/500 templates
+    that extend base.html still receive site_setting and business_* vars.
+    Falls back to config-only values if the DB is unavailable (e.g. during 500).
+    """
+    def _setting(key, default=''):
+        try:
+            return SiteSetting.get(key, default)
+        except Exception:
+            return default
 
-    return {
-        'business_name': current_app.config['BUSINESS_NAME'],
-        'business_phone': current_app.config['BUSINESS_PHONE'],
-        'business_email': current_app.config['BUSINESS_EMAIL'],
-        'business_address': current_app.config['BUSINESS_ADDRESS'],
-        'business_city': current_app.config['BUSINESS_CITY'],
-        'business_state': current_app.config['BUSINESS_STATE'],
-        'business_zip': current_app.config['BUSINESS_ZIP'],
-        'business_hours': current_app.config['BUSINESS_HOURS'],
-        'business_latitude': SiteSetting.get('business_latitude') or current_app.config['BUSINESS_LATITUDE'],
-        'business_longitude': SiteSetting.get('business_longitude') or current_app.config['BUSINESS_LONGITUDE'],
-        'site_url': current_app.config['SITE_URL'],
-        'site_title': SiteSetting.get('site_title', current_app.config['BUSINESS_NAME']),
-        'site_tagline': SiteSetting.get('site_tagline', ''),
-        'site_setting': SiteSetting,
-        'google_tag_id': google_tag_id,
-        'google_analytics_id': analytics_id,
-        'google_search_console_tag': gsc,
-        'facebook_pixel_id': facebook_pixel_id,
-        'facebook_app_id': facebook_app_id,
-        'twitter_handle': twitter_handle,
-        'social_links': social,
-        'now': _utcnow(),
-        'canonical_url': _canonical_url() if request.endpoint else current_app.config['SITE_URL'],
-        'page_type': 'other',
-        'analytics_vehicle': None,
-        'analytics_inventory': None,
-    }
+    try:
+        gsc_raw = _setting('google_search_console', '') or ''
+        gsc = sanitize_gsc_tag(gsc_raw)
+        analytics_id = (
+            _setting('google_analytics_id', '')
+            or current_app.config.get('GOOGLE_ANALYTICS_ID', '')
+        )
+        google_tag_id = (
+            _setting('google_tag_id', '')
+            or current_app.config.get('GOOGLE_TAG_ID', '')
+        )
+        facebook_pixel_id = (
+            _setting('facebook_pixel_id', '')
+            or current_app.config.get('FACEBOOK_PIXEL_ID', '')
+        )
+        facebook_app_id = _setting('facebook_app_id', '') or current_app.config.get('FACEBOOK_APP_ID', '')
+        twitter_handle = _setting('twitter_handle', '') or current_app.config.get('TWITTER_HANDLE', '')
+
+        social = []
+        for key, conf in [
+            ('facebook_url', 'FACEBOOK_URL'),
+            ('instagram_url', 'INSTAGRAM_URL'),
+            ('youtube_url', 'YOUTUBE_URL'),
+        ]:
+            val = _setting(key, '') or current_app.config.get(conf, '')
+            if val:
+                social.append((key.replace('_url', ''), val))
+
+        try:
+            canonical = _canonical_url() if getattr(request, 'endpoint', None) else current_app.config['SITE_URL']
+        except Exception:
+            canonical = current_app.config.get('SITE_URL', '')
+
+        db_ok = True
+        try:
+            SiteSetting.get('site_title', current_app.config.get('BUSINESS_NAME', ''))
+        except Exception:
+            db_ok = False
+
+        return {
+            'business_name': current_app.config.get('BUSINESS_NAME', 'Marshall Auto, LLC'),
+            'business_phone': current_app.config.get('BUSINESS_PHONE', ''),
+            'business_email': current_app.config.get('BUSINESS_EMAIL', ''),
+            'business_address': current_app.config.get('BUSINESS_ADDRESS', ''),
+            'business_city': current_app.config.get('BUSINESS_CITY', ''),
+            'business_state': current_app.config.get('BUSINESS_STATE', ''),
+            'business_zip': current_app.config.get('BUSINESS_ZIP', ''),
+            'business_hours': current_app.config.get('BUSINESS_HOURS', ''),
+            'business_latitude': _setting('business_latitude') or current_app.config.get('BUSINESS_LATITUDE', ''),
+            'business_longitude': _setting('business_longitude') or current_app.config.get('BUSINESS_LONGITUDE', ''),
+            'site_url': current_app.config.get('SITE_URL', ''),
+            'site_title': _setting('site_title', current_app.config.get('BUSINESS_NAME', 'Marshall Auto, LLC')),
+            'site_tagline': _setting('site_tagline', ''),
+            'site_setting': SiteSetting if db_ok else _EmptySiteSettings,
+            'google_tag_id': google_tag_id,
+            'google_analytics_id': analytics_id,
+            'google_search_console_tag': gsc,
+            'facebook_pixel_id': facebook_pixel_id,
+            'facebook_app_id': facebook_app_id,
+            'twitter_handle': twitter_handle,
+            'social_links': social,
+            'now': _utcnow(),
+            'canonical_url': canonical,
+            'page_type': 'other',
+            'analytics_vehicle': None,
+            'analytics_inventory': None,
+        }
+    except Exception:
+        # Last-resort minimal context so error templates can still render
+        name = current_app.config.get('BUSINESS_NAME', 'Marshall Auto, LLC')
+        return {
+            'business_name': name,
+            'business_phone': current_app.config.get('BUSINESS_PHONE', ''),
+            'business_email': current_app.config.get('BUSINESS_EMAIL', ''),
+            'business_address': current_app.config.get('BUSINESS_ADDRESS', ''),
+            'business_city': current_app.config.get('BUSINESS_CITY', ''),
+            'business_state': current_app.config.get('BUSINESS_STATE', ''),
+            'business_zip': current_app.config.get('BUSINESS_ZIP', ''),
+            'business_hours': current_app.config.get('BUSINESS_HOURS', ''),
+            'business_latitude': current_app.config.get('BUSINESS_LATITUDE', ''),
+            'business_longitude': current_app.config.get('BUSINESS_LONGITUDE', ''),
+            'site_url': current_app.config.get('SITE_URL', ''),
+            'site_title': name,
+            'site_tagline': '',
+            'site_setting': _EmptySiteSettings,
+            'google_tag_id': current_app.config.get('GOOGLE_TAG_ID', ''),
+            'google_analytics_id': current_app.config.get('GOOGLE_ANALYTICS_ID', ''),
+            'google_search_console_tag': '',
+            'facebook_pixel_id': current_app.config.get('FACEBOOK_PIXEL_ID', ''),
+            'facebook_app_id': current_app.config.get('FACEBOOK_APP_ID', ''),
+            'twitter_handle': current_app.config.get('TWITTER_HANDLE', ''),
+            'social_links': [],
+            'now': _utcnow(),
+            'canonical_url': current_app.config.get('SITE_URL', ''),
+            'page_type': 'other',
+            'analytics_vehicle': None,
+            'analytics_inventory': None,
+        }
 
 
 @main.route('/')
