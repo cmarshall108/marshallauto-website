@@ -140,15 +140,15 @@
                                 </form>
                             </div>
                         </div>
-                    </div> nav-tabs-scroll" id="vehicleTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="features-tab" data-bs-toggle="tab" data-bs-target="#features" type="button" role="tab" aria-controls="features" aria-selected="false">Features</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service" type="button" role="tab" aria-controls="service" aria-selected="false">Service
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Details + sidebar -->
+        <div class="row g-4 mt-1">
+            <div class="col-lg-8">
+                <ul class="nav nav-tabs nav-tabs-scroll" id="vehicleTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
                     </li>
@@ -271,11 +271,11 @@
 
             <!-- Sidebar -->
             <div class="col-lg-4">
-                <div class="card border-0 shadow p-4 mb-4">
+                <div class="card border-0 shadow p-4 mb-4 sticky-lg-top" style="top: 5.5rem;">
                     <h5 class="fw-bold mb-3">Have Questions?</h5>
                     <p class="text-muted">Our team is ready to help you with financing, trade-ins, and test drives.</p>
-                    <p><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
-                    <p><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
+                    <p class="text-break"><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
+                    <p class="text-break"><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
                     <a href="{{ url_for('main.financing') }}" class="btn btn-primary w-100 mb-2">Get Pre-Approved</a>
                     <a href="{{ url_for('main.inventory', make=vehicle.make) }}" class="btn btn-outline-primary w-100 mb-2">More {{ vehicle.make }} Vehicles</a>
                     {% if vehicle.body_style %}
