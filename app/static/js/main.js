@@ -337,43 +337,142 @@
             });
         }
 
-        // Vehicle gallery thumbnail switcher + swipe
+        // Vehicle gallery: thumbs, arrows, swipe/drag, keyboard
+        const gallery = document.getElementById('vehicle-gallery');
         const mainImage = document.getElementById('main-gallery-image');
         const thumbnails = Array.from(document.querySelectorAll('.thumbnail-list img'));
-        if (mainImage && thumbnails.length) {
-            const setActiveThumb = (index, action) => {
-                const thumb = thumbnails[index];
-                if (!thumb) return;
-                mainImage.src = thumb.dataset.full || thumb.src;
-                thumbnails.forEach(t => t.classList.remove('active'));
-                thumb.classList.add('active');
-                thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                Analytics.trackGallery(action || 'thumb_click', index, thumbnails.length);
+        const galleryPrev = document.getElementById('gallery-prev');
+        const galleryNext = document.getElementById('gallery-next');
+        const galleryCounter = document.getElementById('gallery-counter');
+
+        if (mainImage && thumbnails.length > 1) {
+            let currentIndex = Math.max(0, thumbnails.findIndex((t) => t.classList.contains('active')));
+            if (currentIndex < 0) currentIndex = 0;
+
+            const updateCounter = (index) => {
+                if (galleryCounter) {
+                    galleryCounter.textContent = `${index + 1} / ${thumbnails.length}`;
+                }
+                if (gallery) {
+                    gallery.setAttribute('aria-label', `Photo ${index + 1} of ${thumbnails.length}`);
+                }
             };
 
+            const setActiveThumb = (index, action) => {
+                const total = thumbnails.length;
+                const normalized = ((index % total) + total) % total;
+                const thumb = thumbnails[normalized];
+                if (!thumb) return;
+
+                currentIndex = normalized;
+                mainImage.src = thumb.dataset.full || thumb.src;
+                if (thumb.alt) {
+                    mainImage.alt = thumb.alt;
+                }
+                thumbnails.forEach((t) => t.classList.remove('active'));
+                thumb.classList.add('active');
+                thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                updateCounter(normalized);
+                Analytics.trackGallery(action || 'thumb_click', normalized, total);
+            };
+
+            const goNext = (action) => setActiveThumb(currentIndex + 1, action || 'next');
+            const goPrev = (action) => setActiveThumb(currentIndex - 1, action || 'prev');
+
+            updateCounter(currentIndex);
+
             thumbnails.forEach((thumb, index) => {
-                thumb.addEventListener('click', function () {
-                    setActiveThumb(index, 'thumb_click');
+                const activate = () => setActiveThumb(index, 'thumb_click');
+                thumb.addEventListener('click', activate);
+                thumb.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        activate();
+                    }
                 });
             });
 
-            let touchStartX = 0;
-            let touchEndX = 0;
-            mainImage.addEventListener('touchstart', (e) => {
-                touchStartX = e.changedTouches[0].screenX;
-            }, { passive: true });
-            mainImage.addEventListener('touchend', (e) => {
-                touchEndX = e.changedTouches[0].screenX;
-                const delta = touchEndX - touchStartX;
-                if (Math.abs(delta) < 40) return;
-                const currentIndex = thumbnails.findIndex(t => t.classList.contains('active'));
-                const nextIndex = delta < 0
-                    ? Math.min(currentIndex + 1, thumbnails.length - 1)
-                    : Math.max(currentIndex - 1, 0);
-                if (nextIndex !== currentIndex) {
-                    setActiveThumb(nextIndex, delta < 0 ? 'swipe_next' : 'swipe_prev');
+            if (galleryPrev) {
+                galleryPrev.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goPrev('arrow_prev');
+                });
+            }
+            if (galleryNext) {
+                galleryNext.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goNext('arrow_next');
+                });
+            }
+
+            // Keyboard left/right when gallery is focused
+            if (gallery) {
+                gallery.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        goNext('key_next');
+                    } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        goPrev('key_prev');
+                    }
+                });
+            }
+
+            // Touch swipe + mouse drag on the main gallery
+            const swipeTarget = gallery || mainImage;
+            let pointerStartX = null;
+            let pointerActive = false;
+            const SWIPE_THRESHOLD = 40;
+
+            const endSwipe = (clientX) => {
+                if (pointerStartX === null) return;
+                const delta = clientX - pointerStartX;
+                pointerStartX = null;
+                pointerActive = false;
+                if (gallery) gallery.classList.remove('is-dragging');
+                if (Math.abs(delta) < SWIPE_THRESHOLD) return;
+                if (delta < 0) {
+                    goNext('swipe_next');
+                } else {
+                    goPrev('swipe_prev');
                 }
+            };
+
+            swipeTarget.addEventListener('touchstart', (e) => {
+                if (e.target.closest('.gallery-nav')) return;
+                pointerStartX = e.changedTouches[0].clientX;
             }, { passive: true });
+
+            swipeTarget.addEventListener('touchend', (e) => {
+                endSwipe(e.changedTouches[0].clientX);
+            }, { passive: true });
+
+            swipeTarget.addEventListener('mousedown', (e) => {
+                if (e.button !== 0 || e.target.closest('.gallery-nav')) return;
+                pointerActive = true;
+                pointerStartX = e.clientX;
+                if (gallery) gallery.classList.add('is-dragging');
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!pointerActive) return;
+                e.preventDefault();
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (!pointerActive) return;
+                endSwipe(e.clientX);
+            });
+
+            // Prefetch adjacent full-size images for snappier nav
+            thumbnails.forEach((thumb) => {
+                const src = thumb.dataset.full || thumb.src;
+                if (!src) return;
+                const img = new Image();
+                img.src = src;
+            });
         }
 
         // AJAX contact forms

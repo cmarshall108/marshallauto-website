@@ -276,15 +276,97 @@ a:hover {
 
 /* Vehicle Detail */
 .vehicle-gallery {
+    position: relative;
     border-radius: var(--border-radius);
     overflow: hidden;
     box-shadow: var(--box-shadow);
+    background: #0f172a;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-.vehicle-gallery img {
+.vehicle-gallery:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.vehicle-gallery img#main-gallery-image {
     width: 100%;
     max-height: 500px;
     object-fit: cover;
+    display: block;
+    transition: opacity 0.15s ease;
+}
+
+.vehicle-gallery.has-nav {
+    cursor: grab;
+    touch-action: pan-y;
+}
+
+.vehicle-gallery.has-nav.is-dragging {
+    cursor: grabbing;
+}
+
+.vehicle-gallery.has-nav img#main-gallery-image {
+    pointer-events: none;
+}
+
+.gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.72);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+.gallery-nav:hover,
+.gallery-nav:focus-visible {
+    background: rgba(15, 23, 42, 0.92);
+    color: #fff;
+    outline: none;
+    transform: translateY(-50%) scale(1.05);
+}
+
+.gallery-nav:active {
+    transform: translateY(-50%) scale(0.98);
+}
+
+.gallery-nav-prev {
+    left: 0.75rem;
+}
+
+.gallery-nav-next {
+    right: 0.75rem;
+}
+
+.gallery-nav i {
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.gallery-counter {
+    position: absolute;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 2;
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    pointer-events: none;
 }
 
 .thumbnail-list img {
@@ -294,6 +376,11 @@ a:hover {
     border-radius: 8px;
     cursor: pointer;
     border: 2px solid transparent;
+}
+
+.thumbnail-list img:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
 }
 
 .thumbnail-list img.active {
@@ -565,7 +652,7 @@ a:hover {
 }
 
 .thumbnail-list.is-scrollable img {
-    flex: 0 0 auto;
+    flex: 0 0 auto;#main-gallery-image
 }
 
 /* Touch-friendly form controls */
@@ -783,9 +870,28 @@ a:hover {
         border-radius: 10px;
     }
 
-    .vehicle-gallery img {
+    .vehicle-gallery img#main-gallery-image {
         max-height: 280px;
         min-height: 220px;
+    }
+
+    .gallery-nav {
+        width: 40px;
+        height: 40px;
+    }
+
+    .gallery-nav-prev {
+        left: 0.5rem;
+    }
+
+    .gallery-nav-next {
+        right: 0.5rem;
+    }
+
+    .gallery-counter {
+        right: 0.5rem;
+        bottom: 0.5rem;
+        font-size: 0.75rem;
     }
 
     .thumbnail-list img {
