@@ -337,6 +337,9 @@
                     <meta itemprop="url" content="{{ site_url }}{{ url_for('main.vehicle_detail', slug=rv.slug) }}">
                     <a href="{{ url_for('main.vehicle_detail', slug=rv.slug) }}" class="text-decoration-none text-dark">
                         <div class="card-img-wrapper">
+                            {% set img = rv.primary_image() %}
+                            <img src="{{ rv.primary_image_url() }}" class="card-img-top" alt="{{ rv.year }} {{ rv.make }} {{ rv.model }} {{ rv.trim or '' }} for sale in {{ business_city }}, {{ business_state }}" width="{{ img.width if img and img.width else 600 }}" height="{{ img.height if img and img.height else 400 }}" loading="lazy" decoding="async">
+                            <span class="badge-condition">{{ rv.condition | title }}</span>
                             <div class="vehicle-card-badges">
                                 {% if rv.is_low_mileage %}
                                 <span class="badge-low-miles" title="Low mileage — under 75,000 miles">LOW MILES!</span>
@@ -347,9 +350,6 @@
                                 <span class="badge badge-title-status bg-danger">Salvage Title</span>
                                 {% endif %}
                             </div>
-                            {% set img = rv.primary_image() %}
-                            <img src="{{ rv.primary_image_url() }}" class="card-img-top" alt="{{ rv.year }} {{ rv.make }} {{ rv.model }} {{ rv.trim or '' }} for sale in {{ business_city }}, {{ business_state }}" width="{{ img.width if img and img.width else 600 }}" height="{{ img.height if img and img.height else 400 }}" loading="lazy" decoding="async">
-                            <span class="badge-condition">{{ rv.condition | title }}</span>
                         </div>
                         <div class="card-body p-4">
                             <h5 class="card-title">{{ rv.title }}</h5>

@@ -161,6 +161,7 @@ a:hover {
     position: relative;
     height: 220px;
     overflow: hidden;
+    isolation: isolate; /* keep badges/glow painted inside the photo frame */
 }
 
 .vehicle-card .card-img-top {
@@ -189,70 +190,74 @@ a:hover {
     z-index: 2;
 }
 
-/* Stack title / low-miles badges top-right on inventory cards */
+/* Title / low-miles badges — pinned top-right inside the photo */
 .vehicle-card .vehicle-card-badges {
     position: absolute;
     top: 10px;
     right: 10px;
+    left: auto;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
     gap: 0.35rem;
-    z-index: 2;
-    max-width: min(70%, 11rem);
+    z-index: 3;
+    max-width: calc(100% - 5.5rem); /* leave room for condition badge on left */
     pointer-events: none;
 }
 
 .vehicle-card .badge-title-status {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.02em;
+    line-height: 1.2;
+    padding: 0.35rem 0.55rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    white-space: nowrap;
 }
 
-/* Flashy low-odometer callout */
+/* Flashy low-odometer callout (no transform — stays clipped inside card) */
 .badge-low-miles {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, #ff2d55 0%, #ff9500 55%, #ffd60a 100%);
     color: #1a1a1a;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 900;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    padding: 0.4rem 0.7rem;
+    padding: 0.35rem 0.6rem;
     border-radius: 999px;
-    border: 2px solid rgba(255, 255, 255, 0.85);
+    border: 2px solid rgba(255, 255, 255, 0.9);
     box-shadow:
         0 0 0 1px rgba(255, 45, 85, 0.35),
-        0 4px 14px rgba(255, 149, 0, 0.45);
-    animation: low-miles-pulse 1.6s ease-in-out infinite;
-    line-height: 1.1;
+        0 3px 10px rgba(255, 149, 0, 0.45);
+    animation: low-miles-glow 1.8s ease-in-out infinite;
+    line-height: 1.15;
     white-space: nowrap;
+    max-width: 100%;
 }
 
 .badge-low-miles-inline {
     font-size: 0.78rem;
-    padding: 0.45rem 0.8rem;
+    padding: 0.4rem 0.75rem;
     pointer-events: auto;
+    animation: none;
 }
 
-@keyframes low-miles-pulse {
+@keyframes low-miles-glow {
     0%,
     100% {
-        transform: scale(1);
-        filter: brightness(1);
         box-shadow:
             0 0 0 1px rgba(255, 45, 85, 0.35),
-            0 4px 14px rgba(255, 149, 0, 0.45);
+            0 3px 10px rgba(255, 149, 0, 0.45);
     }
     50% {
-        transform: scale(1.06);
-        filter: brightness(1.08);
         box-shadow:
-            0 0 0 3px rgba(255, 214, 10, 0.55),
-            0 6px 20px rgba(255, 45, 85, 0.4);
+            0 0 0 3px rgba(255, 214, 10, 0.65),
+            0 4px 16px rgba(255, 45, 85, 0.45);
     }
 }
 
