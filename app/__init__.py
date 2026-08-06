@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 load_dotenv()
 
 from config import get_config
-from app.utils import format_mileage, format_price
+from app.utils import format_mileage, format_price, is_low_mileage
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -78,6 +78,8 @@ def create_app(config_class=None):
     # Template filters and globals
     app.jinja_env.filters['format_price'] = format_price
     app.jinja_env.filters['format_mileage'] = format_mileage
+    app.jinja_env.filters['is_low_mileage'] = is_low_mileage
+    app.jinja_env.globals['is_low_mileage'] = is_low_mileage
 
     # Live "now" callable so footer year stays current without restart
     app.jinja_env.globals['now'] = lambda: datetime.now(timezone.utc)

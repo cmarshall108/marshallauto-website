@@ -29,6 +29,8 @@
         engine: form.querySelector('#engine'),
         exterior_color: form.querySelector('#exterior_color'),
         interior_color: form.querySelector('#interior_color'),
+        mpg_city: form.querySelector('#mpg_city'),
+        mpg_highway: form.querySelector('#mpg_highway'),
         features: form.querySelector('#features'),
         vin: form.querySelector('#vin'),
     };
@@ -412,18 +414,17 @@
             ['fuel_type', vehicle.fuel_type],
             ['engine', vehicle.engine],
             ['transmission', vehicle.transmission],
+            ['exterior_color', vehicle.exterior_color],
+            ['interior_color', vehicle.interior_color],
+            ['mpg_city', vehicle.mpg_city],
+            ['mpg_highway', vehicle.mpg_highway],
         ];
 
         fieldMap.forEach(([name, value]) => {
             const el = fields[name];
             if (!el) return;
-            if (force && value !== null && value !== undefined && String(value).trim()) {
-                // Force only when user clicked Decode and field is empty OR
-                // we still respect non-empty user values (never overwrite).
-                if (setIfEmpty(el, value)) filled.push(name);
-            } else if (setIfEmpty(el, value)) {
-                filled.push(name);
-            }
+            // Never overwrite non-empty user values (force still respects this).
+            if (setIfEmpty(el, value)) filled.push(name);
         });
 
         // Features: always merge (never wipe existing chips/text)
@@ -446,17 +447,21 @@
             fields.vin.value = data.vin;
         }
 
-        const warn = (data.warnings && data.warnings.length)
-            ? ` Note: ${data.warnings[0]}`
-            : '';
+        const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
+        // Prefer the most actionable notes (colors / MPG) in the status line.
+        const primaryWarn = warnings.find((w) => /color|fuel economy|mpg|epa/i.test(w))
+            || warnings[0]
+            || '';
+        const warn = primaryWarn ? ` Note: ${primaryWarn}` : '';
+        const src = data.source ? ` [${data.source}]` : '';
         if (filled.length) {
             setVinStatus(
-                `Prefill applied: ${filled.join(', ')}. Review before saving.${warn}`,
+                `Prefill applied${src}: ${filled.join(', ')}. Review before saving.${warn}`,
                 warn ? 'warning' : 'success'
             );
         } else {
             setVinStatus(
-                `VIN decoded (${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}). Fields already had values; features merged if new.${warn}`.replace(/\s+/g, ' ').trim(),
+                `VIN decoded${src} (${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}). Fields already had values; features merged if new.${warn}`.replace(/\s+/g, ' ').trim(),
                 warn ? 'warning' : 'muted'
             );
         }

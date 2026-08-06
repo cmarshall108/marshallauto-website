@@ -146,11 +146,16 @@
                                      decoding="async"
                                      itemprop="image">
                                 <span class="badge-condition">{{ vehicle.condition | title }}</span>
-                                {% if vehicle.title_status == 'rebuilt' %}
-                                <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">Rebuilt Title</span>
-                                {% elif vehicle.title_status == 'salvage' %}
-                                <span class="badge bg-danger position-absolute top-0 end-0 m-2">Salvage Title</span>
-                                {% endif %}
+                                <div class="vehicle-card-badges">
+                                    {% if vehicle.is_low_mileage %}
+                                    <span class="badge-low-miles" title="Low mileage — under 75,000 miles">LOW MILES!</span>
+                                    {% endif %}
+                                    {% if vehicle.title_status == 'rebuilt' %}
+                                    <span class="badge badge-title-status bg-warning text-dark">Rebuilt Title</span>
+                                    {% elif vehicle.title_status == 'salvage' %}
+                                    <span class="badge badge-title-status bg-danger">Salvage Title</span>
+                                    {% endif %}
+                                </div>
                             </div>
                             <div class="card-body p-4">
                                 <h5 class="card-title" itemprop="name">{{ vehicle.title }}</h5>

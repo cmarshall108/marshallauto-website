@@ -129,6 +129,12 @@ class Vehicle(db.Model):
     def is_available(self):
         return self.status == 'available'
 
+    @property
+    def is_low_mileage(self):
+        """Retail attention flag for low-odometer inventory cards."""
+        from app.utils import is_low_mileage
+        return is_low_mileage(self.mileage)
+
     def generate_slug(self):
         base = re.sub(
             r'[^\w]+',

@@ -186,6 +186,80 @@ a:hover {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 600;
+    z-index: 2;
+}
+
+/* Stack title / low-miles badges top-right on inventory cards */
+.vehicle-card .vehicle-card-badges {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    z-index: 2;
+    max-width: min(70%, 11rem);
+    pointer-events: none;
+}
+
+.vehicle-card .badge-title-status {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* Flashy low-odometer callout */
+.badge-low-miles {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ff2d55 0%, #ff9500 55%, #ffd60a 100%);
+    color: #1a1a1a;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    box-shadow:
+        0 0 0 1px rgba(255, 45, 85, 0.35),
+        0 4px 14px rgba(255, 149, 0, 0.45);
+    animation: low-miles-pulse 1.6s ease-in-out infinite;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.badge-low-miles-inline {
+    font-size: 0.78rem;
+    padding: 0.45rem 0.8rem;
+    pointer-events: auto;
+}
+
+@keyframes low-miles-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+        box-shadow:
+            0 0 0 1px rgba(255, 45, 85, 0.35),
+            0 4px 14px rgba(255, 149, 0, 0.45);
+    }
+    50% {
+        transform: scale(1.06);
+        filter: brightness(1.08);
+        box-shadow:
+            0 0 0 3px rgba(255, 214, 10, 0.55),
+            0 6px 20px rgba(255, 45, 85, 0.4);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .badge-low-miles {
+        animation: none;
+    }
 }
 
 .vehicle-card .card-title {

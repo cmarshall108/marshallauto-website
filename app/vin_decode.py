@@ -1,7 +1,12 @@
-"""NHTSA vPIC VIN decode helpers for admin vehicle form prefills.
+"""NHTSA vPIC + EPA fuel-economy helpers for admin vehicle form prefills.
 
-Uses the free public DecodeVinValues API (no API key). Results are mapped to
-form fields and a default feature list derived from equipment flags.
+Uses free public APIs (no keys):
+- NHTSA DecodeVinValues for year/make/model/specs/features
+- EPA fueleconomy.gov for city/highway MPG
+
+Paint colors are not encoded in a VIN; exterior/interior color keys are
+returned empty so the admin form can still merge them if a future source
+provides values.
 """
 
 from __future__ import annotations
@@ -14,9 +19,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from typing import Any
 
-from app.vehicle_catalog import COMMON_FEATURES
+from app.vehicle_catalog import COMMON_FEATURES, EXTERIOR_COLORS, INTERIOR_COLORS
 
 
 def _ssl_context() -> ssl.SSLContext | None:
@@ -30,14 +36,18 @@ def _ssl_context() -> ssl.SSLContext | None:
 NHTSA_DECODE_URL = (
     'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{vin}?format=json'
 )
+EPA_BASE_URL = 'https://www.fueleconomy.gov/ws/rest/vehicle'
 
 # VIN characters exclude I, O, Q.
 _VIN_RE = re.compile(r'^[A-HJ-NPR-Z0-9]{17}$')
 
-# Short-lived process cache to avoid hammering NHTSA during form edits.
+# Short-lived process cache to avoid hammering upstream APIs during form edits.
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = 600
 _CACHE_MAX = 64
+_EPA_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
+_EPA_CACHE_TTL_SECONDS = 3600
+_EPA_CACHE_MAX = 128
 
 # NHTSA equipment field -> catalog-friendly feature label.
 # Only applied when the decoded value indicates the equipment is present.
@@ -337,6 +347,55 @@ def map_transmission(style: str | None, speeds: str | None = None) -> str:
     return text[:128]
 
 
+def _normalize_color(raw: str | None, catalog: list[str]) -> str:
+    """Map a free-text color onto catalog casing when possible."""
+    text = (raw or '').strip()
+    if not text:
+        return ''
+    # Drop useless placeholders
+    if text.lower() in _ABSENT_VALUES or text.lower() in {'other', 'unknown', 'n/a'}:
+        return ''
+    lookup = {c.lower(): c for c in catalog}
+    if text.lower() in lookup:
+        return lookup[text.lower()]
+    # Prefer a catalog color contained in the string (e.g. "Pearl White Metallic")
+    for color in catalog:
+        if color.lower() in text.lower():
+            return color
+    # Title-case short free text
+    if text.isupper() and len(text) > 2:
+        return text.title()[:64]
+    return text[:64]
+
+
+def map_colors(result: dict[str, Any]) -> dict[str, str]:
+    """Extract exterior/interior colors when present (usually empty on NHTSA)."""
+    exterior = _normalize_color(
+        _nhtsa_get(
+            result,
+            'ExteriorColor',
+            'Colour',
+            'Color',
+            'PaintColor',
+            'PrimaryColor',
+        ),
+        EXTERIOR_COLORS,
+    )
+    interior = _normalize_color(
+        _nhtsa_get(
+            result,
+            'InteriorColor',
+            'InteriorColour',
+            'CabinColor',
+        ),
+        INTERIOR_COLORS,
+    )
+    return {
+        'exterior_color': exterior,
+        'interior_color': interior,
+    }
+
+
 def derive_features(result: dict[str, Any]) -> list[str]:
     """Build a default feature list from NHTSA equipment + body/fuel cues."""
     features: list[str] = []
@@ -355,6 +414,22 @@ def derive_features(result: dict[str, Any]) -> list[str]:
     for field, label in _EQUIPMENT_FEATURE_MAP.items():
         if _is_present(_nhtsa_get(result, field)):
             add(label)
+
+    # Headlamp light source often returns "LED" rather than Standard/Optional.
+    lamp = _nhtsa_get(result, 'LowerBeamHeadlampLightSource', 'HeadlampLightSource').lower()
+    if 'led' in lamp:
+        add('LED Headlights')
+    elif 'hid' in lamp or 'xenon' in lamp:
+        add('LED Headlights')
+
+    # Alloy wheels: NHTSA wheel size is common; 17"+ is a reasonable retail cue.
+    wheel = _nhtsa_get(result, 'WheelSizeFront', 'WheelSizeRear')
+    try:
+        wheel_n = float(wheel) if wheel else 0
+    except ValueError:
+        wheel_n = 0
+    if wheel_n >= 17:
+        add('Alloy Wheels')
 
     # Seating cues from NHTSA counts only (no guessy package adds).
     seats = _nhtsa_get(result, 'Seats')
@@ -376,6 +451,10 @@ def derive_features(result: dict[str, Any]) -> list[str]:
     elif 'hev' in electrification or 'hybrid' in electrification:
         add('Hybrid System')
 
+    fuel = map_fuel_type(_nhtsa_get(result, 'FuelTypePrimary'))
+    if fuel == 'Electric':
+        add('Electric')
+
     # Prefer catalog casing when we have an exact case-insensitive match.
     catalog_lookup = {f.lower(): f for f in COMMON_FEATURES}
     normalized: list[str] = []
@@ -388,6 +467,373 @@ def derive_features(result: dict[str, Any]) -> list[str]:
         seen_out.add(key)
         normalized.append(canon)
     return normalized
+
+
+def _http_get_bytes(url: str, timeout: float = 8.0, accept: str = '*/*') -> bytes:
+    """GET bytes with certifi SSL + curl fallback (macOS-friendly)."""
+    req = urllib.request.Request(
+        url,
+        headers={
+            'Accept': accept,
+            'User-Agent': 'MarshallAutoWebsite/1.0 (admin-vin-decode)',
+        },
+        method='GET',
+    )
+    ctx = _ssl_context()
+    open_kwargs: dict[str, Any] = {'timeout': timeout}
+    if ctx is not None:
+        open_kwargs['context'] = ctx
+    try:
+        with urllib.request.urlopen(req, **open_kwargs) as resp:
+            return resp.read()
+    except (urllib.error.URLError, TimeoutError, ssl.SSLError) as exc:
+        # curl uses the OS trust store — helpful on some macOS Python builds.
+        try:
+            completed = subprocess.run(
+                [
+                    'curl', '-fsSL',
+                    '--max-time', str(max(1, int(timeout))),
+                    '-H', f'Accept: {accept}',
+                    '-H', 'User-Agent: MarshallAutoWebsite/1.0 (admin-vin-decode)',
+                    url,
+                ],
+                check=False,
+                capture_output=True,
+            )
+        except FileNotFoundError as curl_exc:
+            raise RuntimeError(f'Network error: {exc}') from curl_exc
+        if completed.returncode != 0:
+            err = (completed.stderr or completed.stdout or b'curl failed')[:200]
+            raise RuntimeError(f'Network error: {err!r}') from exc
+        return completed.stdout
+
+
+def _epa_cache_get(key: str) -> tuple[bool, dict[str, Any] | None]:
+    entry = _EPA_CACHE.get(key)
+    if not entry:
+        return False, None
+    ts, payload = entry
+    if time.time() - ts > _EPA_CACHE_TTL_SECONDS:
+        _EPA_CACHE.pop(key, None)
+        return False, None
+    return True, payload
+
+
+def _epa_cache_set(key: str, payload: dict[str, Any] | None) -> None:
+    if len(_EPA_CACHE) >= _EPA_CACHE_MAX:
+        oldest = min(_EPA_CACHE.items(), key=lambda kv: kv[1][0])[0]
+        _EPA_CACHE.pop(oldest, None)
+    _EPA_CACHE[key] = (time.time(), payload)
+
+
+def _epa_menu_items(path: str, params: dict[str, str], timeout: float = 8.0) -> list[tuple[str, str]]:
+    query = urllib.parse.urlencode(params)
+    url = f'{EPA_BASE_URL}/menu/{path}?{query}'
+    body = _http_get_bytes(url, timeout=timeout, accept='application/xml, text/xml, */*')
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as exc:
+        raise RuntimeError('EPA returned invalid XML') from exc
+    items: list[tuple[str, str]] = []
+    for mi in root.findall('.//menuItem'):
+        text = (mi.findtext('text') or '').strip()
+        value = (mi.findtext('value') or '').strip()
+        if text or value:
+            items.append((text, value))
+    return items
+
+
+def _epa_vehicle(vehicle_id: str, timeout: float = 8.0) -> dict[str, str]:
+    url = f'{EPA_BASE_URL}/{urllib.parse.quote(str(vehicle_id), safe="")}'
+    body = _http_get_bytes(url, timeout=timeout, accept='application/xml, text/xml, */*')
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as exc:
+        raise RuntimeError('EPA vehicle XML invalid') from exc
+
+    def text(tag: str) -> str:
+        return (root.findtext(tag) or '').strip()
+
+    return {
+        'id': vehicle_id,
+        'city08': text('city08'),
+        'highway08': text('highway08'),
+        'comb08': text('comb08'),
+        'trany': text('trany'),
+        'drive': text('drive'),
+        'displ': text('displ'),
+        'cylinders': text('cylinders'),
+        'fuelType1': text('fuelType1'),
+        'model': text('model'),
+        'make': text('make'),
+        'year': text('year'),
+        'atvType': text('atvType'),
+    }
+
+
+def _score_epa_model_name(candidate: str, model: str, trim: str, fuel_type: str) -> int:
+    cand = (candidate or '').strip().lower()
+    model_l = (model or '').strip().lower()
+    trim_l = (trim or '').strip().lower()
+    fuel_l = (fuel_type or '').strip().lower()
+    if not cand or not model_l:
+        return -1
+    score = 0
+    if cand == model_l:
+        score += 100
+    elif cand.startswith(model_l + ' ') or cand.startswith(model_l + '-'):
+        score += 80
+    elif model_l in cand:
+        score += 50
+    else:
+        # Handle F-150 vs F150 style
+        compact_c = re.sub(r'[^a-z0-9]', '', cand)
+        compact_m = re.sub(r'[^a-z0-9]', '', model_l)
+        if compact_m and compact_m in compact_c:
+            score += 45
+        else:
+            return -1
+
+    if trim_l:
+        # EPA often groups trims: "Camry LE/SE"
+        trim_token = trim_l.split()[0]
+        if trim_token and trim_token in cand:
+            score += 25
+        elif trim_l in cand:
+            score += 30
+
+    is_hybrid_cand = 'hybrid' in cand or 'phev' in cand or 'plug' in cand
+    is_hybrid_fuel = 'hybrid' in fuel_l or 'plug' in fuel_l or 'electric' in fuel_l
+    if is_hybrid_fuel and is_hybrid_cand:
+        score += 35
+    elif is_hybrid_fuel and not is_hybrid_cand:
+        score -= 20
+    elif not is_hybrid_fuel and is_hybrid_cand:
+        score -= 40
+
+    return score
+
+
+def _parse_displacement_liters(engine: str | None, nhtsa_disp: str | None = None) -> float | None:
+    for raw in (nhtsa_disp, engine):
+        if not raw:
+            continue
+        m = re.search(r'(\d+(?:\.\d+)?)\s*L\b', str(raw), re.I)
+        if m:
+            try:
+                return float(m.group(1))
+            except ValueError:
+                continue
+        try:
+            return float(str(raw).strip())
+        except ValueError:
+            continue
+    return None
+
+
+def _score_epa_option(
+    option_text: str,
+    *,
+    engine: str,
+    transmission: str,
+    drivetrain: str,
+    cylinders: str | None,
+    displacement: float | None,
+) -> int:
+    text = (option_text or '').lower()
+    score = 0
+
+    # Displacement match: "2.5 L"
+    if displacement is not None:
+        if re.search(rf'{re.escape(str(displacement).rstrip("0").rstrip("."))}\s*l\b', text) or \
+           re.search(rf'{displacement:.1f}\s*l\b', text):
+            score += 40
+        else:
+            # soft penalty when option has a different explicit liters value
+            m = re.search(r'(\d+(?:\.\d+)?)\s*l\b', text)
+            if m:
+                try:
+                    other = float(m.group(1))
+                    if abs(other - displacement) >= 0.4:
+                        score -= 25
+                except ValueError:
+                    pass
+
+    # Cylinder match: "4 cyl"
+    cyl_n = None
+    if cylinders:
+        try:
+            cyl_n = int(float(cylinders))
+        except ValueError:
+            cyl_n = None
+    if cyl_n is None and engine:
+        m = re.search(r'\b(?:I|V|H|L)?(\d)\b', engine.upper())
+        if m:
+            try:
+                cyl_n = int(m.group(1))
+            except ValueError:
+                cyl_n = None
+    if cyl_n is not None:
+        if re.search(rf'\b{cyl_n}\s*cyl\b', text):
+            score += 25
+
+    # Transmission cues
+    tr = (transmission or '').lower()
+    if 'cvt' in tr and 'av' in text:
+        score += 15
+    if 'manual' in tr and 'man' in text:
+        score += 20
+    if 'auto' in tr and 'auto' in text:
+        score += 10
+    m = re.search(r'(\d+)\s*-?\s*speed', tr)
+    if m and m.group(1) in text:
+        score += 10
+
+    # Drivetrain
+    dt = (drivetrain or '').upper()
+    if dt == 'AWD' and 'awd' in text:
+        score += 20
+    elif dt == '4WD' and ('4wd' in text or '4x4' in text or 'four' in text):
+        score += 20
+    elif dt == 'FWD' and ('fwd' in text or 'front' in text):
+        score += 10
+    elif dt == 'RWD' and ('rwd' in text or 'rear' in text):
+        score += 10
+    elif dt in {'AWD', '4WD'} and ('fwd' in text or '2wd' in text) and 'awd' not in text and '4wd' not in text:
+        score -= 15
+
+    return score
+
+
+def lookup_epa_mpg(
+    *,
+    year: int | None,
+    make: str | None,
+    model: str | None,
+    trim: str | None = None,
+    engine: str | None = None,
+    transmission: str | None = None,
+    drivetrain: str | None = None,
+    fuel_type: str | None = None,
+    nhtsa_displacement: str | None = None,
+    nhtsa_cylinders: str | None = None,
+    timeout: float = 8.0,
+) -> dict[str, Any] | None:
+    """
+    Best-effort EPA MPG lookup by year/make/model (+ trim/engine hints).
+
+    Returns dict with mpg_city, mpg_highway, mpg_combined, epa_model, epa_option
+    or None when no confident match is found.
+    """
+    if not year or not make or not model:
+        return None
+
+    cache_key = '|'.join([
+        str(year),
+        (make or '').lower(),
+        (model or '').lower(),
+        (trim or '').lower(),
+        (engine or '').lower(),
+        (transmission or '').lower(),
+        (drivetrain or '').lower(),
+        (fuel_type or '').lower(),
+    ])
+    hit, cached = _epa_cache_get(cache_key)
+    if hit:
+        return dict(cached) if cached else None
+
+    try:
+        models = _epa_menu_items(
+            'model',
+            {'year': str(year), 'make': make},
+            timeout=timeout,
+        )
+    except RuntimeError:
+        _epa_cache_set(cache_key, None)
+        return None
+
+    if not models:
+        _epa_cache_set(cache_key, None)
+        return None
+
+    ranked_models: list[tuple[int, str]] = []
+    for text, _value in models:
+        score = _score_epa_model_name(text, model, trim or '', fuel_type or '')
+        if score >= 45:
+            ranked_models.append((score, text))
+    ranked_models.sort(key=lambda x: x[0], reverse=True)
+    if not ranked_models:
+        _epa_cache_set(cache_key, None)
+        return None
+
+    displacement = _parse_displacement_liters(engine, nhtsa_displacement)
+    best: tuple[int, dict[str, str], str, str] | None = None
+
+    for model_score, epa_model in ranked_models[:6]:
+        try:
+            options = _epa_menu_items(
+                'options',
+                {'year': str(year), 'make': make, 'model': epa_model},
+                timeout=timeout,
+            )
+        except RuntimeError:
+            continue
+        if not options:
+            continue
+        for opt_text, opt_id in options:
+            if not opt_id:
+                continue
+            opt_score = _score_epa_option(
+                opt_text,
+                engine=engine or '',
+                transmission=transmission or '',
+                drivetrain=drivetrain or '',
+                cylinders=nhtsa_cylinders,
+                displacement=displacement,
+            )
+            total = model_score + opt_score
+            # Prefer fewer options ambiguity: single option gets a small boost
+            if len(options) == 1:
+                total += 5
+            if best is None or total > best[0]:
+                best = (total, {'id': opt_id, 'text': opt_text}, epa_model, opt_text)
+
+    if not best or best[0] < 50:
+        _epa_cache_set(cache_key, None)
+        return None
+
+    try:
+        vehicle = _epa_vehicle(best[1]['id'], timeout=timeout)
+    except RuntimeError:
+        _epa_cache_set(cache_key, None)
+        return None
+
+    def _to_int(raw: str | None) -> int | None:
+        if raw is None or raw == '':
+            return None
+        try:
+            return int(round(float(raw)))
+        except ValueError:
+            return None
+
+    city = _to_int(vehicle.get('city08'))
+    hwy = _to_int(vehicle.get('highway08'))
+    comb = _to_int(vehicle.get('comb08'))
+    if city is None and hwy is None:
+        _epa_cache_set(cache_key, None)
+        return None
+
+    payload = {
+        'mpg_city': city,
+        'mpg_highway': hwy,
+        'mpg_combined': comb,
+        'epa_model': best[2],
+        'epa_option': best[3],
+        'epa_vehicle_id': vehicle.get('id'),
+        'score': best[0],
+    }
+    _epa_cache_set(cache_key, payload)
+    return dict(payload)
 
 
 def map_vehicle_fields(result: dict[str, Any]) -> dict[str, Any]:
@@ -407,6 +853,8 @@ def map_vehicle_fields(result: dict[str, Any]) -> dict[str, Any]:
     if model and model.isupper() and len(model) > 3:
         model = model.title()
 
+    colors = map_colors(result)
+
     return {
         'year': year,
         'make': make,
@@ -420,11 +868,19 @@ def map_vehicle_fields(result: dict[str, Any]) -> dict[str, Any]:
             _nhtsa_get(result, 'TransmissionStyle'),
             _nhtsa_get(result, 'TransmissionSpeeds'),
         ),
+        'exterior_color': colors.get('exterior_color') or '',
+        'interior_color': colors.get('interior_color') or '',
+        'mpg_city': None,
+        'mpg_highway': None,
+        'mpg_combined': None,
         'doors': _nhtsa_get(result, 'Doors') or None,
         'plant_city': _nhtsa_get(result, 'PlantCity') or None,
         'plant_country': _nhtsa_get(result, 'PlantCountry') or None,
         'vehicle_type': _nhtsa_get(result, 'VehicleType') or None,
         'gvwr': _nhtsa_get(result, 'GVWR') or None,
+        # retained for EPA matching
+        '_displacement_l': _nhtsa_get(result, 'DisplacementL') or None,
+        '_cylinders': _nhtsa_get(result, 'EngineCylinders') or None,
     }
 
 
@@ -597,6 +1053,7 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
     vehicle = map_vehicle_fields(result)
     features = derive_features(result)
     warnings: list[str] = []
+    sources = ['nhtsa']
     if codes and codes != ['0']:
         if err_text:
             warnings.append(err_text)
@@ -604,11 +1061,12 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
             warnings.append('Decoded with NHTSA warnings: ' + ', '.join(codes))
 
     if not vehicle.get('make') and not vehicle.get('model'):
+        public_vehicle = {k: v for k, v in vehicle.items() if not str(k).startswith('_')}
         payload = {
             'ok': False,
             'vin': vin,
             'error': err_text or 'No vehicle data returned for this VIN.',
-            'vehicle': vehicle,
+            'vehicle': public_vehicle,
             'features': features,
             'warnings': warnings,
             'source': 'nhtsa',
@@ -616,14 +1074,49 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
         _cache_set(vin, payload)
         return dict(payload)
 
+    # EPA fuel economy (best-effort; never fails the whole decode)
+    epa = None
+    try:
+        epa = lookup_epa_mpg(
+            year=vehicle.get('year'),
+            make=vehicle.get('make'),
+            model=vehicle.get('model'),
+            trim=vehicle.get('trim'),
+            engine=vehicle.get('engine'),
+            transmission=vehicle.get('transmission'),
+            drivetrain=vehicle.get('drivetrain'),
+            fuel_type=vehicle.get('fuel_type'),
+            nhtsa_displacement=vehicle.get('_displacement_l'),
+            nhtsa_cylinders=vehicle.get('_cylinders'),
+        )
+    except Exception:
+        epa = None
+
+    if epa:
+        vehicle['mpg_city'] = epa.get('mpg_city')
+        vehicle['mpg_highway'] = epa.get('mpg_highway')
+        vehicle['mpg_combined'] = epa.get('mpg_combined')
+        vehicle['epa_model'] = epa.get('epa_model')
+        vehicle['epa_option'] = epa.get('epa_option')
+        sources.append('epa')
+    else:
+        warnings.append('Fuel economy not found in EPA database for this configuration.')
+
+    # Paint color is not part of the VIN — tell the admin clearly when empty.
+    if not vehicle.get('exterior_color') and not vehicle.get('interior_color'):
+        warnings.append(
+            'Exterior/interior color are not encoded in the VIN — enter them manually.'
+        )
+
+    public_vehicle = {k: v for k, v in vehicle.items() if not str(k).startswith('_')}
     payload = {
         'ok': True,
         'vin': vin,
         'error': None,
-        'vehicle': vehicle,
+        'vehicle': public_vehicle,
         'features': features,
         'warnings': warnings,
-        'source': 'nhtsa',
+        'source': '+'.join(sources),
     }
     _cache_set(vin, payload)
     return dict(payload)

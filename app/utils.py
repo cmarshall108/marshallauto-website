@@ -199,6 +199,19 @@ def format_mileage(value):
         return '0 mi'
 
 
+# Used-car retail cue: under this odometer reading shows a "LOW MILES!" badge.
+LOW_MILEAGE_THRESHOLD = 75000
+
+
+def is_low_mileage(value, threshold: int = LOW_MILEAGE_THRESHOLD) -> bool:
+    """True when mileage is a non-negative int strictly below the threshold."""
+    try:
+        miles = int(value)
+    except (TypeError, ValueError):
+        return False
+    return 0 <= miles < int(threshold)
+
+
 def parse_optional_int(value):
     """Coerce form/query values to int or None safely."""
     if value is None or value == '':
