@@ -561,6 +561,17 @@ a:hover {
     margin-top: 0.25rem;
 }
 
+/* Brief highlight after VIN decode prefills a field */
+#vehicle-form .vin-prefilled {
+    animation: vin-prefill-flash 1.6s ease-out;
+    border-color: rgba(25, 135, 84, 0.55);
+}
+
+@keyframes vin-prefill-flash {
+    0% { box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.28); }
+    100% { box-shadow: none; }
+}
+
 /* Admin */
 .admin-wrapper {
     min-height: 100vh;

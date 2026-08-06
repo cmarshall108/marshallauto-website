@@ -23,6 +23,7 @@ from app.utils import (
     save_uploaded_image, save_uploaded_pdf,
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
+from app.vin_decode import decode_vin, normalize_vin
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 
@@ -326,6 +327,29 @@ def vehicle_suggestions_api():
         'model': model,
         'suggestions': suggestions,
     })
+
+
+@admin_bp.route('/api/vin-decode', methods=['GET', 'POST'])
+@login_required
+def vin_decode_api():
+    """Decode a VIN via NHTSA vPIC and return form prefills + default features."""
+    if request.method == 'POST':
+        payload = request.get_json(silent=True) or {}
+        raw = payload.get('vin') or request.form.get('vin') or ''
+    else:
+        raw = request.args.get('vin') or ''
+
+    vin = normalize_vin(raw)
+    result = decode_vin(vin)
+    status = 200 if result.get('ok') else 400
+    # 422 for shape errors; 502 when upstream NHTSA fails
+    err = (result.get('error') or '').lower()
+    if not result.get('ok'):
+        if 'nhtsa' in err or 'network' in err or 'timed out' in err:
+            status = 502
+        elif 'character' in err or 'exactly 17' in err or 'enter a vin' in err:
+            status = 422
+    return jsonify(result), status
 
 
 # ------------------------------ SERVICE RECORDS ------------------------------

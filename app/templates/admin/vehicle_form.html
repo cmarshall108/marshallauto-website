@@ -9,12 +9,14 @@
 </div>
 
 <form method="POST" enctype="multipart/form-data" class="card border-0 shadow p-4" id="vehicle-form"
-      data-catalog-url="{{ url_for('admin.vehicle_catalog_api') }}">
+      data-catalog-url="{{ url_for('admin.vehicle_catalog_api') }}"
+      data-vin-decode-url="{{ url_for('admin.vin_decode_api') }}">
     {{ form.hidden_tag() }}
     <div class="alert alert-light border small mb-3">
         <i class="bi bi-lightning-charge text-primary me-1"></i>
-        Start typing in <strong>Make</strong>, <strong>Model</strong>, <strong>Trim</strong>, colors, body style, fuel, transmission, engine, or features for suggestions.
-        Values cascade (make → model → trim) and anything you type is still accepted.
+        Paste a <strong>VIN</strong> and click <strong>Decode VIN</strong> (or tab out of a complete VIN) to prefill year, make, model, trim, drivetrain, fuel, engine, and default safety features from NHTSA.
+        Empty fields are filled; existing values are left alone. Features are merged (not replaced).
+        Typeahead still works on make/model/trim, colors, body style, fuel, transmission, engine, and features.
     </div>
     <div class="row g-3">
         <!-- Identification -->
@@ -38,11 +40,17 @@
             {{ form.trim(class="form-control", id="trim", placeholder="e.g. XLE", autocomplete="off") }}
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-5">
             <label class="form-label" for="vin">VIN</label>
-            {{ form.vin(class="form-control", id="vin", maxlength="17", autocomplete="off") }}
+            <div class="input-group">
+                {{ form.vin(class="form-control text-uppercase", id="vin", maxlength="17", autocomplete="off", spellcheck="false", inputmode="text", placeholder="17-character VIN") }}
+                <button type="button" class="btn btn-outline-primary" id="vin-decode-btn" title="Decode VIN with NHTSA">
+                    <i class="bi bi-search me-1"></i> Decode VIN
+                </button>
+            </div>
+            <div id="vin-decode-status" class="form-text" role="status" aria-live="polite"></div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label class="form-label" for="stock_number">Stock Number</label>
             {{ form.stock_number(class="form-control", id="stock_number", autocomplete="off") }}
         </div>
