@@ -17,6 +17,8 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 - **Admin Panel** (`/admin`)
   - Secure login with Flask-Login
   - Add/edit/delete vehicles with image uploads
+  - VIN decode (NHTSA vPIC) to prefill year/make/model/trim/specs and default safety features when adding a vehicle
+  - Cascading typeahead suggestions for make/model/trim, colors, and features
   - Manage service records per vehicle
   - Upload and link CarFax PDF reports
   - View and manage customer leads (with UTM / click-ID attribution)

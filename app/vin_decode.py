@@ -42,7 +42,7 @@ _CACHE_MAX = 64
 # NHTSA equipment field -> catalog-friendly feature label.
 # Only applied when the decoded value indicates the equipment is present.
 _EQUIPMENT_FEATURE_MAP: dict[str, str] = {
-    'ABS': 'ABS',
+    # Prefer customer-facing ADAS / convenience items over universal basics (ABS/ESC).
     'AdaptiveCruiseControl': 'Adaptive Cruise Control',
     'BlindSpotMon': 'Blind Spot Monitor',
     'BlindSpotIntervention': 'Blind Spot Monitor',
@@ -57,10 +57,6 @@ _EQUIPMENT_FEATURE_MAP: dict[str, str] = {
     'RearAutomaticEmergencyBraking': 'Automatic Emergency Braking',
     'RearCrossTrafficAlert': 'Blind Spot Monitor',
     'RearVisibilitySystem': 'Backup Camera',
-    'TPMS': 'TPMS',
-    'TractionControl': 'Traction Control',
-    'ESC': 'Electronic Stability Control',
-    'DaytimeRunningLight': 'LED Headlights',
     'AdaptiveDrivingBeam': 'LED Headlights',
 }
 
