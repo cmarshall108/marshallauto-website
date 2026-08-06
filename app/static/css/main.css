@@ -354,6 +354,50 @@ a:hover {
 }
 
 /* Vehicle Detail */
+.gallery-toolbar {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.25rem;
+    border-radius: 999px;
+    background: #eef2f7;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.gallery-mode-btn {
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    padding: 0.45rem 0.9rem;
+    line-height: 1.1;
+    display: inline-flex;
+    align-items: center;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gallery-mode-btn:hover,
+.gallery-mode-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.85);
+    color: #0f172a;
+    outline: none;
+}
+
+.gallery-mode-btn.active {
+    background: #0f172a;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+
+.gallery-spin-help {
+    max-width: 36rem;
+}
+
 .vehicle-gallery {
     position: relative;
     border-radius: var(--border-radius);
@@ -416,6 +460,59 @@ a:hover {
 }
 
 .vehicle-gallery.has-nav.is-changing img#main-gallery-image {
+    opacity: 0.72;
+}
+
+/* 360° spin mode: continuous scrub, no slide-pull transform */
+.vehicle-gallery.is-spin-mode {
+    cursor: ew-resize;
+}
+
+.vehicle-gallery.is-spin-mode .gallery-stage {
+    cursor: ew-resize;
+}
+
+.vehicle-gallery.is-spin-mode.is-dragging,
+.vehicle-gallery.is-spin-mode.is-spinning {
+    cursor: grabbing;
+}
+
+.vehicle-gallery.is-spin-mode img#main-gallery-image {
+    transition: opacity 0.08s linear;
+    object-fit: contain;
+    background: #0f172a;
+}
+
+.vehicle-gallery.is-spin-mode.is-changing img#main-gallery-image {
+    opacity: 1;
+}
+
+.vehicle-gallery.is-spin-mode .gallery-nav {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.gallery-spin-badge {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.92), rgba(14, 165, 233, 0.92));
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+}
+
+.thumbnail-list.is-spin-dimmed {
     opacity: 0.72;
 }
 
@@ -1033,7 +1130,29 @@ a:hover {
     .inventory-grid {
         grid-template-columns: 1fr;
         gap: 1rem;
+    }gallery-toolbar {
+        width: 100%;
+        justify-content: stretch;
     }
+
+    .gallery-mode-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        font-size: 0.8rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .gallery-spin-badge {
+        left: 0.5rem;
+        bottom: 0.5rem;
+        font-size: 0.72rem;
+    }
+
+    .vehicle-gallery.is-spin-mode .gallery-swipe-hint {
+        bottom: 2.55rem;
+    }
+
+    .
 
     .vehicle-card .card-img-wrapper {
         height: 210px;

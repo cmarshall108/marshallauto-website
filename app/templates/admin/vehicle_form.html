@@ -152,6 +152,8 @@
             {{ form.images(class="form-control", accept="image/*", multiple=True) }}
             <div class="form-text">
                 Upload multiple photos. First image will be primary by default.
+                For a smooth <strong>360° Spin</strong> on the vehicle page, shoot exterior photos walking around the car
+                (front → passenger → rear → driver) and upload them in that order — 8+ frames looks best (4 minimum).
                 Large batches: keep each submit under {{ (config.MAX_CONTENT_LENGTH // (1024 * 1024)) }}MB total
                 (you can upload more photos later by editing the vehicle).
             </div>

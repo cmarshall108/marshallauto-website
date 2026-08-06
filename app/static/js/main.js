@@ -337,7 +337,7 @@
             });
         }
 
-        // Vehicle gallery: thumbs, arrows, swipe/drag, keyboard (mobile-first)
+        // Vehicle gallery: photos mode + optional 360° spin scrub
         const gallery = document.getElementById('vehicle-gallery');
         const galleryStage = document.getElementById('gallery-stage') || gallery;
         const mainImage = document.getElementById('main-gallery-image');
@@ -346,6 +346,11 @@
         const galleryNext = document.getElementById('gallery-next');
         const galleryCounter = document.getElementById('gallery-counter');
         const swipeHint = document.getElementById('gallery-swipe-hint');
+        const swipeHintText = document.getElementById('gallery-swipe-hint-text');
+        const spinBadge = document.getElementById('gallery-spin-badge');
+        const spinHelp = document.getElementById('gallery-spin-help');
+        const thumbsList = document.getElementById('gallery-thumbs');
+        const modeButtons = Array.from(document.querySelectorAll('[data-gallery-mode]'));
 
         if (mainImage && thumbButtons.length > 1 && gallery) {
             const slides = thumbButtons.map((el, index) => {
@@ -362,6 +367,11 @@
                 let currentIndex = Math.max(0, slides.findIndex((s) => s.el.classList.contains('active')));
                 if (currentIndex < 0) currentIndex = 0;
 
+                const spinReady = gallery.dataset.spinReady === 'true' && slides.length >= 4;
+                let mode = 'photos'; // 'photos' | 'spin'
+                let spinOriginIndex = 0;
+                let spinAccumPx = 0;
+
                 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 const hideSwipeHint = () => {
                     if (!swipeHint) return;
@@ -372,26 +382,45 @@
                     if (galleryCounter) {
                         galleryCounter.textContent = `${index + 1} / ${slides.length}`;
                     }
-                    gallery.setAttribute(
-                        'aria-label',
-                        `Photo ${index + 1} of ${slides.length}. Swipe left or right to change photos.`
-                    );
+                    if (mode === 'spin') {
+                        gallery.setAttribute(
+                            'aria-label',
+                            `360 spin frame ${index + 1} of ${slides.length}. Drag left or right to rotate.`
+                        );
+                    } else {
+                        gallery.setAttribute(
+                            'aria-label',
+                            `Photo ${index + 1} of ${slides.length}. Swipe left or right to change photos.`
+                        );
+                    }
                 };
 
-                const setActiveSlide = (index, action) => {
+                const setActiveSlide = (index, action, options) => {
+                    const opts = options || {};
                     const total = slides.length;
                     const normalized = ((index % total) + total) % total;
                     const slide = slides[normalized];
                     if (!slide) return;
+                    if (normalized === currentIndex && !opts.force) {
+                        updateCounter(normalized);
+                        return;
+                    }
 
                     currentIndex = normalized;
-                    gallery.classList.add('is-changing');
+                    const useFade = mode !== 'spin' || !!opts.forceFade;
+                    if (useFade) {
+                        gallery.classList.add('is-changing');
+                    }
                     mainImage.style.transform = 'translate3d(0,0,0)';
-                    mainImage.src = slide.src;
+                    if (mainImage.getAttribute('src') !== slide.src) {
+                        mainImage.src = slide.src;
+                    }
                     if (slide.alt) mainImage.alt = slide.alt;
 
                     const reveal = () => gallery.classList.remove('is-changing');
-                    if (mainImage.complete) {
+                    if (!useFade) {
+                        reveal();
+                    } else if (mainImage.complete) {
                         reveal();
                     } else {
                         mainImage.addEventListener('load', reveal, { once: true });
@@ -405,17 +434,21 @@
                         }
                     });
 
-                    try {
-                        slide.el.scrollIntoView({
-                            behavior: reduceMotion ? 'auto' : 'smooth',
-                            inline: 'center',
-                            block: 'nearest',
-                        });
-                    } catch (_) { /* ignore */ }
+                    if (!opts.skipScroll) {
+                        try {
+                            slide.el.scrollIntoView({
+                                behavior: reduceMotion || mode === 'spin' ? 'auto' : 'smooth',
+                                inline: 'center',
+                                block: 'nearest',
+                            });
+                        } catch (_) { /* ignore */ }
+                    }
 
                     updateCounter(normalized);
-                    hideSwipeHint();
-                    Analytics.trackGallery(action || 'thumb_click', normalized, total);
+                    if (!opts.quiet) {
+                        hideSwipeHint();
+                        Analytics.trackGallery(action || 'thumb_click', normalized, total);
+                    }
 
                     // Prefetch neighbors
                     [normalized - 1, normalized + 1].forEach((i) => {
@@ -429,11 +462,63 @@
                 const goNext = (action) => setActiveSlide(currentIndex + 1, action || 'next');
                 const goPrev = (action) => setActiveSlide(currentIndex - 1, action || 'prev');
 
+                const setMode = (nextMode, action) => {
+                    if (nextMode === 'spin' && !spinReady) return;
+                    if (nextMode !== 'photos' && nextMode !== 'spin') return;
+                    if (mode === nextMode) return;
+
+                    mode = nextMode;
+                    gallery.dataset.galleryMode = mode;
+                    gallery.classList.toggle('is-spin-mode', mode === 'spin');
+
+                    modeButtons.forEach((btn) => {
+                        const active = btn.getAttribute('data-gallery-mode') === mode;
+                        btn.classList.toggle('active', active);
+                        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+                    });
+
+                    if (spinBadge) spinBadge.hidden = mode !== 'spin';
+                    if (spinHelp) spinHelp.hidden = mode !== 'spin';
+                    if (thumbsList) {
+                        thumbsList.classList.toggle('is-spin-dimmed', mode === 'spin');
+                    }
+
+                    if (galleryPrev) galleryPrev.hidden = mode === 'spin';
+                    if (galleryNext) galleryNext.hidden = mode === 'spin';
+
+                    if (swipeHintText) {
+                        swipeHintText.textContent = mode === 'spin'
+                            ? 'Drag to spin 360°'
+                            : 'Swipe for more photos';
+                    }
+                    if (swipeHint) {
+                        swipeHint.classList.remove('is-hidden');
+                        window.setTimeout(hideSwipeHint, mode === 'spin' ? 4500 : 5000);
+                    }
+
+                    gallery.setAttribute(
+                        'aria-roledescription',
+                        mode === 'spin' ? '360 degree image spinner' : 'carousel'
+                    );
+                    updateCounter(currentIndex);
+                    Analytics.trackGallery(action || (mode === 'spin' ? 'spin_mode' : 'photos_mode'), currentIndex, slides.length);
+                };
+
                 updateCounter(currentIndex);
+
+                modeButtons.forEach((btn) => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        setMode(btn.getAttribute('data-gallery-mode'), 'mode_toggle');
+                    });
+                });
 
                 slides.forEach((slide) => {
                     slide.el.addEventListener('click', (e) => {
                         e.preventDefault();
+                        if (mode === 'spin') {
+                            setMode('photos', 'thumb_exit_spin');
+                        }
                         setActiveSlide(slide.index, 'thumb_click');
                     });
                 });
@@ -442,6 +527,7 @@
                     galleryPrev.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (mode === 'spin') setMode('photos', 'arrow_exit_spin');
                         goPrev('arrow_prev');
                     });
                 }
@@ -449,6 +535,7 @@
                     galleryNext.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (mode === 'spin') setMode('photos', 'arrow_exit_spin');
                         goNext('arrow_next');
                     });
                 }
@@ -456,14 +543,17 @@
                 gallery.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowRight') {
                         e.preventDefault();
-                        goNext('key_next');
+                        goNext(mode === 'spin' ? 'spin_key_next' : 'key_next');
                     } else if (e.key === 'ArrowLeft') {
                         e.preventDefault();
-                        goPrev('key_prev');
+                        goPrev(mode === 'spin' ? 'spin_key_prev' : 'key_prev');
+                    } else if ((e.key === 's' || e.key === 'S') && spinReady) {
+                        e.preventDefault();
+                        setMode(mode === 'spin' ? 'photos' : 'spin', 'key_mode_toggle');
                     }
                 });
 
-                // Pointer-based swipe/drag with axis lock (works on iOS/Android/desktop)
+                // Pointer-based swipe (photos) / continuous scrub (spin)
                 const SWIPE_THRESHOLD_PX = 48;
                 const SWIPE_THRESHOLD_RATIO = 0.14;
                 const AXIS_LOCK_PX = 8;
@@ -474,9 +564,16 @@
                 let startTime = 0;
                 let axis = null; // 'x' | 'y' | null
                 let dragging = false;
+                let lastSpinTrackAt = 0;
+
+                const pxPerFrame = () => {
+                    const width = gallery.offsetWidth || 320;
+                    // ~full drag width ≈ one full rotation through all frames
+                    return Math.max(18, Math.min(56, width / Math.max(slides.length, 8)));
+                };
 
                 const resetDragStyles = () => {
-                    gallery.classList.remove('is-dragging', 'is-swiping-x');
+                    gallery.classList.remove('is-dragging', 'is-swiping-x', 'is-spinning');
                     mainImage.style.transform = 'translate3d(0,0,0)';
                 };
 
@@ -490,12 +587,17 @@
                     startTime = Date.now();
                     axis = null;
                     dragging = true;
+                    spinOriginIndex = currentIndex;
+                    spinAccumPx = 0;
 
                     try {
                         galleryStage.setPointerCapture(pointerId);
                     } catch (_) { /* ignore */ }
 
                     gallery.classList.add('is-dragging');
+                    if (mode === 'spin') {
+                        gallery.classList.add('is-spinning');
+                    }
                 };
 
                 const onPointerMove = (e) => {
@@ -518,8 +620,25 @@
                         return;
                     }
 
-                    // Horizontal swipe: prevent page scroll / pull-to-refresh conflicts
+                    // Horizontal gesture: prevent page scroll / pull-to-refresh conflicts
                     if (e.cancelable) e.preventDefault();
+
+                    if (mode === 'spin') {
+                        spinAccumPx = dx;
+                        // Drag right → previous frames (car rotates with the drag)
+                        const frames = Math.round(-spinAccumPx / pxPerFrame());
+                        const target = spinOriginIndex + frames;
+                        if (target !== currentIndex) {
+                            const now = Date.now();
+                            const quiet = now - lastSpinTrackAt < 700;
+                            if (!quiet) lastSpinTrackAt = now;
+                            setActiveSlide(target, 'spin_scrub', {
+                                quiet: quiet,
+                                skipScroll: true,
+                            });
+                        }
+                        return;
+                    }
 
                     const width = gallery.offsetWidth || 1;
                     const resistance = 0.92;
@@ -540,6 +659,7 @@
                     const distanceThreshold = Math.max(SWIPE_THRESHOLD_PX, width * SWIPE_THRESHOLD_RATIO);
                     const isFlick = velocity > 0.45 && Math.abs(dx) > 24;
                     const committedAxis = axis;
+                    const wasSpin = mode === 'spin';
 
                     pointerId = null;
                     axis = null;
@@ -551,6 +671,12 @@
                     resetDragStyles();
 
                     if (committedAxis !== 'x') return;
+
+                    if (wasSpin) {
+                        // Final frame already applied during scrub; log end of gesture
+                        Analytics.trackGallery('spin_end', currentIndex, slides.length);
+                        return;
+                    }
 
                     if (Math.abs(dx) >= distanceThreshold || isFlick) {
                         if (dx < 0) goNext('swipe_next');
@@ -566,15 +692,13 @@
                     resetDragStyles();
                 };
 
-                // Non-passive touch listeners as fallback for older WebViews
-                // where pointer events are incomplete.
                 galleryStage.addEventListener('pointerdown', onPointerDown);
                 galleryStage.addEventListener('pointermove', onPointerMove, { passive: false });
                 galleryStage.addEventListener('pointerup', onPointerUp);
                 galleryStage.addEventListener('pointercancel', onPointerCancel);
                 galleryStage.addEventListener('lostpointercapture', onPointerCancel);
 
-                // Prefetch all gallery images for snappy mobile swipes
+                // Prefetch all gallery images for snappy mobile swipes / spin
                 slides.forEach((slide) => {
                     const img = new Image();
                     img.src = slide.src;

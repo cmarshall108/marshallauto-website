@@ -33,7 +33,29 @@
                 {% set gallery_images = vehicle.ordered_images() %}
                 {% set primary = vehicle.primary_image() %}
                 {% set gallery_count = gallery_images|length %}
-                <div class="vehicle-gallery mb-3{% if gallery_count > 1 %} has-nav{% endif %}"
+                {% set spin_ready = gallery_count >= 4 %}
+                {% if gallery_count > 1 %}
+                <div class="gallery-toolbar mb-2" id="gallery-toolbar" role="group" aria-label="Photo viewer mode">
+                    <button type="button"
+                            class="gallery-mode-btn active"
+                            id="gallery-mode-photos"
+                            data-gallery-mode="photos"
+                            aria-pressed="true">
+                        <i class="bi bi-images me-1" aria-hidden="true"></i> Photos
+                    </button>
+                    {% if spin_ready %}
+                    <button type="button"
+                            class="gallery-mode-btn"
+                            id="gallery-mode-spin"
+                            data-gallery-mode="spin"
+                            aria-pressed="false"
+                            title="Drag left/right to spin through exterior photos in order">
+                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> 360° Spin
+                    </button>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <div class="vehicle-gallery mb-3{% if gallery_count > 1 %} has-nav{% endif %}{% if spin_ready %} spin-ready{% endif %}"
                      id="vehicle-gallery"
                      {% if gallery_count > 1 %}
                      tabindex="0"
@@ -41,6 +63,8 @@
                      aria-roledescription="carousel"
                      aria-label="{{ vehicle.title }} photo gallery. Swipe left or right to change photos."
                      data-gallery-count="{{ gallery_count }}"
+                     data-spin-ready="{{ 'true' if spin_ready else 'false' }}"
+                     data-gallery-mode="photos"
                      {% endif %}>
                     <div class="gallery-stage" id="gallery-stage">
                         <img id="main-gallery-image"
@@ -59,13 +83,19 @@
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                     </button>
                     <div class="gallery-counter" id="gallery-counter" aria-live="polite">1 / {{ gallery_count }}</div>
+                    {% if spin_ready %}
+                    <div class="gallery-spin-badge" id="gallery-spin-badge" hidden>
+                        <i class="bi bi-arrow-repeat" aria-hidden="true"></i> 360°
+                    </div>
+                    {% endif %}
                     <div class="gallery-swipe-hint d-lg-none" id="gallery-swipe-hint" aria-hidden="true">
-                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Swipe for more photos
+                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                        <span id="gallery-swipe-hint-text">Swipe for more photos</span>
                     </div>
                     {% endif %}
                 </div>
                 {% if gallery_count > 1 %}
-                <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable" role="list" aria-label="Photo thumbnails">
+                <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable" id="gallery-thumbs" role="list" aria-label="Photo thumbnails">
                     {% for image in gallery_images %}
                     <button type="button"
                             class="thumbnail-btn{% if loop.first %} active{% endif %}"
@@ -83,6 +113,12 @@
                     </button>
                     {% endfor %}
                 </div>
+                {% if spin_ready %}
+                <p class="gallery-spin-help small text-muted mt-2 mb-0" id="gallery-spin-help" hidden>
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                    Drag left or right on the photo to spin. Best when exterior shots are ordered around the car.
+                </p>
+                {% endif %}
                 {% endif %}
             </div>
 
