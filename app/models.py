@@ -81,6 +81,12 @@ class Vehicle(db.Model):
     meta_keywords = db.Column(db.String(255), nullable=True)
     slug = db.Column(db.String(256), unique=True, nullable=True, index=True)
 
+    # Facebook Page publish tracking (not Marketplace listing IDs — Meta has no public Marketplace create API)
+    facebook_post_id = db.Column(db.String(64), nullable=True)
+    facebook_posted_at = db.Column(db.DateTime, nullable=True)
+    facebook_last_error = db.Column(db.String(500), nullable=True)
+    facebook_last_status = db.Column(db.String(32), nullable=True)  # posted, error, skipped
+
     # Relationships — selectin avoids N+1 on list pages when preloaded
     images = db.relationship(
         'VehicleImage',

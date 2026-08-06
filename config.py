@@ -97,6 +97,13 @@ class Config:
     GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID') or ''
     FACEBOOK_PIXEL_ID = os.environ.get('FACEBOOK_PIXEL_ID') or ''
     FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID') or ''
+    # Facebook Page publishing (Graph API). Token stays in env only — never commit real tokens.
+    # Note: Meta does not allow ordinary apps to auto-create Marketplace listings.
+    FACEBOOK_PAGE_ID = os.environ.get('FACEBOOK_PAGE_ID') or ''
+    FACEBOOK_PAGE_ACCESS_TOKEN = os.environ.get('FACEBOOK_PAGE_ACCESS_TOKEN') or ''
+    FACEBOOK_AUTO_POST_VEHICLES = os.environ.get('FACEBOOK_AUTO_POST_VEHICLES', 'false').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
     TWITTER_HANDLE = os.environ.get('TWITTER_HANDLE') or ''
     INSTAGRAM_URL = os.environ.get('INSTAGRAM_URL') or ''
     FACEBOOK_URL = os.environ.get('FACEBOOK_URL') or ''

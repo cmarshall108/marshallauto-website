@@ -65,6 +65,17 @@ class VehicleForm(FlaskForm):
     meta_keywords = StringField('Meta Keywords', validators=[Optional(), Length(max=255)])
 
     images = FileField('Vehicle Images', render_kw={'multiple': True})
+
+    # Facebook Page post on save (Marketplace auto-list is not available via public API)
+    post_to_facebook = BooleanField(
+        'Post to Facebook Page on save',
+        default=False,
+        description=(
+            'Creates a Facebook Page post with photos/caption and a link to this listing. '
+            'Does not create a Marketplace listing (Meta does not allow that via public API).'
+        ),
+    )
+
     submit = SubmitField('Save Vehicle')
 
 
@@ -113,7 +124,46 @@ class SiteSettingForm(FlaskForm):
         validators=[Optional(), Length(max=64)],
         description='Numeric Pixel ID for Meta ads conversion tracking.',
     )
-    facebook_app_id = StringField('Facebook App ID', validators=[Optional(), Length(max=64)])
+    facebook_app_id = StringField(
+        'Facebook App ID',
+        validators=[Optional(), Length(max=64)],
+        description='Meta app ID (Open Graph fb:app_id and developer console reference).',
+    )
+    facebook_page_id = StringField(
+        'Facebook Page ID',
+        validators=[Optional(), Length(max=64)],
+        description='Numeric Page ID used for Graph API posts (Page → About, or Graph API Explorer).',
+    )
+    facebook_page_access_token = PasswordField(
+        'Facebook Page Access Token',
+        validators=[Optional(), Length(max=512)],
+        description=(
+            'Long-lived Page access token with pages_manage_posts, pages_read_engagement, '
+            'and pages_show_list. Leave blank when saving to keep the current token.'
+        ),
+    )
+    clear_facebook_page_access_token = BooleanField(
+        'Clear saved Page access token',
+        default=False,
+        description='Remove the token stored in Admin Settings (env token still applies if set).',
+    )
+    facebook_page_posting_enabled = BooleanField(
+        'Enable Facebook Page vehicle posts',
+        default=False,
+        description=(
+            'When enabled, available vehicles can be posted to your Facebook Page. '
+            'Marketplace listings still require manual paste (no public Marketplace create API).'
+        ),
+    )
+    facebook_auto_post_on_create = BooleanField(
+        'Auto-post new available vehicles to Facebook Page',
+        default=False,
+    )
+    facebook_auto_post_on_edit = BooleanField(
+        'Auto-post again when an available vehicle is edited',
+        default=False,
+        description='Creates a new Page post with updated details (does not edit the old post).',
+    )
     twitter_handle = StringField('Twitter / X Handle', validators=[Optional(), Length(max=64)])
     instagram_url = StringField('Instagram URL', validators=[Optional(), Length(max=512)])
     facebook_url = StringField('Facebook URL', validators=[Optional(), Length(max=512)])

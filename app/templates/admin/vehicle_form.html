@@ -178,6 +178,90 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Facebook Page + Marketplace draft -->
+        <div class="col-12">
+            <hr class="my-2">
+            <h5 class="fw-bold mb-1"><i class="bi bi-facebook text-primary me-1"></i> Facebook</h5>
+            <p class="text-muted small mb-3">
+                Meta does <strong>not</strong> allow ordinary websites to auto-create
+                <em>Marketplace</em> vehicle listings. This tool posts to your
+                <strong>Facebook Page</strong> and builds a Marketplace-ready draft you can paste manually.
+            </p>
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.post_to_facebook(class="form-check-input", id="post_to_facebook") }}
+                <label class="form-check-label" for="post_to_facebook">{{ form.post_to_facebook.label.text }}</label>
+            </div>
+            {% if form.post_to_facebook.description %}
+            <div class="form-text">{{ form.post_to_facebook.description }}</div>
+            {% endif %}
+            {% if facebook_status and not facebook_status.configured %}
+            <div class="alert alert-warning small mt-2 mb-0">
+                Facebook Page posting is not fully configured.
+                Add your Page ID and Page access token under
+                <a href="{{ url_for('admin.settings') }}">Settings → Facebook / Meta account details</a>
+                (or set <code>FACEBOOK_PAGE_ACCESS_TOKEN</code> in <code>.env</code>).
+            </div>
+            {% elif facebook_status and not facebook_status.enabled %}
+            <div class="alert alert-info small mt-2 mb-0">
+                Page posting is configured but disabled. Enable it in
+                <a href="{{ url_for('admin.settings') }}">Settings</a>, or check the box above to force a post on this save.
+            </div>
+            {% endif %}
+        </div>
+        {% if vehicle %}
+        <div class="col-12">
+            <div class="card bg-light border-0 p-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                    <strong class="me-2">Last Facebook status:</strong>
+                    {% if vehicle.facebook_last_status == 'posted' %}
+                    <span class="badge bg-success">Posted</span>
+                    {% elif vehicle.facebook_last_status == 'error' %}
+                    <span class="badge bg-danger">Error</span>
+                    {% elif vehicle.facebook_last_status == 'skipped' %}
+                    <span class="badge bg-secondary">Skipped</span>
+                    {% else %}
+                    <span class="badge bg-light text-dark border">Never posted</span>
+                    {% endif %}
+                    {% if vehicle.facebook_post_id %}
+                    <span class="small text-muted">Post ID: <code>{{ vehicle.facebook_post_id }}</code></span>
+                    {% endif %}
+                    {% if vehicle.facebook_posted_at %}
+                    <span class="small text-muted">{{ vehicle.facebook_posted_at.strftime('%m/%d/%Y %I:%M %p') }} UTC</span>
+                    {% endif %}
+                </div>
+                {% if vehicle.facebook_last_error %}
+                <div class="small text-danger mb-2">{{ vehicle.facebook_last_error }}</div>
+                {% endif %}
+                <div class="d-flex flex-wrap gap-2">
+                    <form action="{{ url_for('admin.vehicle_facebook_post', id=vehicle.id) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('Post this vehicle to your Facebook Page now?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-primary" {% if facebook_status and not facebook_status.configured %}disabled{% endif %}>
+                            <i class="bi bi-send me-1"></i> Post to Facebook Page now
+                        </button>
+                    </form>
+                    {% if marketplace_draft %}
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="copy-marketplace-draft-btn"
+                            data-copy-target="marketplace-draft-text">
+                        <i class="bi bi-clipboard me-1"></i> Copy Marketplace draft
+                    </button>
+                    <a href="{{ marketplace_draft.marketplace_create_url }}" target="_blank" rel="noopener"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Marketplace create
+                    </a>
+                    {% endif %}
+                </div>
+                {% if marketplace_draft %}
+                <label class="form-label small fw-semibold mt-3 mb-1" for="marketplace-draft-text">Marketplace paste draft</label>
+                <textarea id="marketplace-draft-text" class="form-control form-control-sm font-monospace" rows="10" readonly>{{ marketplace_draft.copy_block }}</textarea>
+                <div class="form-text">Paste into Facebook Marketplace → Create vehicle listing. Photos must be uploaded there manually.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="mt-4">
@@ -189,4 +273,32 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/admin-vehicle-form.js') }}"></script>
+<script>
+(function () {
+  var btn = document.getElementById('copy-marketplace-draft-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var id = btn.getAttribute('data-copy-target');
+    var el = id ? document.getElementById(id) : null;
+    if (!el) return;
+    var text = el.value || el.textContent || '';
+    function done(ok) {
+      var original = btn.innerHTML;
+      btn.innerHTML = ok
+        ? '<i class="bi bi-check2 me-1"></i> Copied'
+        : '<i class="bi bi-x me-1"></i> Copy failed';
+      setTimeout(function () { btn.innerHTML = original; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }).catch(function () {
+        el.focus(); el.select();
+        try { done(document.execCommand('copy')); } catch (e) { done(false); }
+      });
+    } else {
+      el.focus(); el.select();
+      try { done(document.execCommand('copy')); } catch (e) { done(false); }
+    }
+  });
+})();
+</script>
 {% endblock %}

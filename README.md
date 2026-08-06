@@ -24,6 +24,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Upload and link CarFax PDF reports
   - View and manage customer leads (with UTM / click-ID attribution)
   - Edit site settings, SEO defaults, and analytics IDs
+  - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
 
 ## Quick Start
 
@@ -86,8 +87,38 @@ Set `DATABASE_URL` to a production PostgreSQL database for better performance an
 | `BUSINESS_ADDRESS` | Business street address |
 | `GOOGLE_TAG_ID` | Google Tag Manager container ID (optional; preferred over bare GA4) |
 | `GOOGLE_ANALYTICS_ID` | GA4 measurement ID used only when GTM is not set (optional) |
-| `FACEBOOK_PIXEL_ID` | Facebook Pixel ID (optional) |
+| `FACEBOOK_PAGE_ID` | Facebook Page ID for Graph API vehicle posts (optional; also in Admin → Settings) |
+| `FACEBOOK_PAGE_ACCESS_TOKEN` | Long-lived **Page** access token (optional env fallback; preferred in Admin → Settings) |
+| `FACEBOOK_AUTO_POST_VEHICLES` | Env fallback to enable Page posting (`true`/`false`) |
 
+Analytics and Facebook posting credentials can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`, Page ID, Page access token), which override env defaults when present.
+
+## Facebook Page posts & Marketplace drafts
+
+**Important:** Meta does **not** provide a public API for ordinary third-party apps to automatically create **Facebook Marketplace** vehicle listings. Marketplace listing creation is limited to Meta partnership programs. This site does **not** scrape or browser-automate Marketplace (fragile and against Meta’s terms).
+
+What *is* supported:
+
+1. **Facebook Page posts** via Graph API when you add/edit an available vehicle (photo + caption + link to your inventory page).
+2. **Marketplace-ready draft** on the vehicle edit screen — copy title/price/description and paste into [Marketplace → Create vehicle](https://www.facebook.com/marketplace/create/vehicle). Upload photos there manually.
+
+### Setup
+
+1. Create a Meta developer app and add the **Facebook Login** / Pages product as needed.
+2. Generate a **Page access token** for your business Page with at least:
+   - `pages_manage_posts`
+   - `pages_read_engagement`
+   - `pages_show_list`
+3. Prefer a **long-lived Page token**.
+4. In **Admin → Settings → Facebook / Meta account details**, enter:
+   - Facebook App ID (optional, for Open Graph)
+   - Facebook Page ID
+   - Facebook Page Access Token
+   - Enable posting / auto-post toggles
+5. Optionally set the same values in `.env` (`FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`) as a fallback. Admin Settings takes priority for the token when saved there. Never commit tokens to git.
+6. On **Add/Edit Vehicle**, use **Post to Facebook Page on save**, or **Post to Facebook Page now**, and **Copy Marketplace draft** when you want a Marketplace listing.
+
+Post status (`facebook_post_id`, last error/time) is stored on each vehicle
 Analytics IDs can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`), which override env defaults.
 
 ## Analytics Events

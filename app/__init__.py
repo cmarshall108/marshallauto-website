@@ -163,6 +163,14 @@ def _ensure_schema_columns(app):
                     conn.execute(text("ALTER TABLE vehicles ADD COLUMN title_status VARCHAR(20) DEFAULT 'clean' NOT NULL"))
                 if 'meta_keywords' not in cols:
                     conn.execute(text('ALTER TABLE vehicles ADD COLUMN meta_keywords VARCHAR(255)'))
+                if 'facebook_post_id' not in cols:
+                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_post_id VARCHAR(64)'))
+                if 'facebook_posted_at' not in cols:
+                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_posted_at DATETIME'))
+                if 'facebook_last_error' not in cols:
+                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_last_error VARCHAR(500)'))
+                if 'facebook_last_status' not in cols:
+                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_last_status VARCHAR(32)'))
         if 'reviews' in tables:
             cols = {c['name'] for c in inspector.get_columns('reviews')}
             with db.engine.begin() as conn:
@@ -208,6 +216,11 @@ def _ensure_default_settings():
         'site_tagline': 'Quality Used Cars You Can Trust',
         'meta_description': 'Marshall Auto, LLC is your trusted used car dealer in Sanford, NC offering quality pre-owned vehicles, financing, CarFax reports, and full service history.',
         'meta_keywords': 'used cars Sanford NC, used car dealer Sanford, pre-owned vehicles, car dealership, auto sales, financing, CarFax, Marshall Auto LLC',
+        'facebook_page_id': '',
+        'facebook_page_access_token': '',
+        'facebook_page_posting_enabled': 'false',
+        'facebook_auto_post_on_create': 'false',
+        'facebook_auto_post_on_edit': 'false',
         'about_text': 'Marshall Auto, LLC is a family-owned used car dealership in Sanford, NC committed to transparent pricing, quality vehicles, and exceptional customer service. Every vehicle on our lot is inspected, and CarFax history reports are available on qualifying vehicles.',
         'home_hero_title': 'Find Your Next Ride at Marshall Auto, LLC',
         'home_hero_subtitle': 'Browse our hand-picked inventory of quality used cars, trucks, and SUVs in Sanford, NC. Financing available.',

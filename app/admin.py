@@ -18,6 +18,10 @@ from app.models import (
     CarfaxReport, Lead, Review, ServiceRecord, SiteSetting, User,
     Vehicle, VehicleImage,
 )
+from app.facebook_publish import (
+    apply_publish_result, build_marketplace_draft, configuration_status,
+    maybe_auto_post_vehicle, post_vehicle_to_page,
+)
 from app.utils import (
     client_ip, is_safe_redirect, rate_limit_exceeded,
     save_uploaded_image, save_uploaded_pdf,
@@ -197,6 +201,9 @@ def vehicles():
 @login_required
 def vehicle_new():
     form = VehicleForm()
+    fb_status = configuration_status()
+    if request.method == 'GET' and fb_status.get('auto_post_on_create') and fb_status.get('configured'):
+        form.post_to_facebook.data = True
     if form.validate_on_submit():
         vehicle = _vehicle_from_form(form)
         db.session.add(vehicle)
@@ -204,9 +211,23 @@ def vehicle_new():
         vehicle.ensure_slug()
         db.session.commit()
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
+        # Refresh images relationship after image commit
+        db.session.refresh(vehicle)
+        _maybe_publish_vehicle_to_facebook(
+            vehicle,
+            is_new=True,
+            force=bool(form.post_to_facebook.data),
+        )
         flash('Vehicle added successfully.', 'success')
         return redirect(url_for('admin.vehicles'))
-    return render_template('admin/vehicle_form.html', form=form, vehicle=None, title='Add Vehicle')
+    return render_template(
+        'admin/vehicle_form.html',
+        form=form,
+        vehicle=None,
+        title='Add Vehicle',
+        facebook_status=fb_status,
+        marketplace_draft=None,
+    )
 
 
 @admin_bp.route('/vehicles/<int:id>/edit', methods=['GET', 'POST'])
@@ -219,14 +240,64 @@ def vehicle_edit(id):
         .first_or_404()
     )
     form = VehicleForm(obj=vehicle)
+    fb_status = configuration_status()
     if form.validate_on_submit():
         _apply_vehicle_form(vehicle, form)
         vehicle.ensure_slug()
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         db.session.commit()
+        db.session.refresh(vehicle)
+        _maybe_publish_vehicle_to_facebook(
+            vehicle,
+            is_new=False,
+            force=bool(form.post_to_facebook.data),
+        )
         flash('Vehicle updated successfully.', 'success')
         return redirect(url_for('admin.vehicles'))
-    return render_template('admin/vehicle_form.html', form=form, vehicle=vehicle, title='Edit Vehicle')
+    draft = build_marketplace_draft(vehicle) if vehicle else None
+    return render_template(
+        'admin/vehicle_form.html',
+        form=form,
+        vehicle=vehicle,
+        title='Edit Vehicle',
+        facebook_status=fb_status,
+        marketplace_draft=draft,
+    )
+
+
+@admin_bp.route('/vehicles/<int:id>/facebook/post', methods=['POST'])
+@login_required
+def vehicle_facebook_post(id):
+    """Manually post (or re-post) a vehicle to the Facebook Page."""
+    vehicle = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(id=id)
+        .first_or_404()
+    )
+    result = post_vehicle_to_page(vehicle, force=True)
+    apply_publish_result(vehicle, result)
+    db.session.commit()
+    if result.ok:
+        flash(f'Posted to Facebook Page (post id: {result.post_id}).', 'success')
+    elif result.skipped:
+        flash(result.error or 'Facebook post skipped.', 'warning')
+    else:
+        flash(f'Facebook post failed: {result.error}', 'danger')
+    return redirect(url_for('admin.vehicle_edit', id=id))
+
+
+@admin_bp.route('/vehicles/<int:id>/facebook/marketplace-draft')
+@login_required
+def vehicle_marketplace_draft(id):
+    """JSON Marketplace-ready draft for copy/paste (no API listing create)."""
+    vehicle = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(id=id)
+        .first_or_404()
+    )
+    return jsonify(build_marketplace_draft(vehicle))
 
 
 @admin_bp.route('/vehicles/<int:id>/delete', methods=['POST'])
@@ -475,34 +546,18 @@ def carfax_report_delete(id):
     return redirect(url_for('admin.carfax_reports'))
 
 
-@admin_bp.route('/carfax-reports/<int:id>/download')
-@login_required
-def carfax_report_download(id):
-    """Authenticated admin download for CarFax PDFs."""
-    report = db.session.get(CarfaxReport, id) or abort(404)
-    if not report.filename:
-        abort(404)
-    filename = os.path.basename(report.filename)
-    directory = os.path.join(current_app.config['UPLOAD_FOLDER'], 'carfax')
-    return send_from_directory(directory, filename, as_attachment=True, mimetype='application/pdf')
-
-
 # ------------------------------ LEADS ------------------------------
 
 @admin_bp.route('/leads')
 @login_required
 def leads():
     page = request.args.get('page', 1, type=int)
-    pagination = (
-        Lead.query
-        .options(selectinload(Lead.vehicle))
-        .order_by(Lead.created_at.desc())
-        .paginate(page=page, per_page=25, error_out=False)
-    )
+    pagination = Lead.query.order_by(Lead.created_at.desc()).paginate(
+        page=page, per_page=25, error_out=False)
     return render_template('admin/leads.html', pagination=pagination)
 
 
-@admin_bp.route('/leads/<int:id>/mark-read', methods=['POST'])
+@admin_bp.route('/leads/<int:id>/read', methods=['POST'])
 @login_required
 def lead_mark_read(id):
     lead = db.session.get(Lead, id) or abort(404)
@@ -541,6 +596,27 @@ def settings():
         SiteSetting.set('google_tag_id', form.google_tag_id.data)
         SiteSetting.set('facebook_pixel_id', form.facebook_pixel_id.data)
         SiteSetting.set('facebook_app_id', form.facebook_app_id.data)
+        SiteSetting.set('facebook_page_id', (form.facebook_page_id.data or '').strip())
+        # Token: blank keeps existing; clear checkbox wipes stored token (env still works)
+        if form.clear_facebook_page_access_token.data:
+            SiteSetting.set('facebook_page_access_token', '')
+        elif form.facebook_page_access_token.data:
+            SiteSetting.set(
+                'facebook_page_access_token',
+                form.facebook_page_access_token.data.strip(),
+            )
+        SiteSetting.set(
+            'facebook_page_posting_enabled',
+            'true' if form.facebook_page_posting_enabled.data else 'false',
+        )
+        SiteSetting.set(
+            'facebook_auto_post_on_create',
+            'true' if form.facebook_auto_post_on_create.data else 'false',
+        )
+        SiteSetting.set(
+            'facebook_auto_post_on_edit',
+            'true' if form.facebook_auto_post_on_edit.data else 'false',
+        )
         SiteSetting.set('twitter_handle', form.twitter_handle.data)
         SiteSetting.set('instagram_url', form.instagram_url.data)
         SiteSetting.set('facebook_url', form.facebook_url.data)
@@ -563,20 +639,82 @@ def settings():
         form.home_hero_title.data = SiteSetting.get('home_hero_title')
         form.home_hero_subtitle.data = SiteSetting.get('home_hero_subtitle')
         form.google_search_console.data = SiteSetting.get('google_search_console')
-        form.google_analytics_id.data = SiteSetting.get('google_analytics_id') or current_app.config.get('GOOGLE_ANALYTICS_ID', '')
-        form.google_tag_id.data = SiteSetting.get('google_tag_id') or current_app.config.get('GOOGLE_TAG_ID', '')
-        form.facebook_pixel_id.data = SiteSetting.get('facebook_pixel_id') or current_app.config.get('FACEBOOK_PIXEL_ID', '')
-        form.facebook_app_id.data = SiteSetting.get('facebook_app_id')
+        form.google_analytics_id.data = (
+            SiteSetting.get('google_analytics_id')
+            or current_app.config.get('GOOGLE_ANALYTICS_ID', '')
+        )
+        form.google_tag_id.data = (
+            SiteSetting.get('google_tag_id')
+            or current_app.config.get('GOOGLE_TAG_ID', '')
+        )
+        form.facebook_pixel_id.data = (
+            SiteSetting.get('facebook_pixel_id')
+            or current_app.config.get('FACEBOOK_PIXEL_ID', '')
+        )
+        form.facebook_app_id.data = (
+            SiteSetting.get('facebook_app_id')
+            or current_app.config.get('FACEBOOK_APP_ID', '')
+        )
+        form.facebook_page_id.data = (
+            SiteSetting.get('facebook_page_id')
+            or current_app.config.get('FACEBOOK_PAGE_ID', '')
+        )
+        # Never prefill the token field (password input); blank means keep existing
+        form.facebook_page_access_token.data = ''
+        form.clear_facebook_page_access_token.data = False
+        form.facebook_page_posting_enabled.data = (
+            (SiteSetting.get('facebook_page_posting_enabled') or '').lower()
+            in ('1', 'true', 'yes', 'on')
+            or bool(current_app.config.get('FACEBOOK_AUTO_POST_VEHICLES'))
+        )
+        form.facebook_auto_post_on_create.data = (
+            (SiteSetting.get('facebook_auto_post_on_create') or '').lower()
+            in ('1', 'true', 'yes', 'on')
+        )
+        form.facebook_auto_post_on_edit.data = (
+            (SiteSetting.get('facebook_auto_post_on_edit') or '').lower()
+            in ('1', 'true', 'yes', 'on')
+        )
         form.twitter_handle.data = SiteSetting.get('twitter_handle')
         form.instagram_url.data = SiteSetting.get('instagram_url')
         form.facebook_url.data = SiteSetting.get('facebook_url')
         form.youtube_url.data = SiteSetting.get('youtube_url')
         form.business_latitude.data = SiteSetting.get('business_latitude')
         form.business_longitude.data = SiteSetting.get('business_longitude')
-    return render_template('admin/settings.html', form=form)
+    return render_template(
+        'admin/settings.html',
+        form=form,
+        facebook_status=configuration_status(),
+    )
 
 
 # ------------------------------ HELPERS ------------------------------
+
+def _maybe_publish_vehicle_to_facebook(vehicle, *, is_new: bool, force: bool = False):
+    """Post to Facebook Page when checkbox forced or auto-post settings match."""
+    try:
+        if force:
+            result = post_vehicle_to_page(vehicle, force=True)
+            apply_publish_result(vehicle, result)
+            db.session.commit()
+        else:
+            result = maybe_auto_post_vehicle(vehicle, is_new=is_new)
+            if result is None:
+                return
+            db.session.commit()
+
+        if result.ok:
+            flash(f'Facebook Page post created (id: {result.post_id}).', 'success')
+        elif result.skipped:
+            # Quiet skip for auto path; warn when user checked the box
+            if force:
+                flash(result.error or 'Facebook post skipped.', 'warning')
+        else:
+            flash(f'Facebook post failed: {result.error}', 'warning')
+    except Exception as exc:
+        current_app.logger.exception('Facebook publish hook failed')
+        flash(f'Facebook post error: {exc}', 'warning')
+
 
 def _vehicle_suggestion_catalog():
     """Build make/model/trim/etc suggestions from catalog + existing inventory."""

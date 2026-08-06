@@ -59,10 +59,94 @@
             {{ form.facebook_pixel_id(class="form-control", placeholder="1234567890") }}
             {% if form.facebook_pixel_id.description %}<div class="form-text">{{ form.facebook_pixel_id.description }}</div>{% endif %}
         </div>
+        <div class="col-12">
+            <hr class="my-2">
+            <h5 class="fw-bold mb-1">Facebook / Meta account details</h5>
+            <p class="text-muted small mb-3">
+                Enter the credentials used for Page posts and tracking. Values saved here override
+                matching <code>.env</code> entries. Posts go to your <strong>Facebook Page</strong> via Graph API.
+                <strong>Marketplace auto-listing is not available</strong> through Meta’s public APIs —
+                use the Marketplace draft on each vehicle edit screen to paste listings manually.
+            </p>
+            {% if facebook_status is defined %}
+            <div class="alert alert-{{ 'success' if facebook_status.configured else 'warning' }} small">
+                <div><strong>Posting status:</strong>
+                    {% if facebook_status.configured %}Configured{% else %}Not fully configured{% endif %}
+                    · Page ID {{ 'set' if facebook_status.page_id_set else 'missing' }}
+                    · Access token
+                    {% if facebook_status.token_set %}
+                        set
+                        {% if facebook_status.token_source == 'settings' %}(Admin Settings)
+                        {% elif facebook_status.token_source == 'env' %}(<code>.env</code>)
+                        {% endif %}
+                    {% else %}
+                        missing — paste a Page access token below
+                    {% endif %}
+                </div>
+                <div class="mt-1">{{ facebook_status.note }}</div>
+            </div>
+            {% endif %}
+        </div>
         <div class="col-md-6">
             <label class="form-label">Facebook App ID</label>
-            {{ form.facebook_app_id(class="form-control") }}
-            <div class="form-text">Used for Open Graph <code>fb:app_id</code> only.</div>
+            {{ form.facebook_app_id(class="form-control", placeholder="e.g. 123456789012345") }}
+            {% if form.facebook_app_id.description %}
+            <div class="form-text">{{ form.facebook_app_id.description }}</div>
+            {% else %}
+            <div class="form-text">Used for Open Graph <code>fb:app_id</code>.</div>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Facebook Page ID</label>
+            {{ form.facebook_page_id(class="form-control", placeholder="e.g. 123456789012345") }}
+            {% if form.facebook_page_id.description %}<div class="form-text">{{ form.facebook_page_id.description }}</div>{% endif %}
+        </div>
+        <div class="col-12">
+            <label class="form-label">{{ form.facebook_page_access_token.label.text }}</label>
+            {% set token_placeholder = '••••••••  (leave blank to keep current token)' if facebook_status is defined and facebook_status.token_set else 'Paste long-lived Page access token' %}
+            {{ form.facebook_page_access_token(class="form-control font-monospace", autocomplete="new-password", placeholder=token_placeholder) }}
+            {% if form.facebook_page_access_token.description %}
+            <div class="form-text">{{ form.facebook_page_access_token.description }}</div>
+            {% endif %}
+            <div class="form-text">
+                Required permissions: <code>pages_manage_posts</code>,
+                <code>pages_read_engagement</code>, <code>pages_show_list</code>.
+                You can still set <code>FACEBOOK_PAGE_ACCESS_TOKEN</code> in <code>.env</code> instead;
+                Admin Settings takes priority when a token is saved here.
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.clear_facebook_page_access_token(class="form-check-input", id="clear_facebook_page_access_token") }}
+                <label class="form-check-label" for="clear_facebook_page_access_token">{{ form.clear_facebook_page_access_token.label.text }}</label>
+            </div>
+            {% if form.clear_facebook_page_access_token.description %}
+            <div class="form-text">{{ form.clear_facebook_page_access_token.description }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                {{ form.facebook_page_posting_enabled(class="form-check-input", id="facebook_page_posting_enabled") }}
+                <label class="form-check-label" for="facebook_page_posting_enabled">{{ form.facebook_page_posting_enabled.label.text }}</label>
+            </div>
+            {% if form.facebook_page_posting_enabled.description %}
+            <div class="form-text">{{ form.facebook_page_posting_enabled.description }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                {{ form.facebook_auto_post_on_create(class="form-check-input", id="facebook_auto_post_on_create") }}
+                <label class="form-check-label" for="facebook_auto_post_on_create">{{ form.facebook_auto_post_on_create.label.text }}</label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                {{ form.facebook_auto_post_on_edit(class="form-check-input", id="facebook_auto_post_on_edit") }}
+                <label class="form-check-label" for="facebook_auto_post_on_edit">{{ form.facebook_auto_post_on_edit.label.text }}</label>
+            </div>
+            {% if form.facebook_auto_post_on_edit.description %}
+            <div class="form-text">{{ form.facebook_auto_post_on_edit.description }}</div>
+            {% endif %}
         </div>
         <div class="col-md-6">
             <label class="form-label">Twitter / X Handle</label>
