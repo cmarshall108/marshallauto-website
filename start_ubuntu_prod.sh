@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
+export HOST=0.0.0.0
 export PORT=80
+export FLASK_ENV=production
 
 pid=
 cleanup() {

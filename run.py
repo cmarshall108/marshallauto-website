@@ -204,4 +204,5 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', '1') not in ('0', 'false', 'False')
     if app.config.get('ENV') == 'production' or os.environ.get('FLASK_ENV') == 'production':
         debug = False
-    app.run(debug=debug, port=int(os.environ.get('PORT', 8080)))
+    
+    app.run(debug=debug, host=os.environ.get('HOST', '0.0.0.0'), port=int(os.environ.get('PORT', 8080)))
