@@ -29,6 +29,9 @@ def client_ip():
     forwarded = request.headers.get('X-Forwarded-For', '')
     if forwarded:
         return forwarded.split(',')[0].strip()
+    real_ip = request.headers.get('X-Real-IP', '').strip()
+    if real_ip:
+        return real_ip
     return request.remote_addr or 'unknown'
 
 
@@ -224,14 +227,29 @@ def parse_optional_int(value):
 
 def is_safe_redirect(target):
     """Allow only relative same-host redirects (prevent open redirect)."""
-    if not target:
+    if not target or not isinstance(target, str):
         return False
-    from urllib.parse import urlparse
+
+    from urllib.parse import unquote, urlparse
+
+    candidate = target.strip()
+    if not candidate:
+        return False
+    if any(ch in candidate for ch in '\x00\r\n'):
+        return False
+
+    decoded = unquote(candidate)
+    if '\\' in candidate or '\\' in decoded:
+        return False
+    if decoded.startswith('//') or decoded.startswith('\\\\'):
+        return False
+
     ref = urlparse(request.host_url)
-    test = urlparse(target)
-    # Relative path
-    if not test.netloc and test.path.startswith('/'):
-        return not test.path.startswith('//')
+    test = urlparse(candidate)
+
+    if not test.netloc and not test.scheme:
+        return test.path.startswith('/') and not test.path.startswith('//')
+
     return test.scheme in ('http', 'https') and ref.netloc == test.netloc
 
 
@@ -282,10 +300,12 @@ def notify_new_lead(lead):
         msg.set_content(body)
         port = current_app.config.get('MAIL_PORT', 587)
         use_tls = current_app.config.get('MAIL_USE_TLS', True)
+        use_ssl = current_app.config.get('MAIL_USE_SSL', False)
         username = current_app.config.get('MAIL_USERNAME') or None
         password = current_app.config.get('MAIL_PASSWORD') or None
-        with smtplib.SMTP(server, port, timeout=10) as smtp:
-            if use_tls:
+        smtp_cls = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+        with smtp_cls(server, port, timeout=10) as smtp:
+            if not use_ssl and use_tls:
                 smtp.starttls()
             if username and password:
                 smtp.login(username, password)
