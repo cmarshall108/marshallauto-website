@@ -623,6 +623,22 @@ def carfax_report_delete(id):
     return redirect(url_for('admin.carfax_reports'))
 
 
+# ------------------------------ ANALYTICS ------------------------------
+
+@admin_bp.route('/analytics')
+@login_required
+def analytics():
+    """Detailed first-party website analytics dashboard."""
+    from app.analytics import build_analytics_dashboard, format_duration
+
+    data = build_analytics_dashboard(request.args)
+    return render_template(
+        'admin/analytics.html',
+        **data,
+        format_duration=format_duration,
+    )
+
+
 # ------------------------------ LEADS ------------------------------
 
 @admin_bp.route('/leads')

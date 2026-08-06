@@ -23,6 +23,7 @@
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.carfax_report') %}active{% endif %}" href="{{ url_for('admin.carfax_reports') }}"><i class="bi bi-file-earmark-text me-2"></i> CarFax Reports</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.review') %}active{% endif %}" href="{{ url_for('admin.reviews') }}"><i class="bi bi-star me-2"></i> Reviews</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.lead') %}active{% endif %}" href="{{ url_for('admin.leads') }}"><i class="bi bi-envelope me-2"></i> Leads</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.analytics' %}active{% endif %}" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i> Analytics</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i> Settings</a></li>
             <li class="nav-item mt-4"><a class="nav-link text-danger" href="{{ url_for('admin.logout') }}"><i class="bi bi-box-arrow-right me-2"></i> Log Out</a></li>
         </ul>
@@ -43,6 +44,7 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.carfax_reports') }}"><i class="bi bi-file-earmark-text me-2"></i>CarFax Reports</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.reviews') }}"><i class="bi bi-star me-2"></i>Reviews</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.leads') }}"><i class="bi bi-envelope me-2"></i>Leads</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i>Analytics</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i>Settings</a></li>
                     <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('admin.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Log Out</a></li>
                 </ul>

@@ -70,10 +70,13 @@ def create_app(config_class=None):
             return None
 
     from app.admin import admin_bp
-    from app.routes import inject_globals, main
+    from app.routes import analytics_collect, inject_globals, main
 
     app.register_blueprint(main)
     app.register_blueprint(admin_bp, url_prefix='/admin')
+
+    # Public analytics beacon (sendBeacon / no form token)
+    csrf.exempt(analytics_collect)
 
     # App-level context processor so error handlers (404/500) also get
     # site_setting / business_* vars used by base.html.

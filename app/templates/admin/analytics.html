@@ -1,0 +1,997 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Website Analytics</h2>
+        <p class="text-muted mb-0">
+            First-party viewer counts, interest signals, and time-on-page insights
+            {% if start and end %}
+            · {{ start.strftime('%b %d, %Y') }} – {{ end.strftime('%b %d, %Y') }}
+            {% endif %}
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+        </a>
+        <a href="{{ url_for('admin.leads') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-envelope me-1"></i> Leads
+        </a>
+    </div>
+</div>
+
+{# ---- Filters ---- #}
+<div class="table-card p-3 p-md-4 mb-4">
+    <form method="get" class="row g-3 align-items-end" id="analytics-filters">
+        <div class="col-6 col-md-3 col-lg-2">
+            <label class="form-label small text-muted mb-1">Date range</label>
+            <select name="range" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="24h" {% if range_key == '24h' %}selected{% endif %}>Last 24 hours</option>
+                <option value="7d" {% if range_key == '7d' %}selected{% endif %}>Last 7 days</option>
+                <option value="14d" {% if range_key == '14d' %}selected{% endif %}>Last 14 days</option>
+                <option value="30d" {% if range_key == '30d' %}selected{% endif %}>Last 30 days</option>
+                <option value="90d" {% if range_key == '90d' %}selected{% endif %}>Last 90 days</option>
+                <option value="180d" {% if range_key == '180d' %}selected{% endif %}>Last 6 months</option>
+                <option value="365d" {% if range_key == '365d' %}selected{% endif %}>Last 12 months</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <label class="form-label small text-muted mb-1">Page type</label>
+            <select name="page_type" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All pages</option>
+                {% for key, label in page_type_choices.items() %}
+                <option value="{{ key }}" {% if page_type_filter == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <label class="form-label small text-muted mb-1">Device</label>
+            <select name="device" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All devices</option>
+                <option value="desktop" {% if device_filter == 'desktop' %}selected{% endif %}>Desktop</option>
+                <option value="mobile" {% if device_filter == 'mobile' %}selected{% endif %}>Mobile</option>
+                <option value="tablet" {% if device_filter == 'tablet' %}selected{% endif %}>Tablet</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-funnel me-1"></i> Apply
+            </button>
+        </div>
+        {% if page_type_filter or device_filter or range_key != '30d' %}
+        <div class="col-12 col-lg-auto">
+            <a href="{{ url_for('admin.analytics') }}" class="btn btn-link btn-sm text-decoration-none">Clear filters</a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+{% if not has_data %}
+<div class="table-card p-5 text-center mb-4">
+    <div class="display-6 text-primary mb-3"><i class="bi bi-graph-up-arrow"></i></div>
+    <h4 class="fw-bold">No analytics data yet</h4>
+    <p class="text-muted mb-2 mx-auto" style="max-width: 36rem;">
+        Page views and interest events are collected automatically when visitors browse the public site.
+        Open the homepage or a vehicle listing in another tab, then refresh this page.
+    </p>
+    <p class="small text-muted mb-0">
+        Tracking covers viewer counts, time on page, scroll depth, device mix, traffic sources,
+        vehicle interest, calls, texts, and lead form activity — without relying on Google Analytics.
+    </p>
+</div>
+{% else %}
+
+{# ---- KPI row ---- #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Page Views</p>
+            <div class="stat-value">{{ '{:,}'.format(kpis.page_views) }}</div>
+            {% if kpis.page_views_delta is not none %}
+            <div class="small mt-1 {% if kpis.page_views_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                <i class="bi bi-caret-{% if kpis.page_views_delta >= 0 %}up{% else %}down{% endif %}-fill"></i>
+                {{ kpis.page_views_delta }}% vs prior period
+            </div>
+            {% endif %}
+            <p class="small text-muted mb-0 mt-2">Total page loads in this range</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Unique Visitors</p>
+            <div class="stat-value">{{ '{:,}'.format(kpis.unique_visitors) }}</div>
+            {% if kpis.unique_visitors_delta is not none %}
+            <div class="small mt-1 {% if kpis.unique_visitors_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                <i class="bi bi-caret-{% if kpis.unique_visitors_delta >= 0 %}up{% else %}down{% endif %}-fill"></i>
+                {{ kpis.unique_visitors_delta }}% vs prior period
+            </div>
+            {% endif %}
+            <p class="small text-muted mb-0 mt-2">Anonymous browsers (cookie-based ID)</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Sessions</p>
+            <div class="stat-value">{{ '{:,}'.format(kpis.sessions) }}</div>
+            {% if kpis.sessions_delta is not none %}
+            <div class="small mt-1 {% if kpis.sessions_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                <i class="bi bi-caret-{% if kpis.sessions_delta >= 0 %}up{% else %}down{% endif %}-fill"></i>
+                {{ kpis.sessions_delta }}% vs prior period
+            </div>
+            {% endif %}
+            <p class="small text-muted mb-0 mt-2">{{ kpis.pages_per_session }} pages / session avg</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Avg. Time on Page</p>
+            <div class="stat-value">{{ format_duration(kpis.avg_duration) }}</div>
+            {% if kpis.avg_duration_delta is not none %}
+            <div class="small mt-1 {% if kpis.avg_duration_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                <i class="bi bi-caret-{% if kpis.avg_duration_delta >= 0 %}up{% else %}down{% endif %}-fill"></i>
+                {{ kpis.avg_duration_delta }}% vs prior period
+            </div>
+            {% endif %}
+            <p class="small text-muted mb-0 mt-2">Measured via live heartbeats</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Engagement Rate</p>
+            <div class="stat-value">{{ kpis.engagement_rate }}%</div>
+            <p class="small text-muted mb-0 mt-2">15s+ on page or 50%+ scroll</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Bounce Rate</p>
+            <div class="stat-value">{{ kpis.bounce_rate }}%</div>
+            <p class="small text-muted mb-0 mt-2">Quick exits with little interaction</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Avg. Scroll Depth</p>
+            <div class="stat-value">{{ kpis.avg_scroll }}%</div>
+            <p class="small text-muted mb-0 mt-2">How far visitors read down the page</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card analytics-kpi h-100">
+            <p class="text-muted small mb-1">Interest Events</p>
+            <div class="stat-value">{{ '{:,}'.format(kpis.total_events) }}</div>
+            <p class="small text-muted mb-0 mt-2">Clicks, filters, gallery, leads, etc.</p>
+        </div>
+    </div>
+</div>
+
+{# ---- Conversion interest strip ---- #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-primary"><i class="bi bi-car-front"></i></div>
+            <div>
+                <div class="value">{{ kpis.vehicle_views }}</div>
+                <div class="label">Vehicle detail views</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-success"><i class="bi bi-telephone"></i></div>
+            <div>
+                <div class="value">{{ kpis.calls }}</div>
+                <div class="label">Click-to-call</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-info"><i class="bi bi-chat-dots"></i></div>
+            <div>
+                <div class="value">{{ kpis.sms }}</div>
+                <div class="label">Click-to-text</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-warning"><i class="bi bi-envelope-paper"></i></div>
+            <div>
+                <div class="value">{{ kpis.leads }}</div>
+                <div class="label">Lead form submits</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-secondary"><i class="bi bi-funnel"></i></div>
+            <div>
+                <div class="value">{{ kpis.filters }}</div>
+                <div class="label">Inventory filters</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-danger"><i class="bi bi-images"></i></div>
+            <div>
+                <div class="value">{{ kpis.gallery }}</div>
+                <div class="label">Gallery interactions</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-primary"><i class="bi bi-calculator"></i></div>
+            <div>
+                <div class="value">{{ kpis.payments }}</div>
+                <div class="label">Payment calculations</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg">
+        <div class="analytics-mini-stat">
+            <div class="icon text-dark"><i class="bi bi-file-earmark-pdf"></i></div>
+            <div>
+                <div class="value">{{ kpis.downloads }}</div>
+                <div class="label">CarFax / PDF downloads</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Traffic over time ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="table-card p-3 p-md-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="fw-bold mb-0">Traffic over time</h5>
+                    <p class="small text-muted mb-0">Page views, unique visitors, and sessions</p>
+                </div>
+            </div>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartTraffic" height="120" aria-label="Traffic over time chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Where people browse</h5>
+            <p class="small text-muted mb-3">Share of views by page type</p>
+            <div class="analytics-chart-wrap analytics-chart-sm">
+                <canvas id="chartPageTypes" aria-label="Page types chart"></canvas>
+            </div>
+            {% if page_types %}
+            <ul class="list-unstyled small mt-3 mb-0 analytics-legend-list">
+                {% for p in page_types[:6] %}
+                <li class="d-flex justify-content-between py-1 border-bottom border-light">
+                    <span>{{ p.label }}</span>
+                    <span class="text-muted">{{ p.views }} · {{ p.share }}%</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Time of day / day of week ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Time of day interest</h5>
+            <p class="small text-muted mb-3">When visitors are on the site (UTC). Darker bars = more engaged views.</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartHours" height="110" aria-label="Hourly traffic chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Day of week</h5>
+            <p class="small text-muted mb-3">Which weekdays draw the most traffic</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartDow" height="110" aria-label="Day of week chart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Engagement distributions ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Time spent on page</h5>
+            <p class="small text-muted mb-3">How long viewers stay before leaving</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartDuration" height="120" aria-label="Duration distribution chart"></canvas>
+            </div>
+            {% if duration_dist %}
+            <div class="row g-2 mt-2 small">
+                {% for d in duration_dist %}
+                <div class="col-4">
+                    <div class="text-muted">{{ d.label }}</div>
+                    <strong>{{ d.count }}</strong> <span class="text-muted">({{ d.share }}%)</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Scroll depth</h5>
+            <p class="small text-muted mb-3">How far down the page visitors scroll</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartScroll" height="120" aria-label="Scroll depth chart"></canvas>
+            </div>
+            {% if scroll_dist %}
+            <div class="row g-2 mt-2 small">
+                {% for d in scroll_dist %}
+                <div class="col-3">
+                    <div class="text-muted">{{ d.label }}</div>
+                    <strong>{{ d.count }}</strong> <span class="text-muted">({{ d.share }}%)</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Devices / browsers / OS ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Devices</h5>
+            <p class="small text-muted mb-3">Desktop vs mobile browsing mix</p>
+            <div class="analytics-chart-wrap analytics-chart-sm">
+                <canvas id="chartDevices" aria-label="Devices chart"></canvas>
+            </div>
+            <ul class="list-unstyled small mt-3 mb-0">
+                {% for d in devices %}
+                <li class="d-flex justify-content-between py-1 border-bottom border-light">
+                    <span><i class="bi bi-{% if d.label == 'Mobile' %}phone{% elif d.label == 'Tablet' %}tablet{% else %}laptop{% endif %} me-1"></i>{{ d.label }}</span>
+                    <span class="text-muted">{{ d.views }} views · {{ d.share }}%</span>
+                </li>
+                {% else %}
+                <li class="text-muted">No device data</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Browsers</h5>
+            <p class="small text-muted mb-3">Top browsers used by visitors</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartBrowsers" height="140" aria-label="Browsers chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Operating systems</h5>
+            <p class="small text-muted mb-3">Visitor OS breakdown</p>
+            <ul class="list-unstyled mb-0">
+                {% for o in os_list %}
+                <li class="mb-3">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-semibold">{{ o.label }}</span>
+                        <span class="text-muted">{{ o.views }} · {{ o.share }}%</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar" role="progressbar" style="width: {{ o.share }}%;" aria-valuenow="{{ o.share }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </li>
+                {% else %}
+                <li class="text-muted">No OS data</li>
+                {% endfor %}
+            </ul>
+            {% if languages %}
+            <hr>
+            <h6 class="fw-bold">Browser languages</h6>
+            <div class="d-flex flex-wrap gap-2">
+                {% for lang in languages %}
+                <span class="badge text-bg-light border">{{ lang.label }} · {{ lang.views }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Traffic sources ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Referrers &amp; traffic sources</h5>
+            <p class="small text-muted mb-3">Where visitors came from before landing on your site</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th class="text-end">Views</th>
+                            <th class="text-end">Visitors</th>
+                            <th class="text-end">Share</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in referrers %}
+                        <tr>
+                            <td class="text-break">{{ r.host }}</td>
+                            <td class="text-end">{{ r.views }}</td>
+                            <td class="text-end">{{ r.visitors or '—' }}</td>
+                            <td class="text-end">{{ r.share }}%</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-muted">No referrer data yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex flex-wrap gap-3 mt-3 small">
+                <span class="badge text-bg-primary-subtle text-primary border">Google Ads clicks (gclid): {{ gclid_views }}</span>
+                <span class="badge text-bg-info-subtle text-info border">Meta / Facebook clicks (fbclid): {{ fbclid_views }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Campaign attribution (UTM)</h5>
+            <p class="small text-muted mb-3">Marketing tags captured from campaign links</p>
+            {% if utm_sources %}
+            <h6 class="small text-uppercase text-muted">Sources</h6>
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>utm_source</th><th class="text-end">Views</th><th class="text-end">Visitors</th></tr></thead>
+                    <tbody>
+                        {% for u in utm_sources %}
+                        <tr>
+                            <td>{{ u.source }}</td>
+                            <td class="text-end">{{ u.views }}</td>
+                            <td class="text-end">{{ u.visitors }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% if utm_campaigns %}
+            <h6 class="small text-uppercase text-muted">Campaigns</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Campaign</th><th>Source</th><th class="text-end">Views</th><th class="text-end">Visitors</th></tr></thead>
+                    <tbody>
+                        {% for u in utm_campaigns %}
+                        <tr>
+                            <td>{{ u.campaign }}</td>
+                            <td>{{ u.source }}</td>
+                            <td class="text-end">{{ u.views }}</td>
+                            <td class="text-end">{{ u.visitors }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% if not utm_sources and not utm_campaigns %}
+            <p class="text-muted mb-0">No UTM-tagged visits in this range. Add <code>?utm_source=...</code> to ad and social links to measure campaigns here.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Top pages & landings ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Top pages</h5>
+            <p class="small text-muted mb-3">Most viewed URLs with engagement quality</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Path</th>
+                            <th>Type</th>
+                            <th class="text-end">Views</th>
+                            <th class="text-end">Visitors</th>
+                            <th class="text-end">Avg time</th>
+                            <th class="text-end">Scroll</th>
+                            <th class="text-end">Bounce</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in top_pages %}
+                        <tr>
+                            <td class="text-break" style="max-width: 220px;">
+                                <a href="{{ p.path }}" target="_blank" rel="noopener" class="text-decoration-none">{{ p.path }}</a>
+                            </td>
+                            <td><span class="badge text-bg-light border">{{ p.page_type_label }}</span></td>
+                            <td class="text-end fw-semibold">{{ p.views }}</td>
+                            <td class="text-end">{{ p.visitors }}</td>
+                            <td class="text-end">{{ format_duration(p.avg_duration) }}</td>
+                            <td class="text-end">{{ p.avg_scroll }}%</td>
+                            <td class="text-end">{{ p.bounce_rate }}%</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="text-muted">No page data.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Landing pages</h5>
+            <p class="small text-muted mb-3">First page of each session — where interest starts</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Landing path</th>
+                            <th class="text-end">Sessions</th>
+                            <th class="text-end">Views</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for l in landings %}
+                        <tr>
+                            <td class="text-break">{{ l.path }}</td>
+                            <td class="text-end fw-semibold">{{ l.sessions }}</td>
+                            <td class="text-end">{{ l.views }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No landing data.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Vehicle interest ---- #}
+<div class="table-card p-3 p-md-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h5 class="fw-bold mb-0">Vehicle interest</h5>
+            <p class="small text-muted mb-0">Which listings get views, time, gallery taps, calls, and leads</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Vehicle</th>
+                    <th class="text-end">Views</th>
+                    <th class="text-end">Visitors</th>
+                    <th class="text-end">Avg time</th>
+                    <th class="text-end">Scroll</th>
+                    <th class="text-end">Gallery</th>
+                    <th class="text-end">Payments</th>
+                    <th class="text-end">Calls</th>
+                    <th class="text-end">Leads</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in top_vehicles %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">
+                            {% if v.slug %}
+                            <a href="{{ url_for('main.vehicle_detail', slug=v.slug) }}" target="_blank" rel="noopener">{{ v.title }}</a>
+                            {% else %}
+                            {{ v.title }}
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted">
+                            {% if v.price is not none %}${{ '{:,.0f}'.format(v.price) }} · {% endif %}
+                            {{ v.status or '—' }}
+                        </div>
+                    </td>
+                    <td class="text-end fw-semibold">{{ v.views }}</td>
+                    <td class="text-end">{{ v.visitors }}</td>
+                    <td class="text-end">{{ format_duration(v.avg_duration) }}</td>
+                    <td class="text-end">{{ v.avg_scroll }}%</td>
+                    <td class="text-end">{{ v.gallery }}</td>
+                    <td class="text-end">{{ v.payments }}</td>
+                    <td class="text-end">{{ v.calls }}</td>
+                    <td class="text-end">{{ v.leads }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-muted">No vehicle detail views in this range.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ---- Events ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-5">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Interest &amp; conversion events</h5>
+            <p class="small text-muted mb-3">What visitors do beyond loading a page</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartEvents" height="160" aria-label="Events chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Event breakdown</h5>
+            <p class="small text-muted mb-3">Full list of tracked actions in this period</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Category</th>
+                            <th class="text-end">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in events %}
+                        <tr>
+                            <td>{{ e.label }}</td>
+                            <td><span class="badge analytics-cat-{{ e.category }}">{{ e.category }}</span></td>
+                            <td class="text-end fw-semibold">{{ e.count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No events yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Live-ish recent activity ---- #}
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Recent page views</h5>
+            <p class="small text-muted mb-3">Latest individual visits with device and engagement</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Page</th>
+                            <th>Device</th>
+                            <th class="text-end">Time</th>
+                            <th class="text-end">Scroll</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pv in recent_views %}
+                        <tr>
+                            <td class="text-nowrap small">{{ pv.created_at.strftime('%m/%d %I:%M %p') if pv.created_at else '—' }}</td>
+                            <td>
+                                <div class="small text-break" style="max-width: 200px;">{{ pv.path }}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    {{ pv.page_type_label }}
+                                    {% if pv.vehicle_title %} · {{ pv.vehicle_title }}{% endif %}
+                                    {% if pv.is_engaged %}<span class="badge text-bg-success-subtle text-success border ms-1">engaged</span>{% endif %}
+                                    {% if pv.is_bounce %}<span class="badge text-bg-secondary-subtle text-secondary border ms-1">bounce</span>{% endif %}
+                                </div>
+                            </td>
+                            <td class="small">
+                                {{ (pv.device_type or '—')|capitalize }}
+                                <div class="text-muted" style="font-size: 0.75rem;">{{ pv.browser or '' }} · {{ pv.os or '' }}</div>
+                            </td>
+                            <td class="text-end small">{{ format_duration(pv.duration_seconds) }}</td>
+                            <td class="text-end small">{{ pv.scroll_depth_pct }}%</td>
+                            <td class="small text-break">
+                                {{ pv.referrer_host }}
+                                {% if pv.utm_source %}<div class="text-muted" style="font-size: 0.75rem;">utm: {{ pv.utm_source }}</div>{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-muted">No recent views.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Recent interest events</h5>
+            <p class="small text-muted mb-3">Calls, filters, gallery taps, leads, and more</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Event</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in recent_events %}
+                        <tr>
+                            <td class="text-nowrap small">{{ ev.created_at.strftime('%m/%d %I:%M %p') if ev.created_at else '—' }}</td>
+                            <td>
+                                <span class="badge analytics-cat-{{ ev.category }}">{{ ev.label }}</span>
+                            </td>
+                            <td class="small text-break">
+                                {% if ev.event_label %}{{ ev.event_label }}{% endif %}
+                                {% if ev.path %}<div class="text-muted" style="font-size: 0.75rem;">{{ ev.path }}</div>{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No recent events.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-card p-3 p-md-4">
+    <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-1"></i> How this works</h6>
+    <div class="row small text-muted g-3">
+        <div class="col-md-4">
+            <strong class="text-dark d-block">Viewer counts</strong>
+            Each public page load sends an anonymous page view with path, page type, device, and acquisition tags. Bots are filtered out of reports.
+        </div>
+        <div class="col-md-4">
+            <strong class="text-dark d-block">Time &amp; interest</strong>
+            Heartbeats update time-on-page and scroll depth. Clicks to call/text, inventory filters, gallery use, payment calculator, CarFax downloads, and lead submits are stored as interest events.
+        </div>
+        <div class="col-md-4">
+            <strong class="text-dark d-block">Privacy</strong>
+            Visitor IDs are random browser IDs (not names or emails). IP addresses are one-way hashed. Admin pages and static assets are never tracked.
+        </div>
+    </div>
+</div>
+
+{% endif %}{# has_data #}
+{% endblock %}
+
+{% block extra_js %}
+{% if has_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    'use strict';
+    const charts = {{ charts | tojson }};
+    const palette = ['#0d6efd', '#198754', '#fd7e14', '#6f42c1', '#20c997', '#dc3545', '#0dcaf0', '#6610f2', '#ffc107', '#6c757d'];
+    const grid = { color: 'rgba(0,0,0,0.06)' };
+    const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        },
+    };
+
+    function el(id) { return document.getElementById(id); }
+
+    if (el('chartTraffic')) {
+        new Chart(el('chartTraffic'), {
+            type: 'line',
+            data: {
+                labels: charts.daily_labels || [],
+                datasets: [
+                    {
+                        label: 'Page views',
+                        data: charts.daily_views || [],
+                        borderColor: palette[0],
+                        backgroundColor: 'rgba(13,110,253,0.12)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2,
+                    },
+                    {
+                        label: 'Visitors',
+                        data: charts.daily_visitors || [],
+                        borderColor: palette[1],
+                        backgroundColor: 'transparent',
+                        tension: 0.3,
+                        pointRadius: 2,
+                    },
+                    {
+                        label: 'Sessions',
+                        data: charts.daily_sessions || [],
+                        borderColor: palette[2],
+                        backgroundColor: 'transparent',
+                        tension: 0.3,
+                        pointRadius: 2,
+                        borderDash: [4, 4],
+                    },
+                ],
+            },
+            options: Object.assign({}, commonOpts, {
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 12, font: { size: 10 } } },
+                    y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartPageTypes') && (charts.page_type_views || []).length) {
+        new Chart(el('chartPageTypes'), {
+            type: 'doughnut',
+            data: {
+                labels: charts.page_type_labels || [],
+                datasets: [{ data: charts.page_type_views || [], backgroundColor: palette, borderWidth: 0 }],
+            },
+            options: Object.assign({}, commonOpts, {
+                plugins: { legend: { display: false } },
+                cutout: '58%',
+            }),
+        });
+    }
+
+    if (el('chartHours')) {
+        new Chart(el('chartHours'), {
+            type: 'bar',
+            data: {
+                labels: charts.hour_labels || [],
+                datasets: [
+                    {
+                        label: 'Views',
+                        data: charts.hour_counts || [],
+                        backgroundColor: 'rgba(13,110,253,0.55)',
+                        borderRadius: 3,
+                    },
+                    {
+                        label: 'Engaged',
+                        data: charts.hour_engaged || [],
+                        backgroundColor: 'rgba(25,135,84,0.75)',
+                        borderRadius: 3,
+                    },
+                ],
+            },
+            options: Object.assign({}, commonOpts, {
+                scales: {
+                    x: { stacked: false, grid: { display: false }, ticks: { maxRotation: 0, font: { size: 9 }, autoSkipPadding: 4 } },
+                    y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartDow')) {
+        new Chart(el('chartDow'), {
+            type: 'bar',
+            data: {
+                labels: charts.dow_labels || [],
+                datasets: [{
+                    label: 'Views',
+                    data: charts.dow_counts || [],
+                    backgroundColor: palette[3],
+                    borderRadius: 4,
+                }],
+            },
+            options: Object.assign({}, commonOpts, {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartDuration')) {
+        new Chart(el('chartDuration'), {
+            type: 'bar',
+            data: {
+                labels: charts.duration_dist_labels || [],
+                datasets: [{
+                    label: 'Views',
+                    data: charts.duration_dist_counts || [],
+                    backgroundColor: 'rgba(13,110,253,0.7)',
+                    borderRadius: 4,
+                }],
+            },
+            options: Object.assign({}, commonOpts, {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartScroll')) {
+        new Chart(el('chartScroll'), {
+            type: 'bar',
+            data: {
+                labels: charts.scroll_dist_labels || [],
+                datasets: [{
+                    label: 'Views',
+                    data: charts.scroll_dist_counts || [],
+                    backgroundColor: 'rgba(32,201,151,0.75)',
+                    borderRadius: 4,
+                }],
+            },
+            options: Object.assign({}, commonOpts, {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartDevices') && (charts.device_views || []).length) {
+        new Chart(el('chartDevices'), {
+            type: 'doughnut',
+            data: {
+                labels: charts.device_labels || [],
+                datasets: [{ data: charts.device_views || [], backgroundColor: [palette[0], palette[1], palette[2], palette[5]], borderWidth: 0 }],
+            },
+            options: Object.assign({}, commonOpts, {
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                cutout: '55%',
+            }),
+        });
+    }
+
+    if (el('chartBrowsers')) {
+        new Chart(el('chartBrowsers'), {
+            type: 'bar',
+            data: {
+                labels: charts.browser_labels || [],
+                datasets: [{
+                    label: 'Views',
+                    data: charts.browser_views || [],
+                    backgroundColor: palette.slice(0, 8),
+                    borderRadius: 4,
+                }],
+            },
+            options: Object.assign({}, commonOpts, {
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                    y: { grid: { display: false } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartEvents') && (charts.event_counts || []).length) {
+        new Chart(el('chartEvents'), {
+            type: 'bar',
+            data: {
+                labels: charts.event_labels || [],
+                datasets: [{
+                    label: 'Events',
+                    data: charts.event_counts || [],
+                    backgroundColor: palette[4],
+                    borderRadius: 4,
+                }],
+            },
+            options: Object.assign({}, commonOpts, {
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
+                    y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                },
+            }),
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

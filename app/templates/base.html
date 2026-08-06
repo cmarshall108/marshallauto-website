@@ -296,6 +296,7 @@
          data-business-name="{{ business_name }}"
          data-business-phone="{{ business_phone }}"
          data-lead-value="1"
+         data-collect-url="{{ url_for('main.analytics_collect') }}"
          {% if analytics_vehicle %}data-vehicle='{{ analytics_vehicle | tojson }}'{% endif %}
          {% if analytics_inventory %}data-inventory='{{ analytics_inventory | tojson }}'{% endif %}
          aria-hidden="true"></div>

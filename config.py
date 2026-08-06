@@ -69,6 +69,9 @@ class Config:
     LOGIN_RATE_WINDOW = 300        # seconds
     CONTACT_RATE_LIMIT = 8
     CONTACT_RATE_WINDOW = 600
+    # First-party analytics beacon (pageviews + events)
+    ANALYTICS_RATE_LIMIT = int(os.environ.get('ANALYTICS_RATE_LIMIT', 120))
+    ANALYTICS_RATE_WINDOW = int(os.environ.get('ANALYTICS_RATE_WINDOW', 60))
 
     # Business info
     SITE_URL = os.environ.get('SITE_URL') or 'https://marshallautosanford.com'

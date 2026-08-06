@@ -478,3 +478,89 @@ class Lead(db.Model):
     referrer = db.Column(db.String(512), nullable=True)
 
     vehicle = db.relationship('Vehicle', backref=db.backref('leads', lazy='dynamic'))
+
+
+class PageView(db.Model):
+    """First-party page view / session hit for admin analytics."""
+    __tablename__ = 'page_views'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Anonymous identity (client-generated UUIDs; no login required)
+    visitor_id = db.Column(db.String(64), nullable=False, index=True)
+    session_id = db.Column(db.String(64), nullable=False, index=True)
+
+    # What was viewed
+    path = db.Column(db.String(512), nullable=False, index=True)
+    page_type = db.Column(db.String(64), nullable=True, index=True)
+    page_title = db.Column(db.String(255), nullable=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True, index=True)
+
+    # Navigation / acquisition
+    referrer = db.Column(db.String(512), nullable=True)
+    referrer_host = db.Column(db.String(255), nullable=True, index=True)
+    landing_path = db.Column(db.String(512), nullable=True)
+    query_string = db.Column(db.String(512), nullable=True)
+    utm_source = db.Column(db.String(128), nullable=True, index=True)
+    utm_medium = db.Column(db.String(128), nullable=True)
+    utm_campaign = db.Column(db.String(128), nullable=True, index=True)
+    utm_term = db.Column(db.String(128), nullable=True)
+    utm_content = db.Column(db.String(128), nullable=True)
+    gclid = db.Column(db.String(255), nullable=True)
+    fbclid = db.Column(db.String(255), nullable=True)
+
+    # Client environment
+    device_type = db.Column(db.String(32), nullable=True, index=True)  # desktop|mobile|tablet|bot
+    browser = db.Column(db.String(64), nullable=True)
+    os = db.Column(db.String(64), nullable=True)
+    language = db.Column(db.String(32), nullable=True)
+    screen_width = db.Column(db.Integer, nullable=True)
+    screen_height = db.Column(db.Integer, nullable=True)
+    timezone = db.Column(db.String(64), nullable=True)
+    ip_hash = db.Column(db.String(64), nullable=True, index=True)
+    user_agent = db.Column(db.String(512), nullable=True)
+
+    # Engagement metrics (updated via heartbeat / exit beacon)
+    duration_seconds = db.Column(db.Integer, default=0, nullable=False)
+    scroll_depth_pct = db.Column(db.Integer, default=0, nullable=False)
+    is_bounce = db.Column(db.Boolean, default=True, nullable=False)
+    is_engaged = db.Column(db.Boolean, default=False, nullable=False)
+    is_exit = db.Column(db.Boolean, default=False, nullable=False)
+    heartbeat_count = db.Column(db.Integer, default=0, nullable=False)
+
+    vehicle = db.relationship('Vehicle', backref=db.backref('page_views', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<PageView {self.path} @ {self.created_at}>'
+
+
+class AnalyticsEvent(db.Model):
+    """Discrete interest / engagement events (CTA, filter, gallery, lead, etc.)."""
+    __tablename__ = 'analytics_events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+
+    visitor_id = db.Column(db.String(64), nullable=False, index=True)
+    session_id = db.Column(db.String(64), nullable=False, index=True)
+    page_view_id = db.Column(db.Integer, db.ForeignKey('page_views.id'), nullable=True, index=True)
+
+    event_name = db.Column(db.String(64), nullable=False, index=True)
+    event_category = db.Column(db.String(64), nullable=True, index=True)
+    label = db.Column(db.String(255), nullable=True)
+    value = db.Column(db.Float, nullable=True)
+
+    path = db.Column(db.String(512), nullable=True)
+    page_type = db.Column(db.String(64), nullable=True, index=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True, index=True)
+
+    # Compact extra context (JSON string); keep small
+    meta_json = db.Column(db.Text, nullable=True)
+
+    page_view = db.relationship('PageView', backref=db.backref('events', lazy='dynamic'))
+    vehicle = db.relationship('Vehicle', backref=db.backref('analytics_events', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<AnalyticsEvent {self.event_name}>'

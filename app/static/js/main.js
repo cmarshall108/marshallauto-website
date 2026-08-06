@@ -23,7 +23,63 @@
             vehicle: safeParse(el.dataset.vehicle || 'null'),
             inventory: safeParse(el.dataset.inventory || 'null'),
             leadValue: parseFloat(el.dataset.leadValue || '1') || 1,
+            collectUrl: el.dataset.collectUrl || '/api/analytics/collect',
         };
+    }
+
+    function uuidv4() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+        // RFC4122-ish fallback
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+        });
+    }
+
+    function storageGet(key) {
+        try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function storageSet(key, val) {
+        try { localStorage.setItem(key, val); } catch (e) { /* private mode */ }
+    }
+    function sessionGet(key) {
+        try { return sessionStorage.getItem(key); } catch (e) { return null; }
+    }
+    function sessionSet(key, val) {
+        try { sessionStorage.setItem(key, val); } catch (e) { /* private mode */ }
+    }
+
+    function getVisitorId() {
+        const KEY = 'ma_vid';
+        let id = storageGet(KEY);
+        if (!id || id.length < 16) {
+            id = uuidv4();
+            storageSet(KEY, id);
+        }
+        return id;
+    }
+
+    function getSessionId() {
+        const KEY = 'ma_sid';
+        let id = sessionGet(KEY);
+        if (!id || id.length < 16) {
+            id = uuidv4();
+            sessionSet(KEY, id);
+        }
+        return id;
+    }
+
+    function getLandingPath() {
+        const KEY = 'ma_landing';
+        let path = sessionGet(KEY);
+        if (!path) {
+            path = (window.location.pathname || '/').slice(0, 512);
+            sessionSet(KEY, path);
+        }
+        return path;
     }
 
     function captureUtmParams() {
@@ -70,8 +126,21 @@
 
     const Analytics = {
         config: {},
+        pageViewId: null,
+        visitorId: null,
+        sessionId: null,
+        startedAt: 0,
+        maxScroll: 0,
+        heartbeatTimer: null,
+        engagedSent: false,
+        scrollMarks: {},
+        unloading: false,
+
         init() {
             this.config = getConfig();
+            this.visitorId = getVisitorId();
+            this.sessionId = getSessionId();
+            this.startedAt = Date.now();
             captureUtmParams();
             this.trackPageContext();
             this.bindCtaClicks();
@@ -79,6 +148,7 @@
             this.bindInventoryFilters();
             this.trackViewItem();
             this.trackInventorySearch();
+            this.startFirstPartyTracking();
         },
 
         push(payload) {
@@ -115,6 +185,169 @@
             const payload = Object.assign({ event: name }, params || {});
             this.push(payload);
             this.gtagEvent(name, params);
+            this.sendFirstPartyEvent(name, params || {});
+        },
+
+        /* ---------- First-party admin analytics ---------- */
+
+        identityPayload() {
+            return {
+                visitor_id: this.visitorId,
+                session_id: this.sessionId,
+                page_view_id: this.pageViewId || undefined,
+            };
+        },
+
+        durationSeconds() {
+            return Math.max(0, Math.round((Date.now() - this.startedAt) / 1000));
+        },
+
+        isEngaged() {
+            return this.durationSeconds() >= 15 || this.maxScroll >= 50;
+        },
+
+        postCollect(body, useBeacon) {
+            const url = this.config.collectUrl || '/api/analytics/collect';
+            const json = JSON.stringify(body);
+            try {
+                if (useBeacon && navigator.sendBeacon) {
+                    const blob = new Blob([json], { type: 'application/json' });
+                    if (navigator.sendBeacon(url, blob)) return Promise.resolve({ ok: true, beacon: true });
+                }
+            } catch (e) { /* fall through */ }
+
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: json,
+                credentials: 'same-origin',
+                keepalive: !!useBeacon,
+            }).then((res) => res.json().catch(() => ({ ok: res.ok }))).catch(() => ({ ok: false }));
+        },
+
+        startFirstPartyTracking() {
+            // Skip admin pages if main.js is ever loaded there
+            if ((window.location.pathname || '').indexOf('/admin') === 0) return;
+
+            const utm = getStoredUtm();
+            const v = this.config.vehicle || {};
+            const payload = Object.assign({
+                type: 'pageview',
+                path: window.location.pathname || '/',
+                page_type: this.config.pageType || 'other',
+                page_title: (document.title || '').slice(0, 255),
+                query_string: (window.location.search || '').replace(/^\?/, '').slice(0, 512),
+                referrer: document.referrer || '',
+                landing_path: getLandingPath(),
+                vehicle_id: v.id || null,
+                language: (navigator.language || '').slice(0, 32),
+                screen_width: window.screen ? window.screen.width : null,
+                screen_height: window.screen ? window.screen.height : null,
+                timezone: (function () {
+                    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }
+                    catch (e) { return ''; }
+                })(),
+                user_agent: navigator.userAgent || '',
+            }, this.identityPayload(), utm);
+
+            this.postCollect(payload, false).then((res) => {
+                if (res && res.page_view_id) {
+                    this.pageViewId = res.page_view_id;
+                }
+            });
+
+            // Scroll depth
+            const onScroll = () => {
+                const doc = document.documentElement;
+                const body = document.body;
+                const scrollTop = window.pageYOffset || doc.scrollTop || body.scrollTop || 0;
+                const height = Math.max(
+                    body.scrollHeight, doc.scrollHeight,
+                    body.offsetHeight, doc.offsetHeight,
+                    body.clientHeight, doc.clientHeight
+                );
+                const win = window.innerHeight || doc.clientHeight || 0;
+                const denom = Math.max(1, height - win);
+                const pct = Math.min(100, Math.round((scrollTop / denom) * 100));
+                if (pct > this.maxScroll) this.maxScroll = pct;
+
+                [25, 50, 75, 90, 100].forEach((mark) => {
+                    if (this.maxScroll >= mark && !this.scrollMarks[mark]) {
+                        this.scrollMarks[mark] = true;
+                        this.sendFirstPartyEvent('scroll_depth', {
+                            label: String(mark),
+                            value: mark,
+                            meta: { scroll_depth_pct: mark },
+                        });
+                    }
+                });
+            };
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+
+            // Heartbeat every 15s while tab is visible
+            this.heartbeatTimer = window.setInterval(() => {
+                if (document.visibilityState === 'hidden') return;
+                this.sendEngagementUpdate(false, true);
+            }, 15000);
+
+            const flush = () => {
+                if (this.unloading) return;
+                this.unloading = true;
+                this.sendEngagementUpdate(true, false, true);
+            };
+            window.addEventListener('pagehide', flush);
+            window.addEventListener('beforeunload', flush);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') {
+                    this.sendEngagementUpdate(false, false, true);
+                }
+            });
+        },
+
+        sendEngagementUpdate(isExit, heartbeat, useBeacon) {
+            if (!this.pageViewId && !heartbeat) {
+                // Still try exit update if we somehow lack id — skip
+                if (!this.pageViewId) return;
+            }
+            const engaged = this.isEngaged();
+            if (engaged && !this.engagedSent) {
+                this.engagedSent = true;
+                this.sendFirstPartyEvent('engaged_time', {
+                    value: this.durationSeconds(),
+                    meta: { scroll_depth_pct: this.maxScroll },
+                }, useBeacon);
+            }
+            const body = Object.assign({
+                type: 'update',
+                duration_seconds: this.durationSeconds(),
+                scroll_depth_pct: this.maxScroll,
+                is_engaged: engaged,
+                is_exit: !!isExit,
+                heartbeat: !!heartbeat,
+            }, this.identityPayload());
+            this.postCollect(body, !!useBeacon);
+        },
+
+        sendFirstPartyEvent(name, params, useBeacon) {
+            if (!name) return;
+            // Avoid recursive noise
+            if (name === 'page_context') return;
+            const v = this.config.vehicle || {};
+            const meta = Object.assign({}, params || {});
+            // Keep payload lean
+            delete meta.items;
+            const body = Object.assign({
+                type: 'event',
+                event_name: name,
+                path: window.location.pathname || '/',
+                page_type: this.config.pageType || 'other',
+                vehicle_id: (params && params.vehicle_id) || v.id || null,
+                label: (params && (params.label || params.link_text || params.search_term || params.cta_type || params.gallery_action)) || null,
+                value: (params && (params.value != null ? params.value : params.price)) || null,
+                meta: meta,
+            }, this.identityPayload());
+            this.postCollect(body, !!useBeacon);
         },
 
         trackPageContext() {

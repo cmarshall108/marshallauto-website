@@ -917,6 +917,32 @@ def contact_submit_ajax():
     return jsonify({'success': False, 'errors': form.errors}), 400
 
 
+@main.route('/api/analytics/collect', methods=['POST'])
+def analytics_collect():
+    """First-party pageview / event beacon used by the public site JS."""
+    from app.analytics import process_collect_payload
+
+    data = request.get_json(silent=True)
+    if data is None and request.form:
+        # sendBeacon may post as text/plain JSON body; also accept form field
+        raw = request.form.get('payload') or request.form.get('data')
+        if raw:
+            import json as _json
+            try:
+                data = _json.loads(raw)
+            except (TypeError, ValueError):
+                data = None
+    if data is None and request.data:
+        import json as _json
+        try:
+            data = _json.loads(request.data.decode('utf-8', errors='ignore') or '{}')
+        except (TypeError, ValueError):
+            data = None
+
+    body, status = process_collect_payload(data or {})
+    return jsonify(body), status
+
+
 @main.route('/about')
 def about():
     breadcrumbs = structured_data_breadcrumb([
