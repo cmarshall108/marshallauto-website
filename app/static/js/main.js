@@ -360,6 +360,13 @@
         const hotspotCardText = document.getElementById('gallery-hotspot-card-text');
         const highlightsBadge = document.getElementById('gallery-highlights-badge');
         const highlightsBadgeText = document.getElementById('gallery-highlights-badge-text');
+        const maximizeBtn = document.getElementById('gallery-maximize');
+        const lightbox = document.getElementById('gallery-lightbox');
+        const lightboxImage = document.getElementById('gallery-lightbox-image');
+        const lightboxClose = document.getElementById('gallery-lightbox-close');
+        const lightboxPrev = document.getElementById('gallery-lightbox-prev');
+        const lightboxNext = document.getElementById('gallery-lightbox-next');
+        const lightboxCounter = document.getElementById('gallery-lightbox-counter');
 
         if (mainImage && thumbButtons.length >= 1 && gallery) {
             const parseHighlights = (raw) => {
@@ -385,6 +392,8 @@
                 if (currentIndex < 0) currentIndex = 0;
 
                 const multi = slides.length > 1;
+                let lightboxOpen = false;
+                let lightboxLastFocus = null;
                 const spinReady = multi && gallery.dataset.spinReady === 'true' && slides.length >= 4;
                 const highlightsEnabled = gallery.dataset.highlightsEnabled !== 'false';
                 let mode = 'photos'; // 'photos' | 'spin'
@@ -599,6 +608,9 @@
                     if (galleryCounter) {
                         galleryCounter.textContent = `${index + 1} / ${slides.length}`;
                     }
+                    if (lightboxCounter) {
+                        lightboxCounter.textContent = `${index + 1} / ${slides.length}`;
+                    }
                     if (mode === 'spin') {
                         gallery.setAttribute(
                             'aria-label',
@@ -616,6 +628,59 @@
                     }
                 };
 
+                const syncLightboxImage = (index) => {
+                    if (!lightbox || !lightboxImage) return;
+                    const slide = slides[index];
+                    if (!slide) return;
+                    if (lightboxImage.getAttribute('src') !== slide.src) {
+                        lightboxImage.src = slide.src;
+                    }
+                    lightboxImage.alt = slide.alt
+                        ? `${slide.alt} (enlarged)`
+                        : 'Enlarged vehicle photo';
+                    if (lightboxCounter) {
+                        lightboxCounter.textContent = `${index + 1} / ${slides.length}`;
+                    }
+                };
+
+                const closeLightbox = () => {
+                    if (!lightbox || !lightboxOpen) return;
+                    lightboxOpen = false;
+                    lightbox.hidden = true;
+                    document.body.classList.remove('gallery-lightbox-open');
+                    if (maximizeBtn) {
+                        maximizeBtn.setAttribute('aria-expanded', 'false');
+                    }
+                    const restore = lightboxLastFocus;
+                    lightboxLastFocus = null;
+                    if (restore && typeof restore.focus === 'function') {
+                        try { restore.focus(); } catch (_) { /* ignore */ }
+                    } else if (maximizeBtn) {
+                        try { maximizeBtn.focus(); } catch (_) { /* ignore */ }
+                    }
+                };
+
+                const openLightbox = () => {
+                    if (!lightbox || !lightboxImage) return;
+                    if (mode === 'spin') {
+                        setMode('photos', 'maximize_exit_spin');
+                    }
+                    closeHotspotCard();
+                    lightboxLastFocus = document.activeElement;
+                    lightboxOpen = true;
+                    syncLightboxImage(currentIndex);
+                    lightbox.hidden = false;
+                    document.body.classList.add('gallery-lightbox-open');
+                    if (maximizeBtn) {
+                        maximizeBtn.setAttribute('aria-expanded', 'true');
+                    }
+                    const focusTarget = lightboxClose || lightbox;
+                    window.setTimeout(() => {
+                        try { focusTarget.focus(); } catch (_) { /* ignore */ }
+                    }, 0);
+                    Analytics.trackGallery('maximize_open', currentIndex, slides.length);
+                };
+
                 const setActiveSlide = (index, action, options) => {
                     const opts = options || {};
                     const total = slides.length;
@@ -625,6 +690,7 @@
                     if (normalized === currentIndex && !opts.force) {
                         updateCounter(normalized);
                         if (!opts.skipHotspots) renderHotspots(normalized);
+                        if (lightboxOpen) syncLightboxImage(normalized);
                         return;
                     }
 
@@ -670,6 +736,9 @@
                     }
 
                     updateCounter(normalized);
+                    if (lightboxOpen) {
+                        syncLightboxImage(normalized);
+                    }
                     if (!opts.quiet) {
                         hideSwipeHint();
                         Analytics.trackGallery(action || 'thumb_click', normalized, total);
@@ -767,8 +836,85 @@
                     hotspotCard.addEventListener('click', (e) => e.stopPropagation());
                 }
                 document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') closeHotspotCard();
+                    if (e.key === 'Escape') {
+                        if (lightboxOpen) {
+                            e.preventDefault();
+                            closeLightbox();
+                            return;
+                        }
+                        closeHotspotCard();
+                        return;
+                    }
+                    if (!lightboxOpen) return;
+                    if (e.key === 'ArrowRight' && multi) {
+                        e.preventDefault();
+                        goNext('lightbox_key_next');
+                    } else if (e.key === 'ArrowLeft' && multi) {
+                        e.preventDefault();
+                        goPrev('lightbox_key_prev');
+                    }
                 });
+
+                if (maximizeBtn) {
+                    maximizeBtn.setAttribute('aria-expanded', 'false');
+                    maximizeBtn.setAttribute('aria-controls', 'gallery-lightbox');
+                    maximizeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openLightbox();
+                    });
+                    maximizeBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+                }
+                if (lightboxClose) {
+                    lightboxClose.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeLightbox();
+                    });
+                }
+                if (lightboxPrev) {
+                    lightboxPrev.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        goPrev('lightbox_prev');
+                    });
+                }
+                if (lightboxNext) {
+                    lightboxNext.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        goNext('lightbox_next');
+                    });
+                }
+                if (lightbox) {
+                    lightbox.addEventListener('click', (e) => {
+                        if (e.target && e.target.closest && e.target.closest('[data-lightbox-close]')) {
+                            e.preventDefault();
+                            closeLightbox();
+                        }
+                    });
+                }
+                // Double-click / double-tap photo to maximize (photos mode only)
+                let lastStageTapAt = 0;
+                if (galleryStage) {
+                    galleryStage.addEventListener('dblclick', (e) => {
+                        if (e.target.closest('.gallery-hotspot, .gallery-hotspot-card, .gallery-nav, .gallery-maximize-btn')) return;
+                        if (mode === 'spin') return;
+                        e.preventDefault();
+                        openLightbox();
+                    });
+                    galleryStage.addEventListener('click', (e) => {
+                        if (e.target.closest('.gallery-hotspot, .gallery-hotspot-card, .gallery-nav, .gallery-maximize-btn')) return;
+                        if (mode === 'spin' || Date.now() < suppressClickUntil) return;
+                        const now = Date.now();
+                        if (now - lastStageTapAt < 320) {
+                            lastStageTapAt = 0;
+                            openLightbox();
+                            return;
+                        }
+                        lastStageTapAt = now;
+                    });
+                }
 
                 modeButtons.forEach((btn) => {
                     btn.addEventListener('click', (e) => {
@@ -842,7 +988,7 @@
                 };
 
                 const onPointerDown = (e) => {
-                    if (e.target.closest('.gallery-nav, .gallery-hotspot, .gallery-hotspot-card')) return;
+                    if (e.target.closest('.gallery-nav, .gallery-hotspot, .gallery-hotspot-card, .gallery-maximize-btn')) return;
                     if (e.pointerType === 'mouse' && e.button !== 0) return;
                     if (!multi && mode !== 'spin') return;
 

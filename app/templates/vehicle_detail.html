@@ -118,6 +118,16 @@
                         <span id="gallery-highlights-badge-text">{{ ns.highlight_total }} highlights</span>
                     </div>
                     {% endif %}
+                    {% if gallery_count >= 1 %}
+                    <button type="button"
+                            class="gallery-maximize-btn"
+                            id="gallery-maximize"
+                            aria-label="View photo larger"
+                            title="View larger">
+                        <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
+                        <span class="visually-hidden">Maximize photo</span>
+                    </button>
+                    {% endif %}
                 </div>
                 {% if gallery_count >= 1 %}
                 <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable{% if gallery_count == 1 %} d-none{% endif %}" id="gallery-thumbs" role="list" aria-label="Photo thumbnails">
@@ -151,6 +161,43 @@
                     Drag left or right on the photo to spin. Best when exterior shots are ordered around the car.
                 </p>
                 {% endif %}
+                <div class="gallery-lightbox"
+                     id="gallery-lightbox"
+                     hidden
+                     role="dialog"
+                     aria-modal="true"
+                     aria-label="Enlarged vehicle photo viewer">
+                    <div class="gallery-lightbox-backdrop" data-lightbox-close="1" tabindex="-1"></div>
+                    <div class="gallery-lightbox-panel">
+                        <button type="button"
+                                class="gallery-lightbox-close"
+                                id="gallery-lightbox-close"
+                                aria-label="Close enlarged photo">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </button>
+                        {% if gallery_count > 1 %}
+                        <button type="button"
+                                class="gallery-lightbox-nav gallery-lightbox-prev"
+                                id="gallery-lightbox-prev"
+                                aria-label="Previous photo">
+                            <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                        </button>
+                        <button type="button"
+                                class="gallery-lightbox-nav gallery-lightbox-next"
+                                id="gallery-lightbox-next"
+                                aria-label="Next photo">
+                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        </button>
+                        <div class="gallery-lightbox-counter" id="gallery-lightbox-counter" aria-live="polite">1 / {{ gallery_count }}</div>
+                        {% endif %}
+                        <div class="gallery-lightbox-stage">
+                            <img id="gallery-lightbox-image"
+                                 src="{{ vehicle.primary_image_url() }}"
+                                 alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} enlarged photo"
+                                 draggable="false">
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
             </div>
 
