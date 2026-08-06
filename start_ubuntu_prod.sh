@@ -6,14 +6,64 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-# Prefer project venv if present
-if [[ -x "$ROOT/venv/bin/python" ]]; then
-  PYTHON="$ROOT/venv/bin/python"
-elif [[ -x "$ROOT/.venv/bin/python" ]]; then
-  PYTHON="$ROOT/.venv/bin/python"
-else
+# Prefer / create project venv so worker deps (OpenCV) install cleanly
+ensure_python() {
+  if [[ -x "$ROOT/venv/bin/python" ]]; then
+    PYTHON="$ROOT/venv/bin/python"
+    return 0
+  fi
+  if [[ -x "$ROOT/.venv/bin/python" ]]; then
+    PYTHON="$ROOT/.venv/bin/python"
+    return 0
+  fi
+  # Create venv when missing (avoids system-site / PEP 668 issues on Ubuntu)
+  if command -v python3 >/dev/null 2>&1; then
+    echo "Creating Python venv at $ROOT/venv ..."
+    python3 -m venv "$ROOT/venv"
+    PYTHON="$ROOT/venv/bin/python"
+    "$PYTHON" -m pip install --upgrade pip setuptools wheel >/dev/null
+    return 0
+  fi
   PYTHON="${PYTHON:-python3}"
-fi
+}
+ensure_python
+echo "Using Python: $PYTHON ($("$PYTHON" -c 'import sys; print(sys.version.split()[0])'))"
+
+# Ensure photo-highlight deps (OpenCV + numpy) are importable in THIS interpreter
+ensure_highlight_deps() {
+  if "$PYTHON" - <<'PY' >/dev/null 2>&1
+import cv2  # noqa: F401
+import numpy  # noqa: F401
+PY
+  then
+    echo "Photo highlight deps OK (opencv + numpy)"
+    return 0
+  fi
+
+  echo "Installing photo highlight deps (opencv-python-headless, numpy) ..."
+  # Prefer full requirements when present so versions stay pinned together
+  if [[ -f "$ROOT/requirements.txt" ]]; then
+    if ! "$PYTHON" -m pip install -r "$ROOT/requirements.txt"; then
+      echo "Full requirements install failed; trying highlight packages only..." >&2
+      "$PYTHON" -m pip install "numpy>=1.26,<3" "opencv-python-headless>=4.8,<5"
+    fi
+  else
+    "$PYTHON" -m pip install "numpy>=1.26,<3" "opencv-python-headless>=4.8,<5"
+  fi
+
+  if ! "$PYTHON" - <<'PY'
+import cv2
+import numpy
+print(f"opencv {cv2.__version__}, numpy {numpy.__version__}")
+PY
+  then
+    echo "ERROR: OpenCV/numpy still missing after install." >&2
+    echo "  Tried interpreter: $PYTHON" >&2
+    echo "  Fix: $PYTHON -m pip install opencv-python-headless numpy" >&2
+    exit 1
+  fi
+}
+ensure_highlight_deps
 
 # Load .env into this shell (export KEY=VALUE lines; ignore comments/blank)
 load_dotenv_file() {
