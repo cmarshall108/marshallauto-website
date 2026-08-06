@@ -151,55 +151,73 @@ def _ensure_schema_columns(app):
     """
     Lightweight additive schema fixes for columns added after initial create_all
     without a full migration history (SQLite-friendly).
+
+    Each ALTER is independent and ignores "duplicate column" races (multi-worker boot).
     """
     from sqlalchemy import inspect, text
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+
+    def _add_column(conn, table_name, column_name, ddl):
+        # Re-check immediately before ALTER to reduce multi-process races.
+        cols = {c['name'] for c in inspect(conn).get_columns(table_name)}
+        if column_name in cols:
+            return
+        try:
+            conn.execute(text(ddl))
+        except (OperationalError, ProgrammingError) as exc:
+            msg = str(exc).lower()
+            if 'duplicate column' in msg or 'already exists' in msg:
+                return
+            raise
+
     try:
         inspector = inspect(db.engine)
         tables = set(inspector.get_table_names())
         if 'vehicle_images' in tables:
-            cols = {c['name'] for c in inspector.get_columns('vehicle_images')}
             with db.engine.begin() as conn:
-                if 'width' not in cols:
-                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN width INTEGER'))
-                if 'height' not in cols:
-                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN height INTEGER'))
-                if 'highlight_status' not in cols:
-                    conn.execute(text(
-                        "ALTER TABLE vehicle_images ADD COLUMN highlight_status VARCHAR(20) "
-                        "DEFAULT 'pending' NOT NULL"
-                    ))
-                if 'highlight_error' not in cols:
-                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_error VARCHAR(500)'))
-                if 'highlight_scene' not in cols:
-                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_scene VARCHAR(64)'))
-                if 'highlight_analyzed_at' not in cols:
-                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_analyzed_at DATETIME'))
-                if 'highlight_version' not in cols:
-                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_version INTEGER'))
+                _add_column(conn, 'vehicle_images', 'width',
+                            'ALTER TABLE vehicle_images ADD COLUMN width INTEGER')
+                _add_column(conn, 'vehicle_images', 'height',
+                            'ALTER TABLE vehicle_images ADD COLUMN height INTEGER')
+                _add_column(
+                    conn, 'vehicle_images', 'highlight_status',
+                    "ALTER TABLE vehicle_images ADD COLUMN highlight_status VARCHAR(20) "
+                    "DEFAULT 'pending' NOT NULL",
+                )
+                _add_column(conn, 'vehicle_images', 'highlight_error',
+                            'ALTER TABLE vehicle_images ADD COLUMN highlight_error VARCHAR(500)')
+                _add_column(conn, 'vehicle_images', 'highlight_scene',
+                            'ALTER TABLE vehicle_images ADD COLUMN highlight_scene VARCHAR(64)')
+                _add_column(conn, 'vehicle_images', 'highlight_analyzed_at',
+                            'ALTER TABLE vehicle_images ADD COLUMN highlight_analyzed_at DATETIME')
+                _add_column(conn, 'vehicle_images', 'highlight_version',
+                            'ALTER TABLE vehicle_images ADD COLUMN highlight_version INTEGER')
         if 'vehicles' in tables:
-            cols = {c['name'] for c in inspector.get_columns('vehicles')}
             with db.engine.begin() as conn:
-                if 'title_status' not in cols:
-                    conn.execute(text("ALTER TABLE vehicles ADD COLUMN title_status VARCHAR(20) DEFAULT 'clean' NOT NULL"))
-                if 'meta_keywords' not in cols:
-                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN meta_keywords VARCHAR(255)'))
-                if 'facebook_post_id' not in cols:
-                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_post_id VARCHAR(64)'))
-                if 'facebook_posted_at' not in cols:
-                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_posted_at DATETIME'))
-                if 'facebook_last_error' not in cols:
-                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_last_error VARCHAR(500)'))
-                if 'facebook_last_status' not in cols:
-                    conn.execute(text('ALTER TABLE vehicles ADD COLUMN facebook_last_status VARCHAR(32)'))
+                _add_column(
+                    conn, 'vehicles', 'title_status',
+                    "ALTER TABLE vehicles ADD COLUMN title_status VARCHAR(20) "
+                    "DEFAULT 'clean' NOT NULL",
+                )
+                _add_column(conn, 'vehicles', 'meta_keywords',
+                            'ALTER TABLE vehicles ADD COLUMN meta_keywords VARCHAR(255)')
+                _add_column(conn, 'vehicles', 'facebook_post_id',
+                            'ALTER TABLE vehicles ADD COLUMN facebook_post_id VARCHAR(64)')
+                _add_column(conn, 'vehicles', 'facebook_posted_at',
+                            'ALTER TABLE vehicles ADD COLUMN facebook_posted_at DATETIME')
+                _add_column(conn, 'vehicles', 'facebook_last_error',
+                            'ALTER TABLE vehicles ADD COLUMN facebook_last_error VARCHAR(500)')
+                _add_column(conn, 'vehicles', 'facebook_last_status',
+                            'ALTER TABLE vehicles ADD COLUMN facebook_last_status VARCHAR(32)')
         if 'reviews' in tables:
-            cols = {c['name'] for c in inspector.get_columns('reviews')}
             with db.engine.begin() as conn:
-                if 'source' not in cols:
-                    conn.execute(text('ALTER TABLE reviews ADD COLUMN source VARCHAR(64)'))
-                if 'is_featured' not in cols:
-                    conn.execute(text('ALTER TABLE reviews ADD COLUMN is_featured BOOLEAN DEFAULT 0 NOT NULL'))
+                _add_column(conn, 'reviews', 'source',
+                            'ALTER TABLE reviews ADD COLUMN source VARCHAR(64)')
+                _add_column(
+                    conn, 'reviews', 'is_featured',
+                    'ALTER TABLE reviews ADD COLUMN is_featured BOOLEAN DEFAULT 0 NOT NULL',
+                )
         if 'leads' in tables:
-            cols = {c['name'] for c in inspector.get_columns('leads')}
             with db.engine.begin() as conn:
                 for col, ddl in [
                     ('utm_source', 'ALTER TABLE leads ADD COLUMN utm_source VARCHAR(128)'),
@@ -212,8 +230,7 @@ def _ensure_schema_columns(app):
                     ('landing_path', 'ALTER TABLE leads ADD COLUMN landing_path VARCHAR(512)'),
                     ('referrer', 'ALTER TABLE leads ADD COLUMN referrer VARCHAR(512)'),
                 ]:
-                    if col not in cols:
-                        conn.execute(text(ddl))
+                    _add_column(conn, 'leads', col, ddl)
     except Exception as e:
         app.logger.warning('Schema ensure skipped: %s', e)
 

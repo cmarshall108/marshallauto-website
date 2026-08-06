@@ -8,6 +8,8 @@ Create Date: 2026-08-06
 from alembic import op
 import sqlalchemy as sa
 
+from migrations.compat import create_index_if_missing, create_table_if_missing, has_table
+
 
 # revision identifiers, used by Alembic.
 revision = 'e3a4b5c6d7e8'
@@ -17,7 +19,7 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
+    create_table_if_missing(
         'page_views',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
@@ -57,19 +59,19 @@ def upgrade():
         sa.ForeignKeyConstraint(['vehicle_id'], ['vehicles.id'], ),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index('ix_page_views_created_at', 'page_views', ['created_at'], unique=False)
-    op.create_index('ix_page_views_visitor_id', 'page_views', ['visitor_id'], unique=False)
-    op.create_index('ix_page_views_session_id', 'page_views', ['session_id'], unique=False)
-    op.create_index('ix_page_views_path', 'page_views', ['path'], unique=False)
-    op.create_index('ix_page_views_page_type', 'page_views', ['page_type'], unique=False)
-    op.create_index('ix_page_views_vehicle_id', 'page_views', ['vehicle_id'], unique=False)
-    op.create_index('ix_page_views_referrer_host', 'page_views', ['referrer_host'], unique=False)
-    op.create_index('ix_page_views_utm_source', 'page_views', ['utm_source'], unique=False)
-    op.create_index('ix_page_views_utm_campaign', 'page_views', ['utm_campaign'], unique=False)
-    op.create_index('ix_page_views_device_type', 'page_views', ['device_type'], unique=False)
-    op.create_index('ix_page_views_ip_hash', 'page_views', ['ip_hash'], unique=False)
+    create_index_if_missing('ix_page_views_created_at', 'page_views', ['created_at'])
+    create_index_if_missing('ix_page_views_visitor_id', 'page_views', ['visitor_id'])
+    create_index_if_missing('ix_page_views_session_id', 'page_views', ['session_id'])
+    create_index_if_missing('ix_page_views_path', 'page_views', ['path'])
+    create_index_if_missing('ix_page_views_page_type', 'page_views', ['page_type'])
+    create_index_if_missing('ix_page_views_vehicle_id', 'page_views', ['vehicle_id'])
+    create_index_if_missing('ix_page_views_referrer_host', 'page_views', ['referrer_host'])
+    create_index_if_missing('ix_page_views_utm_source', 'page_views', ['utm_source'])
+    create_index_if_missing('ix_page_views_utm_campaign', 'page_views', ['utm_campaign'])
+    create_index_if_missing('ix_page_views_device_type', 'page_views', ['device_type'])
+    create_index_if_missing('ix_page_views_ip_hash', 'page_views', ['ip_hash'])
 
-    op.create_table(
+    create_table_if_missing(
         'analytics_events',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
@@ -88,16 +90,18 @@ def upgrade():
         sa.ForeignKeyConstraint(['vehicle_id'], ['vehicles.id'], ),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index('ix_analytics_events_created_at', 'analytics_events', ['created_at'], unique=False)
-    op.create_index('ix_analytics_events_visitor_id', 'analytics_events', ['visitor_id'], unique=False)
-    op.create_index('ix_analytics_events_session_id', 'analytics_events', ['session_id'], unique=False)
-    op.create_index('ix_analytics_events_page_view_id', 'analytics_events', ['page_view_id'], unique=False)
-    op.create_index('ix_analytics_events_event_name', 'analytics_events', ['event_name'], unique=False)
-    op.create_index('ix_analytics_events_event_category', 'analytics_events', ['event_category'], unique=False)
-    op.create_index('ix_analytics_events_page_type', 'analytics_events', ['page_type'], unique=False)
-    op.create_index('ix_analytics_events_vehicle_id', 'analytics_events', ['vehicle_id'], unique=False)
+    create_index_if_missing('ix_analytics_events_created_at', 'analytics_events', ['created_at'])
+    create_index_if_missing('ix_analytics_events_visitor_id', 'analytics_events', ['visitor_id'])
+    create_index_if_missing('ix_analytics_events_session_id', 'analytics_events', ['session_id'])
+    create_index_if_missing('ix_analytics_events_page_view_id', 'analytics_events', ['page_view_id'])
+    create_index_if_missing('ix_analytics_events_event_name', 'analytics_events', ['event_name'])
+    create_index_if_missing('ix_analytics_events_event_category', 'analytics_events', ['event_category'])
+    create_index_if_missing('ix_analytics_events_page_type', 'analytics_events', ['page_type'])
+    create_index_if_missing('ix_analytics_events_vehicle_id', 'analytics_events', ['vehicle_id'])
 
 
 def downgrade():
-    op.drop_table('analytics_events')
-    op.drop_table('page_views')
+    if has_table('analytics_events'):
+        op.drop_table('analytics_events')
+    if has_table('page_views'):
+        op.drop_table('page_views')
