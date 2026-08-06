@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -10,7 +11,10 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
-load_dotenv()
+# Project-root .env (cwd-independent). DOTENV_PATH can override.
+_ROOT = Path(__file__).resolve().parent.parent
+_ENV_PATH = Path(os.environ.get('DOTENV_PATH') or _ROOT / '.env')
+load_dotenv(_ENV_PATH if _ENV_PATH.is_file() else _ROOT / '.env')
 
 from config import get_config
 from app.utils import format_mileage, format_price, is_low_mileage

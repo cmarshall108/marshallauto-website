@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from project root (not just cwd) so production launches are reliable.
+_ROOT = Path(__file__).resolve().parent
+_ENV_PATH = Path(os.environ.get('DOTENV_PATH') or _ROOT / '.env')
+load_dotenv(_ENV_PATH if _ENV_PATH.is_file() else _ROOT / '.env')
 
 from app import create_app, db
 from app.models import (
