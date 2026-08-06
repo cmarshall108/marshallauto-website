@@ -9,6 +9,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Home page with featured inventory and search
   - Inventory listing with filters (make, body style, price, mileage, search)
   - Vehicle detail pages with image gallery, specs, features, service history, and CarFax
+  - Carvana-style photo highlight bubbles (features + condition notes) powered by a local OpenCV worker
   - Financing, sell-your-car, about, and contact pages
   - SEO: meta tags, Open Graph, JSON-LD (AutoDealer, Car, FAQ, HowTo, ItemList, Breadcrumb), sitemap.xml, robots.txt
   - Local SEO landings for cities, makes, body styles, and rebuilt-title inventory
@@ -90,6 +91,12 @@ Set `DATABASE_URL` to a production PostgreSQL database for better performance an
 | `FACEBOOK_PAGE_ID` | Facebook Page ID for Graph API vehicle posts (optional; also in Admin → Settings) |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Long-lived **Page** access token (optional env fallback; preferred in Admin → Settings) |
 | `FACEBOOK_AUTO_POST_VEHICLES` | Env fallback to enable Page posting (`true`/`false`) |
+| `PHOTO_HIGHLIGHTS_ENABLED` | Enable photo highlight system (`true`/`false`, default true) |
+| `PHOTO_HIGHLIGHTS_AUTO_ENQUEUE` | Auto-queue analysis on image upload (`true`/`false`, default true) |
+| `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `8`) |
+| `PHOTO_HIGHLIGHTS_USE_YOLO` | Optional YOLO nano refinement if ultralytics installed (default false) |
+| `HIGHLIGHT_WORKER_POLL` | Worker idle poll seconds (default `2`) |
+| `HIGHLIGHT_WORKER_LEASE` | Job lease seconds (default `300`) |
 
 Analytics and Facebook posting credentials can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`, Page ID, Page access token), which override env defaults when present.
 
@@ -120,6 +127,43 @@ What *is* supported:
 
 Post status (`facebook_post_id`, last error/time) is stored on each vehicle
 Analytics IDs can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`), which override env defaults.
+
+
+## Photo Highlights (Carvana-style bubbles)
+
+Listing photos can show clickable hotspot bubbles for features (CarPlay, leather seats, new tires, sunroof, etc.) and condition notes (scratches, dings). Detection runs **locally** with a lightweight OpenCV pipeline — uploads never wait on analysis.
+
+### How it works
+
+1. Admin uploads vehicle photos (or saves a vehicle with feature text).
+2. The web app **only enqueues** a DB-backed `PhotoHighlightJob`.
+3. A **separate worker process** claims jobs and writes `VehicleImageHighlight` rows.
+4. The public vehicle gallery renders bubbles + a detail card when analysis is `ready`.
+
+### Run the worker
+
+In a second terminal (or as a Procfile `worker` process):
+
+```bash
+python -m app.highlight_worker
+# one-shot:
+python -m app.highlight_worker --once
+# flask CLI:
+flask highlight-worker
+flask highlight-enqueue-all
+```
+
+On platforms that use the included `Procfile`, start both `web` and `worker`.
+
+### Admin controls
+
+On **Edit Vehicle**:
+
+- Per-image highlight status (`pending` / `processing` / `ready` / `failed`)
+- **Analyze** one image or **Re-analyze all**
+- Toggle visibility or delete individual bubbles
+
+Optional queue snapshot: `GET /admin/api/highlight-queue` (logged-in admin).
 
 ## Analytics Events
 

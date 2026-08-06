@@ -161,17 +161,83 @@
 
         {% if vehicle and vehicle.images %}
         <div class="col-12">
-            <label class="form-label">Manage Images</label>
-            <div class="row g-2">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <label class="form-label mb-0">Manage Images &amp; Photo Highlights</label>
+                <form action="{{ url_for('admin.vehicle_highlights_analyze', id=vehicle.id) }}" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="force" value="1">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-bullseye me-1"></i>Re-analyze all photo highlights
+                    </button>
+                </form>
+            </div>
+            <p class="form-text mt-0 mb-2">
+                Carvana-style bubbles (CarPlay, leather, tires, scratches, dings, etc.) are detected by a
+                <strong>local OpenCV worker</strong> in a separate process — uploads never wait on analysis.
+                Run <code>python -m app.highlight_worker</code> (or the Procfile <code>worker</code> process) so the queue drains.
+            </p>
+            <div class="row g-3">
                 {% for image in vehicle.ordered_images() %}
-                <div class="col-md-3 col-6">
-                    <div class="position-relative">
-                        <img src="{{ image.url }}" class="img-fluid rounded" alt="">
-                        {% if image.is_primary %}<span class="position-absolute top-0 start-0 badge bg-primary m-1">Primary</span>{% endif %}
-                        <form action="{{ url_for('admin.vehicle_image_delete', id=image.id) }}" method="POST" class="position-absolute top-0 end-0 m-1" onsubmit="return confirm('Delete this image?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
-                        </form>
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="position-relative">
+                            <img src="{{ image.url }}" class="card-img-top" alt="" style="object-fit:cover;height:160px;">
+                            {% if image.is_primary %}<span class="position-absolute top-0 start-0 badge bg-primary m-1">Primary</span>{% endif %}
+                            {% set hs = image.highlight_status or 'pending' %}
+                            <span class="position-absolute bottom-0 start-0 badge m-1
+                                {% if hs == 'ready' %}bg-success
+                                {% elif hs == 'processing' %}bg-info text-dark
+                                {% elif hs == 'failed' %}bg-danger
+                                {% else %}bg-secondary{% endif %}">
+                                Highlights: {{ hs }}
+                            </span>
+                            <form action="{{ url_for('admin.vehicle_image_delete', id=image.id) }}" method="POST" class="position-absolute top-0 end-0 m-1" onsubmit="return confirm('Delete this image?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <form action="{{ url_for('admin.vehicle_image_highlights_analyze', id=image.id) }}" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="force" value="1">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Analyze</button>
+                                </form>
+                                {% if image.highlight_scene %}
+                                <span class="badge text-bg-light border">{{ image.highlight_scene }}</span>
+                                {% endif %}
+                            </div>
+                            {% if image.highlight_error %}
+                            <div class="small text-danger mb-2">{{ image.highlight_error[:180] }}{% if image.highlight_error|length > 180 %}…{% endif %}</div>
+                            {% endif %}
+                            {% set hl_list = image.highlights or [] %}
+                            {% if hl_list %}
+                            <ul class="list-unstyled small mb-0">
+                                {% for h in hl_list %}
+                                <li class="d-flex align-items-start justify-content-between gap-1 py-1 border-top">
+                                    <span>
+                                        <i class="bi bi-{{ h.icon or 'info-circle' }} me-1"></i>
+                                        <strong>{{ h.label }}</strong>
+                                        <span class="text-muted">({{ h.category }}{% if not h.is_visible %}, hidden{% endif %})</span>
+                                    </span>
+                                    <span class="text-nowrap">
+                                        <form action="{{ url_for('admin.vehicle_image_highlight_toggle', image_id=image.id, highlight_id=h.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-link btn-sm p-0" title="Toggle visibility">{{ 'Hide' if h.is_visible else 'Show' }}</button>
+                                        </form>
+                                        ·
+                                        <form action="{{ url_for('admin.vehicle_image_highlight_delete', image_id=image.id, highlight_id=h.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this highlight?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-link btn-sm p-0 text-danger">Del</button>
+                                        </form>
+                                    </span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <div class="small text-muted">No highlights yet.</div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 {% endfor %}

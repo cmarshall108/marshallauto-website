@@ -199,6 +199,28 @@ class VehicleImage(db.Model):
     height = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
+    # Photo highlight analysis (Carvana-style hotspots)
+    # pending | processing | ready | failed | skipped
+    highlight_status = db.Column(db.String(20), default='pending', nullable=False, index=True)
+    highlight_error = db.Column(db.String(500), nullable=True)
+    highlight_scene = db.Column(db.String(64), nullable=True)
+    highlight_analyzed_at = db.Column(db.DateTime, nullable=True)
+    highlight_version = db.Column(db.Integer, nullable=True)
+
+    highlights = db.relationship(
+        'VehicleImageHighlight',
+        backref='image',
+        lazy='selectin',
+        cascade='all, delete-orphan',
+        order_by='VehicleImageHighlight.order_index.asc()',
+    )
+    highlight_jobs = db.relationship(
+        'PhotoHighlightJob',
+        backref='image',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+    )
+
     @property
     def url(self):
         return f'/static/uploads/vehicles/{self.filename}'
@@ -206,6 +228,84 @@ class VehicleImage(db.Model):
     @property
     def absolute_url(self):
         return f"{current_app.config['SITE_URL']}/static/uploads/vehicles/{self.filename}"
+
+    def visible_highlights(self):
+        """Public-facing highlights only (visible + ready analysis or manual)."""
+        rows = list(self.highlights or [])
+        return [
+            h for h in rows
+            if h.is_visible and (h.source == 'manual' or self.highlight_status == 'ready')
+        ]
+
+    def highlights_payload(self):
+        """JSON-serializable hotspot list for the gallery UI."""
+        return [h.to_public_dict() for h in self.visible_highlights()]
+
+
+class VehicleImageHighlight(db.Model):
+    """Clickable hotspot on a vehicle photo (feature or imperfection)."""
+    __tablename__ = 'vehicle_image_highlights'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_image_id = db.Column(
+        db.Integer, db.ForeignKey('vehicle_images.id'), nullable=False, index=True
+    )
+    # Position as percent of displayed image box (0-100)
+    x_pct = db.Column(db.Float, nullable=False, default=50.0)
+    y_pct = db.Column(db.Float, nullable=False, default=50.0)
+    label = db.Column(db.String(120), nullable=False)
+    category = db.Column(db.String(32), default='detail', nullable=False)  # feature|imperfection|detail
+    description = db.Column(db.Text, nullable=True)
+    icon = db.Column(db.String(64), default='info-circle', nullable=True)
+    severity = db.Column(db.String(32), default='info', nullable=False)  # positive|info|caution|issue
+    confidence = db.Column(db.Float, nullable=True)
+    source = db.Column(db.String(20), default='auto', nullable=False)  # auto|manual
+    order_index = db.Column(db.Integer, default=0, nullable=False)
+    is_visible = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    def to_public_dict(self):
+        return {
+            'id': self.id,
+            'x_pct': float(self.x_pct or 0),
+            'y_pct': float(self.y_pct or 0),
+            'label': self.label,
+            'category': self.category or 'detail',
+            'description': self.description or '',
+            'icon': self.icon or 'info-circle',
+            'severity': self.severity or 'info',
+            'confidence': float(self.confidence) if self.confidence is not None else None,
+            'source': self.source or 'auto',
+        }
+
+
+class PhotoHighlightJob(db.Model):
+    """Queued background analysis job for a vehicle image."""
+    __tablename__ = 'photo_highlight_jobs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_image_id = db.Column(
+        db.Integer, db.ForeignKey('vehicle_images.id'), nullable=False, index=True
+    )
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True, index=True)
+    # queued | running | completed | failed | cancelled
+    status = db.Column(db.String(20), default='queued', nullable=False, index=True)
+    priority = db.Column(db.Integer, default=100, nullable=False, index=True)
+    attempts = db.Column(db.Integer, default=0, nullable=False)
+    max_attempts = db.Column(db.Integer, default=3, nullable=False)
+    locked_by = db.Column(db.String(128), nullable=True)
+    locked_at = db.Column(db.DateTime, nullable=True)
+    lease_expires_at = db.Column(db.DateTime, nullable=True, index=True)
+    scheduled_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    result_summary = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    vehicle = db.relationship('Vehicle', backref=db.backref('highlight_jobs', lazy='dynamic'))
 
 
 class ServiceRecord(db.Model):

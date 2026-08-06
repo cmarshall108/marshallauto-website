@@ -156,6 +156,19 @@ def _ensure_schema_columns(app):
                     conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN width INTEGER'))
                 if 'height' not in cols:
                     conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN height INTEGER'))
+                if 'highlight_status' not in cols:
+                    conn.execute(text(
+                        "ALTER TABLE vehicle_images ADD COLUMN highlight_status VARCHAR(20) "
+                        "DEFAULT 'pending' NOT NULL"
+                    ))
+                if 'highlight_error' not in cols:
+                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_error VARCHAR(500)'))
+                if 'highlight_scene' not in cols:
+                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_scene VARCHAR(64)'))
+                if 'highlight_analyzed_at' not in cols:
+                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_analyzed_at DATETIME'))
+                if 'highlight_version' not in cols:
+                    conn.execute(text('ALTER TABLE vehicle_images ADD COLUMN highlight_version INTEGER'))
         if 'vehicles' in tables:
             cols = {c['name'] for c in inspector.get_columns('vehicles')}
             with db.engine.begin() as conn:

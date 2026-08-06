@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app import create_app, db
-from app.models import CarfaxReport, Lead, Review, ServiceRecord, SiteSetting, User, Vehicle
+from app.models import (
+    CarfaxReport, Lead, PhotoHighlightJob, Review, ServiceRecord, SiteSetting,
+    User, Vehicle, VehicleImage, VehicleImageHighlight,
+)
 
 app = create_app()
 
@@ -17,6 +20,9 @@ def make_shell_context():
         'db': db,
         'User': User,
         'Vehicle': Vehicle,
+        'VehicleImage': VehicleImage,
+        'VehicleImageHighlight': VehicleImageHighlight,
+        'PhotoHighlightJob': PhotoHighlightJob,
         'ServiceRecord': ServiceRecord,
         'CarfaxReport': CarfaxReport,
         'SiteSetting': SiteSetting,
@@ -38,6 +44,27 @@ def create_admin():
     db.session.add(user)
     db.session.commit()
     print(f'Admin user "{username}" created.')
+
+
+@app.cli.command('highlight-worker')
+def highlight_worker_cmd():
+    """Run the photo-highlight analysis worker (separate process from the web app)."""
+    from app.highlight_worker import run_loop
+    poll = float(os.environ.get('HIGHLIGHT_WORKER_POLL', '2'))
+    lease = int(os.environ.get('HIGHLIGHT_WORKER_LEASE', '300'))
+    run_loop(poll_seconds=poll, lease_seconds=lease, once=False)
+
+
+@app.cli.command('highlight-enqueue-all')
+def highlight_enqueue_all_cmd():
+    """Queue photo highlight analysis for every vehicle image missing results."""
+    from app.highlight_jobs import enqueue_vehicle_highlight_jobs
+    force = os.environ.get('FORCE', '').lower() in ('1', 'true', 'yes')
+    total = 0
+    vehicles = Vehicle.query.order_by(Vehicle.id.asc()).all()
+    for vehicle in vehicles:
+        total += enqueue_vehicle_highlight_jobs(vehicle.id, force=force, only_missing=not force)
+    print(f'Queued/kept {total} highlight job(s) across {len(vehicles)} vehicle(s). force={force}')
 
 
 @app.cli.command('seed')

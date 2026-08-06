@@ -337,7 +337,7 @@
             });
         }
 
-        // Vehicle gallery: photos mode + optional 360° spin scrub
+        // Vehicle gallery: photos mode + optional 360° spin scrub + highlight bubbles
         const gallery = document.getElementById('vehicle-gallery');
         const galleryStage = document.getElementById('gallery-stage') || gallery;
         const mainImage = document.getElementById('main-gallery-image');
@@ -350,9 +350,24 @@
         const spinBadge = document.getElementById('gallery-spin-badge');
         const spinHelp = document.getElementById('gallery-spin-help');
         const thumbsList = document.getElementById('gallery-thumbs');
-        const modeButtons = Array.from(document.querySelectorAll('[data-gallery-mode]'));
+        const modeButtons = Array.from(document.querySelectorAll('.gallery-mode-toggle [data-gallery-mode], .btn-group [data-gallery-mode]'));
+        const hotspotsEl = document.getElementById('gallery-hotspots');
+        const hotspotCard = document.getElementById('gallery-hotspot-card');
+        const hotspotCardClose = document.getElementById('gallery-hotspot-card-close');
+        const hotspotCardIcon = document.getElementById('gallery-hotspot-card-icon');
+        const hotspotCardKicker = document.getElementById('gallery-hotspot-card-kicker');
+        const hotspotCardTitle = document.getElementById('gallery-hotspot-card-title');
+        const hotspotCardText = document.getElementById('gallery-hotspot-card-text');
+        const highlightsBadge = document.getElementById('gallery-highlights-badge');
+        const highlightsBadgeText = document.getElementById('gallery-highlights-badge-text');
 
-        if (mainImage && thumbButtons.length > 1 && gallery) {
+        if (mainImage && thumbButtons.length >= 1 && gallery) {
+            const parseHighlights = (raw) => {
+                if (!raw) return [];
+                const parsed = typeof raw === 'string' ? safeParse(raw) : raw;
+                return Array.isArray(parsed) ? parsed : [];
+            };
+
             const slides = thumbButtons.map((el, index) => {
                 const img = el.tagName === 'IMG' ? el : el.querySelector('img');
                 return {
@@ -360,22 +375,134 @@
                     index,
                     src: el.dataset.full || (img && (img.dataset.full || img.currentSrc || img.src)) || '',
                     alt: (img && img.alt) || mainImage.alt || '',
+                    highlights: parseHighlights(el.dataset.highlights),
+                    imageId: el.dataset.imageId || null,
                 };
             }).filter((s) => s.src);
 
-            if (slides.length > 1) {
+            if (slides.length >= 1) {
                 let currentIndex = Math.max(0, slides.findIndex((s) => s.el.classList.contains('active')));
                 if (currentIndex < 0) currentIndex = 0;
 
-                const spinReady = gallery.dataset.spinReady === 'true' && slides.length >= 4;
+                const multi = slides.length > 1;
+                const spinReady = multi && gallery.dataset.spinReady === 'true' && slides.length >= 4;
+                const highlightsEnabled = gallery.dataset.highlightsEnabled !== 'false';
                 let mode = 'photos'; // 'photos' | 'spin'
                 let spinOriginIndex = 0;
                 let spinAccumPx = 0;
+                let openHighlightId = null;
+                let suppressClickUntil = 0;
 
                 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 const hideSwipeHint = () => {
                     if (!swipeHint) return;
                     swipeHint.classList.add('is-hidden');
+                };
+
+                const severityLabel = (severity) => {
+                    if (severity === 'positive') return 'Feature';
+                    if (severity === 'caution') return 'Condition note';
+                    if (severity === 'issue') return 'Needs attention';
+                    return 'Highlight';
+                };
+
+                const closeHotspotCard = () => {
+                    openHighlightId = null;
+                    if (hotspotCard) hotspotCard.hidden = true;
+                    if (hotspotsEl) {
+                        hotspotsEl.querySelectorAll('.gallery-hotspot.is-active').forEach((btn) => {
+                            btn.classList.remove('is-active');
+                            btn.setAttribute('aria-expanded', 'false');
+                        });
+                    }
+                };
+
+                const openHotspotCard = (item, bubbleBtn) => {
+                    if (!hotspotCard || !item) return;
+                    openHighlightId = item.id;
+                    if (hotspotCardKicker) {
+                        hotspotCardKicker.textContent = severityLabel(item.severity);
+                        hotspotCardKicker.dataset.severity = item.severity || 'info';
+                    }
+                    if (hotspotCardTitle) hotspotCardTitle.textContent = item.label || 'Detail';
+                    if (hotspotCardText) {
+                        hotspotCardText.textContent = item.description || 'Tap another bubble to explore this photo.';
+                    }
+                    if (hotspotCardIcon) {
+                        const icon = (item.icon || 'info-circle').replace(/[^a-z0-9-]/gi, '');
+                        hotspotCardIcon.innerHTML = `<i class="bi bi-${icon}" aria-hidden="true"></i>`;
+                        hotspotCardIcon.dataset.severity = item.severity || 'info';
+                    }
+                    hotspotCard.hidden = false;
+                    hotspotCard.dataset.severity = item.severity || 'info';
+                    if (hotspotsEl) {
+                        hotspotsEl.querySelectorAll('.gallery-hotspot').forEach((btn) => {
+                            const active = btn === bubbleBtn;
+                            btn.classList.toggle('is-active', active);
+                            btn.setAttribute('aria-expanded', active ? 'true' : 'false');
+                        });
+                    }
+                    Analytics.trackGallery('highlight_open', currentIndex, slides.length);
+                };
+
+                const renderHotspots = (index) => {
+                    if (!hotspotsEl) return;
+                    closeHotspotCard();
+                    hotspotsEl.innerHTML = '';
+
+                    const hideForSpin = mode === 'spin';
+                    gallery.classList.toggle('has-hotspots', false);
+                    if (highlightsBadge) {
+                        highlightsBadge.hidden = hideForSpin;
+                    }
+                    if (!highlightsEnabled || hideForSpin) return;
+
+                    const slide = slides[index];
+                    const items = (slide && slide.highlights) || [];
+                    if (highlightsBadgeText) {
+                        const total = slides.reduce((sum, s) => sum + ((s.highlights && s.highlights.length) || 0), 0);
+                        if (total > 0) {
+                            highlightsBadgeText.textContent = items.length
+                                ? `${items.length} on this photo · ${total} total`
+                                : `${total} highlights`;
+                        }
+                    }
+                    if (!items.length) return;
+
+                    gallery.classList.add('has-hotspots');
+                    items.forEach((item, i) => {
+                        const x = Math.max(4, Math.min(96, Number(item.x_pct) || 50));
+                        const y = Math.max(4, Math.min(96, Number(item.y_pct) || 50));
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = `gallery-hotspot severity-${item.severity || 'info'}`;
+                        btn.style.left = `${x}%`;
+                        btn.style.top = `${y}%`;
+                        btn.dataset.highlightId = item.id != null ? String(item.id) : String(i);
+                        btn.setAttribute('aria-label', `${item.label || 'Highlight'}. ${item.description || ''}`.trim());
+                        btn.setAttribute('aria-expanded', 'false');
+                        btn.innerHTML = `
+                            <span class="gallery-hotspot-pulse" aria-hidden="true"></span>
+                            <span class="gallery-hotspot-core" aria-hidden="true">
+                                <i class="bi bi-${(item.icon || 'info-circle').replace(/[^a-z0-9-]/gi, '')}"></i>
+                            </span>
+                        `;
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (Date.now() < suppressClickUntil) return;
+                            if (openHighlightId != null && String(openHighlightId) === String(item.id)) {
+                                closeHotspotCard();
+                                return;
+                            }
+                            openHotspotCard(item, btn);
+                        });
+                        btn.addEventListener('pointerdown', (e) => {
+                            // Keep swipe/spin gestures from starting on a bubble
+                            e.stopPropagation();
+                        });
+                        hotspotsEl.appendChild(btn);
+                    });
                 };
 
                 const updateCounter = (index) => {
@@ -388,9 +515,13 @@
                             `360 spin frame ${index + 1} of ${slides.length}. Drag left or right to rotate.`
                         );
                     } else {
+                        const n = ((slides[index] && slides[index].highlights) || []).length;
+                        const highlightHint = n > 0 ? ` ${n} highlight bubble${n === 1 ? '' : 's'} available.` : '';
                         gallery.setAttribute(
                             'aria-label',
-                            `Photo ${index + 1} of ${slides.length}. Swipe left or right to change photos.`
+                            multi
+                                ? `Photo ${index + 1} of ${slides.length}. Swipe left or right to change photos.${highlightHint}`
+                                : `Vehicle photo.${highlightHint}`
                         );
                     }
                 };
@@ -403,6 +534,7 @@
                     if (!slide) return;
                     if (normalized === currentIndex && !opts.force) {
                         updateCounter(normalized);
+                        if (!opts.skipHotspots) renderHotspots(normalized);
                         return;
                     }
 
@@ -417,7 +549,10 @@
                     }
                     if (slide.alt) mainImage.alt = slide.alt;
 
-                    const reveal = () => gallery.classList.remove('is-changing');
+                    const reveal = () => {
+                        gallery.classList.remove('is-changing');
+                        if (!opts.skipHotspots) renderHotspots(normalized);
+                    };
                     if (!useFade) {
                         reveal();
                     } else if (mainImage.complete) {
@@ -434,7 +569,7 @@
                         }
                     });
 
-                    if (!opts.skipScroll) {
+                    if (!opts.skipScroll && multi) {
                         try {
                             slide.el.scrollIntoView({
                                 behavior: reduceMotion || mode === 'spin' ? 'auto' : 'smooth',
@@ -451,12 +586,14 @@
                     }
 
                     // Prefetch neighbors
-                    [normalized - 1, normalized + 1].forEach((i) => {
-                        const n = slides[((i % total) + total) % total];
-                        if (!n) return;
-                        const pre = new Image();
-                        pre.src = n.src;
-                    });
+                    if (multi) {
+                        [normalized - 1, normalized + 1].forEach((i) => {
+                            const n = slides[((i % total) + total) % total];
+                            if (!n) return;
+                            const pre = new Image();
+                            pre.src = n.src;
+                        });
+                    }
                 };
 
                 const goNext = (action) => setActiveSlide(currentIndex + 1, action || 'next');
@@ -500,11 +637,29 @@
                         'aria-roledescription',
                         mode === 'spin' ? '360 degree image spinner' : 'carousel'
                     );
+                    closeHotspotCard();
+                    renderHotspots(currentIndex);
                     updateCounter(currentIndex);
                     Analytics.trackGallery(action || (mode === 'spin' ? 'spin_mode' : 'photos_mode'), currentIndex, slides.length);
                 };
 
                 updateCounter(currentIndex);
+                renderHotspots(currentIndex);
+
+                if (hotspotCardClose) {
+                    hotspotCardClose.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeHotspotCard();
+                    });
+                }
+                if (hotspotCard) {
+                    hotspotCard.addEventListener('pointerdown', (e) => e.stopPropagation());
+                    hotspotCard.addEventListener('click', (e) => e.stopPropagation());
+                }
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') closeHotspotCard();
+                });
 
                 modeButtons.forEach((btn) => {
                     btn.addEventListener('click', (e) => {
@@ -541,10 +696,10 @@
                 }
 
                 gallery.addEventListener('keydown', (e) => {
-                    if (e.key === 'ArrowRight') {
+                    if (e.key === 'ArrowRight' && multi) {
                         e.preventDefault();
                         goNext(mode === 'spin' ? 'spin_key_next' : 'key_next');
-                    } else if (e.key === 'ArrowLeft') {
+                    } else if (e.key === 'ArrowLeft' && multi) {
                         e.preventDefault();
                         goPrev(mode === 'spin' ? 'spin_key_prev' : 'key_prev');
                     } else if ((e.key === 's' || e.key === 'S') && spinReady) {
@@ -578,8 +733,9 @@
                 };
 
                 const onPointerDown = (e) => {
-                    if (e.target.closest('.gallery-nav')) return;
+                    if (e.target.closest('.gallery-nav, .gallery-hotspot, .gallery-hotspot-card')) return;
                     if (e.pointerType === 'mouse' && e.button !== 0) return;
+                    if (!multi && mode !== 'spin') return;
 
                     pointerId = e.pointerId;
                     startX = lastX = e.clientX;
@@ -589,6 +745,7 @@
                     dragging = true;
                     spinOriginIndex = currentIndex;
                     spinAccumPx = 0;
+                    closeHotspotCard();
 
                     try {
                         galleryStage.setPointerCapture(pointerId);
@@ -672,6 +829,11 @@
 
                     if (committedAxis !== 'x') return;
 
+                    // Avoid accidental bubble clicks right after a swipe
+                    if (Math.abs(dx) > 10) {
+                        suppressClickUntil = Date.now() + 280;
+                    }
+
                     if (wasSpin) {
                         // Final frame already applied during scrub; log end of gesture
                         Analytics.trackGallery('spin_end', currentIndex, slides.length);
@@ -699,10 +861,12 @@
                 galleryStage.addEventListener('lostpointercapture', onPointerCancel);
 
                 // Prefetch all gallery images for snappy mobile swipes / spin
-                slides.forEach((slide) => {
-                    const img = new Image();
-                    img.src = slide.src;
-                });
+                if (multi) {
+                    slides.forEach((slide) => {
+                        const img = new Image();
+                        img.src = slide.src;
+                    });
+                }
 
                 // Auto-hide swipe hint after first interaction window
                 window.setTimeout(hideSwipeHint, 5000);

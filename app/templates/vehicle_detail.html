@@ -55,16 +55,21 @@
                     {% endif %}
                 </div>
                 {% endif %}
+                {% set ns = namespace(highlight_total=0) %}
+                {% for _img in gallery_images %}
+                    {% set ns.highlight_total = ns.highlight_total + (_img.visible_highlights()|length) %}
+                {% endfor %}
                 <div class="vehicle-gallery mb-3{% if gallery_count > 1 %} has-nav{% endif %}{% if spin_ready %} spin-ready{% endif %}"
                      id="vehicle-gallery"
-                     {% if gallery_count > 1 %}
+                     {% if gallery_count >= 1 %}
                      tabindex="0"
                      role="region"
                      aria-roledescription="carousel"
-                     aria-label="{{ vehicle.title }} photo gallery. Swipe left or right to change photos."
+                     aria-label="{{ vehicle.title }} photo gallery. Swipe left or right to change photos. Tap highlight bubbles for details."
                      data-gallery-count="{{ gallery_count }}"
                      data-spin-ready="{{ 'true' if spin_ready else 'false' }}"
                      data-gallery-mode="photos"
+                     data-highlights-enabled="true"
                      {% endif %}>
                     <div class="gallery-stage" id="gallery-stage">
                         <img id="main-gallery-image"
@@ -74,6 +79,20 @@
                              height="{{ primary.height if primary and primary.height else 600 }}"
                              fetchpriority="high"
                              draggable="false">
+                        <div class="gallery-hotspots" id="gallery-hotspots" aria-live="polite"></div>
+                        <div class="gallery-hotspot-card" id="gallery-hotspot-card" hidden role="dialog" aria-modal="false" aria-labelledby="gallery-hotspot-card-title">
+                            <button type="button" class="gallery-hotspot-card-close" id="gallery-hotspot-card-close" aria-label="Close highlight details">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                            </button>
+                            <div class="gallery-hotspot-card-icon" id="gallery-hotspot-card-icon" aria-hidden="true">
+                                <i class="bi bi-info-circle"></i>
+                            </div>
+                            <div class="gallery-hotspot-card-body">
+                                <div class="gallery-hotspot-card-kicker" id="gallery-hotspot-card-kicker">Highlight</div>
+                                <h3 class="gallery-hotspot-card-title" id="gallery-hotspot-card-title">Detail</h3>
+                                <p class="gallery-hotspot-card-text" id="gallery-hotspot-card-text"></p>
+                            </div>
+                        </div>
                     </div>
                     {% if gallery_count > 1 %}
                     <button type="button" class="gallery-nav gallery-nav-prev" id="gallery-prev" aria-label="Previous photo">
@@ -93,16 +112,25 @@
                         <span id="gallery-swipe-hint-text">Swipe for more photos</span>
                     </div>
                     {% endif %}
+                    {% if ns.highlight_total > 0 %}
+                    <div class="gallery-highlights-badge" id="gallery-highlights-badge" title="Tap the bubbles on the photo for features and condition notes">
+                        <i class="bi bi-bullseye" aria-hidden="true"></i>
+                        <span id="gallery-highlights-badge-text">{{ ns.highlight_total }} highlights</span>
+                    </div>
+                    {% endif %}
                 </div>
-                {% if gallery_count > 1 %}
-                <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable" id="gallery-thumbs" role="list" aria-label="Photo thumbnails">
+                {% if gallery_count >= 1 %}
+                <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable{% if gallery_count == 1 %} d-none{% endif %}" id="gallery-thumbs" role="list" aria-label="Photo thumbnails">
                     {% for image in gallery_images %}
                     <button type="button"
-                            class="thumbnail-btn{% if loop.first %} active{% endif %}"
+                            class="thumbnail-btn{% if (primary and image.id == primary.id) or (not primary and loop.first) %} active{% endif %}"
                             data-full="{{ image.url }}"
                             data-index="{{ loop.index0 }}"
+                            data-image-id="{{ image.id }}"
+                            data-highlights='{{ image.highlights_payload() | tojson }}'
+                            data-highlight-status="{{ image.highlight_status or 'pending' }}"
                             aria-label="Show photo {{ loop.index }} of {{ gallery_count }}"
-                            aria-current="{% if loop.first %}true{% else %}false{% endif %}">
+                            aria-current="{% if (primary and image.id == primary.id) or (not primary and loop.first) %}true{% else %}false{% endif %}">
                         <img src="{{ image.url }}"
                              alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} - view {{ loop.index }} at {{ business_name }} in {{ business_city }}, {{ business_state }}"
                              width="100"
@@ -110,6 +138,10 @@
                              loading="lazy"
                              decoding="async"
                              draggable="false">
+                        {% set hc = image.visible_highlights()|length %}
+                        {% if hc > 0 %}
+                        <span class="thumbnail-highlight-dot" aria-hidden="true" title="{{ hc }} highlight{{ 's' if hc != 1 else '' }}">{{ hc }}</span>
+                        {% endif %}
                     </button>
                     {% endfor %}
                 </div>

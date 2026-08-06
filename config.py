@@ -43,6 +43,19 @@ class Config:
     }
     IMAGE_QUALITY = 85
 
+    # Carvana-style photo highlights (local OpenCV worker; never blocks web requests)
+    PHOTO_HIGHLIGHTS_ENABLED = os.environ.get('PHOTO_HIGHLIGHTS_ENABLED', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    PHOTO_HIGHLIGHTS_AUTO_ENQUEUE = os.environ.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    PHOTO_HIGHLIGHTS_MAX = int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '8'))
+    # Optional YOLO nano refinement (requires ultralytics + weights); off by default
+    PHOTO_HIGHLIGHTS_USE_YOLO = os.environ.get('PHOTO_HIGHLIGHTS_USE_YOLO', 'false').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+
     # Admin auth
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME') or 'admin'
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'admin'

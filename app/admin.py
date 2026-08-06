@@ -16,7 +16,10 @@ from app.forms import (
 )
 from app.models import (
     CarfaxReport, Lead, Review, ServiceRecord, SiteSetting, User,
-    Vehicle, VehicleImage,
+    Vehicle, VehicleImage, VehicleImageHighlight,
+)
+from app.highlight_jobs import (
+    enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
 )
 from app.facebook_publish import (
     apply_publish_result, build_marketplace_draft, configuration_status,
@@ -213,6 +216,7 @@ def vehicle_new():
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         # Refresh images relationship after image commit
         db.session.refresh(vehicle)
+        _enqueue_highlights_for_vehicle(vehicle)
         _maybe_publish_vehicle_to_facebook(
             vehicle,
             is_new=True,
@@ -247,6 +251,7 @@ def vehicle_edit(id):
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         db.session.commit()
         db.session.refresh(vehicle)
+        _enqueue_highlights_for_vehicle(vehicle)
         _maybe_publish_vehicle_to_facebook(
             vehicle,
             is_new=False,
@@ -353,6 +358,78 @@ def vehicle_image_delete(id):
     db.session.commit()
     flash('Image deleted.', 'success')
     return redirect(url_for('admin.vehicle_edit', id=vehicle_id))
+
+
+@admin_bp.route('/vehicles/<int:id>/highlights/analyze', methods=['POST'])
+@login_required
+def vehicle_highlights_analyze(id):
+    """Queue (or re-queue) photo highlight analysis for all images on a vehicle."""
+    vehicle = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(id=id)
+        .first_or_404()
+    )
+    if not current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True):
+        flash('Photo highlights are disabled in configuration.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=id))
+
+    force = request.form.get('force') in ('1', 'true', 'on', 'yes')
+    queued = enqueue_vehicle_highlight_jobs(vehicle.id, force=force, only_missing=not force)
+    flash(
+        f'Queued photo highlight analysis for {queued} image(s). '
+        'Run the highlight worker if it is not already running.',
+        'success',
+    )
+    return redirect(url_for('admin.vehicle_edit', id=id))
+
+
+@admin_bp.route('/vehicles/images/<int:id>/highlights/analyze', methods=['POST'])
+@login_required
+def vehicle_image_highlights_analyze(id):
+    image = db.session.get(VehicleImage, id) or abort(404)
+    if not current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True):
+        flash('Photo highlights are disabled in configuration.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=image.vehicle_id))
+    force = request.form.get('force') in ('1', 'true', 'on', 'yes')
+    enqueue_image_highlight_job(image.id, force=True if force else False)
+    flash('Photo highlight analysis queued for this image.', 'success')
+    return redirect(url_for('admin.vehicle_edit', id=image.vehicle_id))
+
+
+@admin_bp.route('/vehicles/images/<int:image_id>/highlights/<int:highlight_id>/toggle', methods=['POST'])
+@login_required
+def vehicle_image_highlight_toggle(image_id, highlight_id):
+    image = db.session.get(VehicleImage, image_id) or abort(404)
+    highlight = db.session.get(VehicleImageHighlight, highlight_id) or abort(404)
+    if highlight.vehicle_image_id != image.id:
+        abort(404)
+    highlight.is_visible = not bool(highlight.is_visible)
+    db.session.commit()
+    state = 'visible' if highlight.is_visible else 'hidden'
+    flash(f'Highlight “{highlight.label}” is now {state}.', 'success')
+    return redirect(url_for('admin.vehicle_edit', id=image.vehicle_id))
+
+
+@admin_bp.route('/vehicles/images/<int:image_id>/highlights/<int:highlight_id>/delete', methods=['POST'])
+@login_required
+def vehicle_image_highlight_delete(image_id, highlight_id):
+    image = db.session.get(VehicleImage, image_id) or abort(404)
+    highlight = db.session.get(VehicleImageHighlight, highlight_id) or abort(404)
+    if highlight.vehicle_image_id != image.id:
+        abort(404)
+    label = highlight.label
+    db.session.delete(highlight)
+    db.session.commit()
+    flash(f'Deleted highlight “{label}”.', 'success')
+    return redirect(url_for('admin.vehicle_edit', id=image.vehicle_id))
+
+
+@admin_bp.route('/api/highlight-queue')
+@login_required
+def highlight_queue_api():
+    """Admin JSON snapshot of the photo highlight job queue."""
+    return jsonify(queue_stats())
 
 
 @admin_bp.route('/api/vehicle-catalog')
@@ -838,6 +915,7 @@ def _apply_vehicle_form(vehicle, form):
 def _handle_vehicle_images(vehicle, files):
     existing = list(vehicle.images or [])
     order_offset = len(existing)
+    new_image_ids = []
     for idx, file in enumerate(files):
         if not file or not getattr(file, 'filename', None):
             continue
@@ -854,10 +932,39 @@ def _handle_vehicle_images(vehicle, files):
             order_index=order_offset + idx,
             width=width,
             height=height,
+            highlight_status='pending',
         )
         db.session.add(img)
+        db.session.flush()
         existing.append(img)
+        if img.id:
+            new_image_ids.append(img.id)
     db.session.commit()
+    # Enqueue analysis outside the image commit so upload latency stays low
+    if new_image_ids and current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True) \
+            and current_app.config.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', True):
+        for image_id in new_image_ids:
+            try:
+                enqueue_image_highlight_job(image_id, force=False)
+            except Exception as exc:
+                current_app.logger.warning(
+                    'Failed to enqueue highlight job for image %s: %s', image_id, exc
+                )
+
+
+def _enqueue_highlights_for_vehicle(vehicle, force=False):
+    """Queue missing analyses after vehicle create/update (features may have changed)."""
+    if not vehicle or not current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True):
+        return
+    if not current_app.config.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', True) and not force:
+        return
+    try:
+        # Re-run when features change so CarPlay/leather bubbles stay accurate
+        enqueue_vehicle_highlight_jobs(vehicle.id, force=force, only_missing=not force)
+    except Exception as exc:
+        current_app.logger.warning(
+            'Highlight enqueue failed for vehicle %s: %s', vehicle.id, exc
+        )
 
 
 def _delete_vehicle_image_file(image):
