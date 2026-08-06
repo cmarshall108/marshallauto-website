@@ -233,8 +233,8 @@ def _ensure_default_settings():
         'instagram_url': '',
         'facebook_url': '',
         'youtube_url': '',
-        'business_latitude': '35.4799',
-        'business_longitude': '-79.1803',
+        'business_latitude': '35.4438494',
+        'business_longitude': '-79.1374067',
     }
     changed = False
     for key, value in defaults.items():

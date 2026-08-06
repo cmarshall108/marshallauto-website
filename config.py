@@ -61,9 +61,10 @@ class Config:
     BUSINESS_ADDRESS = os.environ.get('BUSINESS_ADDRESS') or '360 Wilson Rd'
     BUSINESS_CITY = os.environ.get('BUSINESS_CITY') or 'Sanford'
     BUSINESS_STATE = os.environ.get('BUSINESS_STATE') or 'NC'
-    BUSINESS_ZIP = os.environ.get('BUSINESS_ZIP') or '27330'
-    BUSINESS_LATITUDE = os.environ.get('BUSINESS_LATITUDE') or '35.4799'
-    BUSINESS_LONGITUDE = os.environ.get('BUSINESS_LONGITUDE') or '-79.1803'
+    BUSINESS_ZIP = os.environ.get('BUSINESS_ZIP') or '27332'
+    # Geocoded for 360 Wilson Rd, Sanford, NC 27332
+    BUSINESS_LATITUDE = os.environ.get('BUSINESS_LATITUDE') or '35.4438494'
+    BUSINESS_LONGITUDE = os.environ.get('BUSINESS_LONGITUDE') or '-79.1374067'
     BUSINESS_HOURS = {
         'Monday': '9:00 AM - 5:00 PM',
         'Tuesday': '9:00 AM - 5:00 PM',
