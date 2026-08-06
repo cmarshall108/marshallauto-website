@@ -233,7 +233,7 @@ def process_job(job) -> bool:
             path,
             features_text=features_text,
             vehicle_context=context,
-            max_highlights=int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '8')),
+            max_highlights=int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '5')),
         )
         # Replace auto-generated highlights; keep manual ones
         existing = list(image.highlights or [])

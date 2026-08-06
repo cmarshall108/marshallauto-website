@@ -445,6 +445,79 @@
                     Analytics.trackGallery('highlight_open', currentIndex, slides.length);
                 };
 
+                /**
+                 * Map image-space % (0-100 of natural image) into the painted
+                 * content box under object-fit: cover | contain | fill.
+                 * Hotspot layer is inset:0 over the full stage, so we convert
+                 * to % of the stage (hotspotsEl) box.
+                 */
+                const mapImagePctToStagePct = (xPct, yPct) => {
+                    const stage = hotspotsEl || galleryStage || gallery;
+                    if (!stage || !mainImage) {
+                        return { left: xPct, top: yPct, visible: true };
+                    }
+                    const stageRect = stage.getBoundingClientRect();
+                    const stageW = stageRect.width || stage.clientWidth || 1;
+                    const stageH = stageRect.height || stage.clientHeight || 1;
+                    const natW = mainImage.naturalWidth || 0;
+                    const natH = mainImage.naturalHeight || 0;
+                    if (!natW || !natH || stageW < 2 || stageH < 2) {
+                        return { left: xPct, top: yPct, visible: true };
+                    }
+
+                    const fit = (window.getComputedStyle(mainImage).objectFit || 'fill').toLowerCase();
+                    const imgRatio = natW / natH;
+                    const stageRatio = stageW / stageH;
+                    let contentW = stageW;
+                    let contentH = stageH;
+                    let offsetX = 0;
+                    let offsetY = 0;
+
+                    if (fit === 'cover') {
+                        if (imgRatio > stageRatio) {
+                            contentH = stageH;
+                            contentW = stageH * imgRatio;
+                            offsetX = (stageW - contentW) / 2;
+                            offsetY = 0;
+                        } else {
+                            contentW = stageW;
+                            contentH = stageW / imgRatio;
+                            offsetX = 0;
+                            offsetY = (stageH - contentH) / 2;
+                        }
+                    } else if (fit === 'contain') {
+                        if (imgRatio > stageRatio) {
+                            contentW = stageW;
+                            contentH = stageW / imgRatio;
+                            offsetX = 0;
+                            offsetY = (stageH - contentH) / 2;
+                        } else {
+                            contentH = stageH;
+                            contentW = stageH * imgRatio;
+                            offsetX = (stageW - contentW) / 2;
+                            offsetY = 0;
+                        }
+                    } else {
+                        // fill / none / scale-down → treat as stretch to stage
+                        contentW = stageW;
+                        contentH = stageH;
+                        offsetX = 0;
+                        offsetY = 0;
+                    }
+
+                    const px = offsetX + (Number(xPct) / 100) * contentW;
+                    const py = offsetY + (Number(yPct) / 100) * contentH;
+                    const left = (px / stageW) * 100;
+                    const top = (py / stageH) * 100;
+                    const pad = 1.5;
+                    const visible = left >= -pad && left <= 100 + pad && top >= -pad && top <= 100 + pad;
+                    return {
+                        left: Math.max(-5, Math.min(105, left)),
+                        top: Math.max(-5, Math.min(105, top)),
+                        visible,
+                    };
+                };
+
                 const renderHotspots = (index) => {
                     if (!hotspotsEl) return;
                     closeHotspotCard();
@@ -471,13 +544,17 @@
 
                     gallery.classList.add('has-hotspots');
                     items.forEach((item, i) => {
-                        const x = Math.max(4, Math.min(96, Number(item.x_pct) || 50));
-                        const y = Math.max(4, Math.min(96, Number(item.y_pct) || 50));
+                        const xImg = Math.max(0, Math.min(100, Number(item.x_pct) || 50));
+                        const yImg = Math.max(0, Math.min(100, Number(item.y_pct) || 50));
+                        const mapped = mapImagePctToStagePct(xImg, yImg);
+                        if (!mapped.visible) return;
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = `gallery-hotspot severity-${item.severity || 'info'}`;
-                        btn.style.left = `${x}%`;
-                        btn.style.top = `${y}%`;
+                        btn.style.left = `${mapped.left}%`;
+                        btn.style.top = `${mapped.top}%`;
+                        btn.dataset.xPct = String(xImg);
+                        btn.dataset.yPct = String(yImg);
                         btn.dataset.highlightId = item.id != null ? String(item.id) : String(i);
                         btn.setAttribute('aria-label', `${item.label || 'Highlight'}. ${item.description || ''}`.trim());
                         btn.setAttribute('aria-expanded', 'false');
@@ -502,6 +579,19 @@
                             e.stopPropagation();
                         });
                         hotspotsEl.appendChild(btn);
+                    });
+                };
+
+                const relayoutHotspots = () => {
+                    if (!hotspotsEl || !gallery.classList.contains('has-hotspots')) return;
+                    hotspotsEl.querySelectorAll('.gallery-hotspot').forEach((btn) => {
+                        const xImg = Number(btn.dataset.xPct);
+                        const yImg = Number(btn.dataset.yPct);
+                        if (Number.isNaN(xImg) || Number.isNaN(yImg)) return;
+                        const mapped = mapImagePctToStagePct(xImg, yImg);
+                        btn.style.left = `${mapped.left}%`;
+                        btn.style.top = `${mapped.top}%`;
+                        btn.hidden = !mapped.visible;
                     });
                 };
 
@@ -645,6 +735,25 @@
 
                 updateCounter(currentIndex);
                 renderHotspots(currentIndex);
+
+                // Re-map bubbles when object-fit content box changes
+                let hotspotResizeTimer = null;
+                const scheduleHotspotRelayout = () => {
+                    if (hotspotResizeTimer) window.clearTimeout(hotspotResizeTimer);
+                    hotspotResizeTimer = window.setTimeout(() => {
+                        relayoutHotspots();
+                    }, 50);
+                };
+                window.addEventListener('resize', scheduleHotspotRelayout);
+                if (typeof ResizeObserver !== 'undefined' && (galleryStage || gallery)) {
+                    try {
+                        const ro = new ResizeObserver(scheduleHotspotRelayout);
+                        ro.observe(galleryStage || gallery);
+                    } catch (_) { /* ignore */ }
+                }
+                mainImage.addEventListener('load', () => {
+                    renderHotspots(currentIndex);
+                });
 
                 if (hotspotCardClose) {
                     hotspotCardClose.addEventListener('click', (e) => {

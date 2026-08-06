@@ -43,15 +43,19 @@ class Config:
     }
     IMAGE_QUALITY = 85
 
-    # Carvana-style photo highlights (local OpenCV worker; never blocks web requests)
+    # Carvana-style photo highlights (worker only; never blocks web requests)
+    # Primary engine: Grok vision via xAI (XAI_API_KEY). Fallback: OpenCV.
     PHOTO_HIGHLIGHTS_ENABLED = os.environ.get('PHOTO_HIGHLIGHTS_ENABLED', 'true').lower() in (
         '1', 'true', 'yes', 'on',
     )
     PHOTO_HIGHLIGHTS_AUTO_ENQUEUE = os.environ.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', 'true').lower() in (
         '1', 'true', 'yes', 'on',
     )
-    PHOTO_HIGHLIGHTS_MAX = int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '8'))
-    # Optional YOLO nano refinement (requires ultralytics + weights); off by default
+    PHOTO_HIGHLIGHTS_MAX = int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '5'))
+    PHOTO_HIGHLIGHTS_ENGINE = (os.environ.get('PHOTO_HIGHLIGHTS_ENGINE') or 'grok').strip().lower()
+    PHOTO_HIGHLIGHTS_GROK_MODEL = (os.environ.get('PHOTO_HIGHLIGHTS_GROK_MODEL') or 'grok-4.5').strip()
+    XAI_API_KEY = (os.environ.get('XAI_API_KEY') or os.environ.get('GROK_API_KEY') or '').strip()
+    # Legacy optional YOLO path (unused when engine=grok)
     PHOTO_HIGHLIGHTS_USE_YOLO = os.environ.get('PHOTO_HIGHLIGHTS_USE_YOLO', 'false').lower() in (
         '1', 'true', 'yes', 'on',
     )

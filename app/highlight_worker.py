@@ -7,7 +7,8 @@ Usage:
   python -m app.highlight_worker --once
   flask highlight-worker
 
-Runs outside the web request path so OpenCV analysis never blocks Flask/gunicorn.
+Runs outside the web request path so Grok/OpenCV analysis never blocks Flask/gunicorn.
+Requires XAI_API_KEY in .env for the default Grok engine.
 """
 from __future__ import annotations
 

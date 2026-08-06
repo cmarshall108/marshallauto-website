@@ -93,8 +93,11 @@ Set `DATABASE_URL` to a production PostgreSQL database for better performance an
 | `FACEBOOK_AUTO_POST_VEHICLES` | Env fallback to enable Page posting (`true`/`false`) |
 | `PHOTO_HIGHLIGHTS_ENABLED` | Enable photo highlight system (`true`/`false`, default true) |
 | `PHOTO_HIGHLIGHTS_AUTO_ENQUEUE` | Auto-queue analysis on image upload (`true`/`false`, default true) |
-| `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `8`) |
-| `PHOTO_HIGHLIGHTS_USE_YOLO` | Optional YOLO nano refinement if ultralytics installed (default false) |
+| `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `5`) |
+| `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` fallback-only |
+| `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.5`) |
+| `XAI_API_KEY` | xAI API key for Grok vision highlights (required for Grok engine) |
+| `PHOTO_HIGHLIGHTS_GROK_REQUIRED` | If `true`, fail the job instead of OpenCV fallback when Grok errors |
 | `HIGHLIGHT_WORKER_POLL` | Worker idle poll seconds (default `2`) |
 | `HIGHLIGHT_WORKER_LEASE` | Job lease seconds (default `300`) |
 
@@ -131,14 +134,34 @@ Analytics IDs can also be set in **Admin → Settings** (`google_tag_id`, `googl
 
 ## Photo Highlights (Carvana-style bubbles)
 
-Listing photos can show clickable hotspot bubbles for features (CarPlay, leather seats, new tires, sunroof, etc.) and condition notes (scratches, dings). Detection runs **locally** with a lightweight OpenCV pipeline — uploads never wait on analysis.
+Listing photos can show clickable hotspot bubbles for features (CarPlay, leather seats, new tires, sunroof, etc.) and condition notes (scratches, dings). Analysis runs in a **background worker** — uploads never wait on the model.
+
+**Primary engine:** [Grok vision](https://docs.x.ai/) via the xAI API (`XAI_API_KEY`).  
+**Fallback:** local OpenCV if the key is missing or the API call fails (unless `PHOTO_HIGHLIGHTS_GROK_REQUIRED=true`).
+
+Coordinates are stored as percent of the **full source image**. The gallery JS maps them through `object-fit: cover` so bubbles sit on the painted car, not the cropped stage edges.
 
 ### How it works
 
 1. Admin uploads vehicle photos (or saves a vehicle with feature text).
 2. The web app **only enqueues** a DB-backed `PhotoHighlightJob`.
-3. A **separate worker process** claims jobs and writes `VehicleImageHighlight` rows.
+3. A **separate worker process** claims jobs, calls Grok (or OpenCV), and writes `VehicleImageHighlight` rows.
 4. The public vehicle gallery renders bubbles + a detail card when analysis is `ready`.
+
+### Grok / xAI setup
+
+1. Create an API key at [console.x.ai](https://console.x.ai/).
+2. Put it in `.env` on the app host **and** the worker host (never commit the key):
+
+```bash
+XAI_API_KEY=xai-...
+PHOTO_HIGHLIGHTS_ENGINE=grok
+PHOTO_HIGHLIGHTS_GROK_MODEL=grok-4.5
+PHOTO_HIGHLIGHTS_MAX=5
+```
+
+3. Restart the web app and `python -m app.highlight_worker`.
+4. In Admin → vehicle edit, use **Re-analyze all photos** so existing images pick up Grok results.
 
 ### Run the worker
 
