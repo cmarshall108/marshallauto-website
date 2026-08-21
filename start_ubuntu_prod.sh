@@ -7,27 +7,66 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 # Prefer / create project venv so worker deps (OpenCV) install cleanly
+# A venv built with --system-site-packages is rejected: pip then tries to
+# uninstall apt-managed packages (e.g. python3-werkzeug) and fails with
+# "Cannot uninstall Werkzeug ... RECORD file not found".
+is_isolated_venv() {
+  local py="$1"
+  [[ -x "$py" ]] || return 1
+  "$py" - <<'PY' >/dev/null 2>&1
+import pathlib, sys
+if sys.prefix == sys.base_prefix:
+    raise SystemExit(1)
+cfg = pathlib.Path(sys.prefix, "pyvenv.cfg")
+for line in cfg.read_text().splitlines() if cfg.is_file() else []:
+    key, _, value = line.partition("=")
+    if key.strip() == "include-system-site-packages" and value.strip().lower() == "true":
+        raise SystemExit(1)
+PY
+}
+
+create_venv() {
+  command -v python3 >/dev/null 2>&1 || return 1
+  echo "Creating isolated Python venv at $ROOT/venv ..."
+  if ! python3 -m venv "$ROOT/venv" 2>/dev/null; then
+    echo "ERROR: python3 -m venv failed. Install it with:" >&2
+    echo "  apt-get install -y python3-venv python3-pip" >&2
+    return 1
+  fi
+  "$ROOT/venv/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null
+}
+
 ensure_python() {
-  if [[ -x "$ROOT/venv/bin/python" ]]; then
+  local candidate
+  for candidate in "$ROOT/venv/bin/python" "$ROOT/.venv/bin/python"; do
+    if is_isolated_venv "$candidate"; then
+      PYTHON="$candidate"
+      return 0
+    fi
+    if [[ -x "$candidate" ]]; then
+      echo "WARNING: $candidate is not an isolated venv (system site-packages)." >&2
+      echo "         Recreate it:  rm -rf $(dirname "$(dirname "$candidate")") && python3 -m venv venv" >&2
+    fi
+  done
+  if create_venv && is_isolated_venv "$ROOT/venv/bin/python"; then
     PYTHON="$ROOT/venv/bin/python"
     return 0
   fi
-  if [[ -x "$ROOT/.venv/bin/python" ]]; then
-    PYTHON="$ROOT/.venv/bin/python"
-    return 0
-  fi
-  # Create venv when missing (avoids system-site / PEP 668 issues on Ubuntu)
-  if command -v python3 >/dev/null 2>&1; then
-    echo "Creating Python venv at $ROOT/venv ..."
-    python3 -m venv "$ROOT/venv"
-    PYTHON="$ROOT/venv/bin/python"
-    "$PYTHON" -m pip install --upgrade pip setuptools wheel >/dev/null
-    return 0
-  fi
-  PYTHON="${PYTHON:-python3}"
+  echo "ERROR: no isolated virtualenv available. Refusing to pip install into the" >&2
+  echo "       system Python (Debian/Ubuntu packages cannot be uninstalled by pip)." >&2
+  exit 1
 }
 ensure_python
 echo "Using Python: $PYTHON ($("$PYTHON" -c 'import sys; print(sys.version.split()[0])'))"
+
+# pip install that survives leftover distro-managed packages
+pip_install() {
+  if "$PYTHON" -m pip install "$@"; then
+    return 0
+  fi
+  echo "pip install failed; retrying with --ignore-installed ..." >&2
+  "$PYTHON" -m pip install --ignore-installed "$@"
+}
 
 # Ensure photo-highlight deps (OpenCV + numpy) are importable in THIS interpreter
 ensure_highlight_deps() {
@@ -43,12 +82,12 @@ PY
   echo "Installing photo highlight deps (opencv-python-headless, numpy) ..."
   # Prefer full requirements when present so versions stay pinned together
   if [[ -f "$ROOT/requirements.txt" ]]; then
-    if ! "$PYTHON" -m pip install -r "$ROOT/requirements.txt"; then
+    if ! pip_install -r "$ROOT/requirements.txt"; then
       echo "Full requirements install failed; trying highlight packages only..." >&2
-      "$PYTHON" -m pip install "numpy>=1.26,<3" "opencv-python-headless>=4.8,<5"
+      pip_install "numpy>=1.26,<3" "opencv-python-headless>=4.8,<5"
     fi
   else
-    "$PYTHON" -m pip install "numpy>=1.26,<3" "opencv-python-headless>=4.8,<5"
+    pip_install "numpy>=1.26,<3" "opencv-python-headless>=4.8,<5"
   fi
 
   if ! "$PYTHON" - <<'PY'
