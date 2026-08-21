@@ -128,7 +128,7 @@ a:hover {
     min-height: 600px;
     display: flex;
     align-items: center;
-    background: linear-gradient(135deg, rgba(13, 46, 77, 0.95) 0%, rgba(26, 26, 46, 0.92) 100%),
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.25) 100%),
                 url('../images/gallardo_cover.jpg') center/cover no-repeat;
     color: #fff;
 }
@@ -137,11 +137,18 @@ a:hover {
     font-size: 3.2rem;
     font-weight: 800;
     line-height: 1.15;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
 }
 
 .hero-section p {
     font-size: 1.2rem;
     opacity: 0.9;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Bootstrap's 50% white is too faint now that the photo shows through */
+.hero-section .text-white-50 {
+    color: rgba(255, 255, 255, 0.85) !important;
 }
 
 /* Search Box */
