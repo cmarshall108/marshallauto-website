@@ -129,7 +129,7 @@ a:hover {
     display: flex;
     align-items: center;
     background: linear-gradient(135deg, rgba(13, 46, 77, 0.95) 0%, rgba(26, 26, 46, 0.92) 100%),
-                url('../images/hero-bg.jpg') center/cover no-repeat;
+                url('../images/gallardo_cover.jpg') center/cover no-repeat;
     color: #fff;
 }
 
