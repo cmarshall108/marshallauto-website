@@ -48,10 +48,12 @@
                     <td>
                         {% if not lead.is_read %}
                         <form action="{{ url_for('admin.lead_mark_read', id=lead.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
                         </form>
                         {% endif %}
                         <form action="{{ url_for('admin.lead_delete', id=lead.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this lead?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
                         </form>
                     </td>

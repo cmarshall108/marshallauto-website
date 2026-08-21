@@ -163,13 +163,9 @@
         <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <label class="form-label mb-0">Manage Images &amp; Photo Highlights</label>
-                <form action="{{ url_for('admin.vehicle_highlights_analyze', id=vehicle.id) }}" method="POST" class="d-inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="force" value="1">
-                    <button type="submit" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-bullseye me-1"></i>Re-analyze all photo highlights
-                    </button>
-                </form>
+                <button type="submit" form="highlights-analyze-all-form" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-bullseye me-1"></i>Re-analyze all photo highlights
+                </button>
             </div>
             <p class="form-text mt-0 mb-2">
                 Carvana-style bubbles (CarPlay, leather, tires, scratches, dings, etc.) are detected by a
@@ -191,18 +187,11 @@
                                 {% else %}bg-secondary{% endif %}">
                                 Highlights: {{ hs }}
                             </span>
-                            <form action="{{ url_for('admin.vehicle_image_delete', id=image.id) }}" method="POST" class="position-absolute top-0 end-0 m-1" onsubmit="return confirm('Delete this image?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
-                            </form>
+                            <button type="submit" form="image-delete-form-{{ image.id }}" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"><i class="bi bi-trash"></i></button>
                         </div>
                         <div class="card-body p-2">
                             <div class="d-flex flex-wrap gap-1 mb-2">
-                                <form action="{{ url_for('admin.vehicle_image_highlights_analyze', id=image.id) }}" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="force" value="1">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Analyze</button>
-                                </form>
+                                <button type="submit" form="image-analyze-form-{{ image.id }}" class="btn btn-sm btn-outline-secondary">Analyze</button>
                                 {% if image.highlight_scene %}
                                 <span class="badge text-bg-light border">{{ image.highlight_scene }}</span>
                                 {% endif %}
@@ -221,15 +210,9 @@
                                         <span class="text-muted">({{ h.category }}{% if not h.is_visible %}, hidden{% endif %})</span>
                                     </span>
                                     <span class="text-nowrap">
-                                        <form action="{{ url_for('admin.vehicle_image_highlight_toggle', image_id=image.id, highlight_id=h.id) }}" method="POST" class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-link btn-sm p-0" title="Toggle visibility">{{ 'Hide' if h.is_visible else 'Show' }}</button>
-                                        </form>
+                                        <button type="submit" form="highlight-toggle-form-{{ h.id }}" class="btn btn-link btn-sm p-0" title="Toggle visibility">{{ 'Hide' if h.is_visible else 'Show' }}</button>
                                         ·
-                                        <form action="{{ url_for('admin.vehicle_image_highlight_delete', image_id=image.id, highlight_id=h.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this highlight?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-link btn-sm p-0 text-danger">Del</button>
-                                        </form>
+                                        <button type="submit" form="highlight-delete-form-{{ h.id }}" class="btn btn-link btn-sm p-0 text-danger">Del</button>
                                     </span>
                                 </li>
                                 {% endfor %}
@@ -302,13 +285,9 @@
                 <div class="small text-danger mb-2">{{ vehicle.facebook_last_error }}</div>
                 {% endif %}
                 <div class="d-flex flex-wrap gap-2">
-                    <form action="{{ url_for('admin.vehicle_facebook_post', id=vehicle.id) }}" method="POST" class="d-inline"
-                          onsubmit="return confirm('Post this vehicle to your Facebook Page now?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-sm btn-primary" {% if facebook_status and not facebook_status.configured %}disabled{% endif %}>
-                            <i class="bi bi-send me-1"></i> Post to Facebook Page now
-                        </button>
-                    </form>
+                    <button type="submit" form="facebook-post-form" class="btn btn-sm btn-primary" {% if facebook_status and not facebook_status.configured %}disabled{% endif %}>
+                        <i class="bi bi-send me-1"></i> Post to Facebook Page now
+                    </button>
                     {% if marketplace_draft %}
                     <button type="button" class="btn btn-sm btn-outline-primary" id="copy-marketplace-draft-btn"
                             data-copy-target="marketplace-draft-text">
@@ -335,6 +314,40 @@
         <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
     </div>
 </form>
+
+{# Action forms live outside the main form: HTML forbids nested forms (nesting silently
+   closed the vehicle form early and broke Save). Buttons above target them via form="id". #}
+{% if vehicle %}
+<form action="{{ url_for('admin.vehicle_facebook_post', id=vehicle.id) }}" method="POST" id="facebook-post-form" class="d-none"
+      onsubmit="return confirm('Post this vehicle to your Facebook Page now?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endif %}
+{% if vehicle and vehicle.images %}
+<form action="{{ url_for('admin.vehicle_highlights_analyze', id=vehicle.id) }}" method="POST" id="highlights-analyze-all-form" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="force" value="1">
+</form>
+{% for image in vehicle.ordered_images() %}
+<form action="{{ url_for('admin.vehicle_image_delete', id=image.id) }}" method="POST" id="image-delete-form-{{ image.id }}" class="d-none"
+      onsubmit="return confirm('Delete this image?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form action="{{ url_for('admin.vehicle_image_highlights_analyze', id=image.id) }}" method="POST" id="image-analyze-form-{{ image.id }}" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="force" value="1">
+</form>
+{% for h in image.highlights or [] %}
+<form action="{{ url_for('admin.vehicle_image_highlight_toggle', image_id=image.id, highlight_id=h.id) }}" method="POST" id="highlight-toggle-form-{{ h.id }}" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form action="{{ url_for('admin.vehicle_image_highlight_delete', image_id=image.id, highlight_id=h.id) }}" method="POST" id="highlight-delete-form-{{ h.id }}" class="d-none"
+      onsubmit="return confirm('Delete this highlight?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endfor %}
+{% endfor %}
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

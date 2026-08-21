@@ -40,12 +40,14 @@
                     </td>
                     <td class="text-end">
                         <form action="{{ url_for('admin.review_toggle_approval', id=review.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                 {% if review.is_approved %}Unapprove{% else %}Approve{% endif %}
                             </button>
                         </form>
                         <a href="{{ url_for('admin.review_edit', id=review.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                         <form action="{{ url_for('admin.review_delete', id=review.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this review?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                         </form>
                     </td>

@@ -38,6 +38,7 @@
                     <td>
                         <a href="{{ url_for('admin.carfax_report_edit', id=report.id) }}" class="btn btn-sm btn-primary"><i class="bi bi-pencil"></i></a>
                         <form action="{{ url_for('admin.carfax_report_delete', id=report.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this report?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
                         </form>
                     </td>

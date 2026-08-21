@@ -110,9 +110,23 @@ def create_app(config_class=None):
     # Error handlers
     from app.routes import internal_server_error, page_not_found
     from werkzeug.exceptions import RequestEntityTooLarge
+    from flask_wtf.csrf import CSRFError
 
     app.register_error_handler(404, page_not_found)
     app.register_error_handler(500, internal_server_error)
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        from flask import flash, jsonify, redirect, request, url_for
+        message = 'Your session expired or the security token was missing. Please try that again.'
+        wants_json = (
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or request.accept_mimetypes.best == 'application/json'
+        )
+        if wants_json:
+            return jsonify({'success': False, 'message': message}), 400
+        flash(message, 'danger')
+        return redirect(request.referrer or url_for('main.index'))
 
     @app.errorhandler(RequestEntityTooLarge)
     def request_entity_too_large(e):
