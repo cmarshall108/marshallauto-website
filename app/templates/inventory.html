@@ -138,11 +138,13 @@
                             <div class="card-img-wrapper">
                                 {% set img = vehicle.primary_image() %}
                                 <img src="{{ vehicle.primary_image_url() }}"
+                                     {% if img and img.srcset %}srcset="{{ img.srcset }}" sizes="(max-width: 575px) 100vw, (max-width: 991px) 50vw, 350px"{% endif %}
                                      class="card-img-top"
                                      alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} {{ vehicle.exterior_color or '' }} for sale in {{ business_city }}, {{ business_state }} at {{ business_name }}"
-                                     width="{{ img.width if img and img.width is defined else 600 }}"
-                                     height="{{ img.height if img and img.height is defined else 400 }}"
-                                     loading="lazy"
+                                     width="{{ img.width if img and img.width else 600 }}"
+                                     height="{{ img.height if img and img.height else 400 }}"
+                                     loading="{{ 'eager' if loop.first else 'lazy' }}"
+                                     {% if loop.first %}fetchpriority="high"{% endif %}
                                      decoding="async"
                                      itemprop="image">
                                 <span class="badge-condition">{{ vehicle.condition | title }}</span>

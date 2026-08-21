@@ -986,12 +986,16 @@ def _enqueue_highlights_for_vehicle(vehicle, force=False):
 def _delete_vehicle_image_file(image):
     try:
         base = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vehicles')
-        path = os.path.join(base, image.filename)
+        # basename() keeps a tampered DB filename from escaping the uploads dir
+        stored = os.path.basename(image.filename or '')
+        if not stored:
+            return
+        path = os.path.join(base, stored)
         if os.path.exists(path):
             os.remove(path)
         # Remove responsive variants if present
-        if '.' in image.filename:
-            name, ext = image.filename.rsplit('.', 1)
+        if '.' in stored:
+            name, ext = stored.rsplit('.', 1)
             for label in current_app.config.get('IMAGE_WIDTHS', {}):
                 if label == 'detail':
                     continue

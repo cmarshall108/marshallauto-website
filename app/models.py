@@ -229,6 +229,31 @@ class VehicleImage(db.Model):
     def absolute_url(self):
         return f"{current_app.config['SITE_URL']}/static/uploads/vehicles/{self.filename}"
 
+    def variant_url(self, label):
+        """URL for a resized variant, or the original when that variant was not written."""
+        target = (current_app.config.get('IMAGE_WIDTHS') or {}).get(label)
+        if not target or not self.width or self.width <= target or '.' not in self.filename:
+            return self.url
+        name, ext = self.filename.rsplit('.', 1)
+        return f'/static/uploads/vehicles/{name}_{label}.{ext}'
+
+    @property
+    def srcset(self):
+        """Candidates limited to variants _save_image_variants actually produced."""
+        if not self.width or '.' not in self.filename:
+            return None
+        name, ext = self.filename.rsplit('.', 1)
+        widths = current_app.config.get('IMAGE_WIDTHS') or {}
+        entries = []
+        for label, target in sorted(widths.items(), key=lambda kv: kv[1]):
+            if label == 'detail' or target >= self.width:
+                continue
+            entries.append(f'/static/uploads/vehicles/{name}_{label}.{ext} {target}w')
+        if not entries:
+            return None
+        entries.append(f'{self.url} {self.width}w')
+        return ', '.join(entries)
+
     def visible_highlights(self):
         """Public-facing highlights only (visible + ready analysis or manual)."""
         rows = list(self.highlights or [])

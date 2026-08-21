@@ -12,6 +12,10 @@
 {% block twitter_description %}{{ meta_description }}{% endblock %}
 {% block twitter_image %}{{ og_image_absolute or vehicle.primary_image_url(absolute=True) }}{% endblock %}
 
+{% block extra_head %}
+<link rel="preload" as="image" href="{{ vehicle.primary_image_url() }}" fetchpriority="high">
+{% endblock %}
+
 {% block content %}
 <section class="bg-light-brand py-4">
     <div class="container">
@@ -141,7 +145,7 @@
                             data-highlight-status="{{ image.highlight_status or 'pending' }}"
                             aria-label="Show photo {{ loop.index }} of {{ gallery_count }}"
                             aria-current="{% if (primary and image.id == primary.id) or (not primary and loop.first) %}true{% else %}false{% endif %}">
-                        <img src="{{ image.url }}"
+                        <img src="{{ image.variant_url('thumbnail') }}"
                              alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} - view {{ loop.index }} at {{ business_name }} in {{ business_city }}, {{ business_state }}"
                              width="100"
                              height="75"
@@ -453,7 +457,7 @@
                     <a href="{{ url_for('main.vehicle_detail', slug=rv.slug) }}" class="text-decoration-none text-dark">
                         <div class="card-img-wrapper">
                             {% set img = rv.primary_image() %}
-                            <img src="{{ rv.primary_image_url() }}" class="card-img-top" alt="{{ rv.year }} {{ rv.make }} {{ rv.model }} {{ rv.trim or '' }} for sale in {{ business_city }}, {{ business_state }}" width="{{ img.width if img and img.width else 600 }}" height="{{ img.height if img and img.height else 400 }}" loading="lazy" decoding="async">
+                            <img src="{{ rv.primary_image_url() }}" {% if img and img.srcset %}srcset="{{ img.srcset }}" sizes="(max-width: 575px) 100vw, (max-width: 991px) 50vw, 350px"{% endif %} class="card-img-top" alt="{{ rv.year }} {{ rv.make }} {{ rv.model }} {{ rv.trim or '' }} for sale in {{ business_city }}, {{ business_state }}" width="{{ img.width if img and img.width else 600 }}" height="{{ img.height if img and img.height else 400 }}" loading="lazy" decoding="async">
                             <span class="badge-condition">{{ rv.condition | title }}</span>
                             <div class="vehicle-card-badges">
                                 {% if rv.is_low_mileage %}

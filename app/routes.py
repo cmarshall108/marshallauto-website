@@ -6,6 +6,7 @@ from flask import (
     render_template, request, send_from_directory, url_for, abort
 )
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app import db
@@ -850,7 +851,12 @@ def _create_lead_from_form(form, source='contact'):
         referrer=attr['referrer'],
     )
     db.session.add(lead)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('Lead save failed (source=%s)', source)
+        return None
     notify_new_lead(lead)
     return lead
 
@@ -870,7 +876,9 @@ def contact():
             # Bot trap — pretend success
             flash('Thank you! We have received your message and will contact you soon.', 'success')
             return redirect(url_for('main.contact'))
-        _create_lead_from_form(form, source='contact')
+        if _create_lead_from_form(form, source='contact') is None:
+            flash('Sorry, we could not save your message. Please call us instead.', 'danger')
+            return redirect(url_for('main.contact'))
         flash('Thank you! We have received your message and will contact you soon.', 'success')
         return redirect(url_for('main.contact'))
 
@@ -909,6 +917,11 @@ def contact_submit_ajax():
             return jsonify({'success': True, 'message': 'Thank you! We will be in touch soon.'})
         source = (request.form.get('source') or 'ajax')[:64]
         lead = _create_lead_from_form(form, source=source)
+        if lead is None:
+            return jsonify({
+                'success': False,
+                'errors': {'_form': ['Sorry, we could not save your message. Please call us instead.']},
+            }), 500
         return jsonify({
             'success': True,
             'message': 'Thank you! We will be in touch soon.',
@@ -921,6 +934,12 @@ def contact_submit_ajax():
 def analytics_collect():
     """First-party pageview / event beacon used by the public site JS."""
     from app.analytics import process_collect_payload
+
+    # This endpoint is CSRF-exempt and public; MAX_CONTENT_LENGTH is sized for
+    # bulk photo uploads, so cap the beacon body separately.
+    max_beacon = current_app.config.get('ANALYTICS_MAX_BODY_BYTES', 64 * 1024)
+    if (request.content_length or 0) > max_beacon:
+        return jsonify({'ok': False, 'error': 'payload_too_large'}), 413
 
     data = request.get_json(silent=True)
     if data is None and request.form:
