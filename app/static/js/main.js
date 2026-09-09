@@ -583,7 +583,7 @@
         const spinBadge = document.getElementById('gallery-spin-badge');
         const spinHelp = document.getElementById('gallery-spin-help');
         const thumbsList = document.getElementById('gallery-thumbs');
-        const modeButtons = Array.from(document.querySelectorAll('.gallery-mode-toggle [data-gallery-mode], .btn-group [data-gallery-mode]'));
+        const modeButtons = Array.from(document.querySelectorAll('.gallery-toolbar [data-gallery-mode], .gallery-mode-toggle [data-gallery-mode], .btn-group [data-gallery-mode]'));
         const hotspotsEl = document.getElementById('gallery-hotspots');
         const hotspotCard = document.getElementById('gallery-hotspot-card');
         const hotspotCardClose = document.getElementById('gallery-hotspot-card-close');
