@@ -242,7 +242,22 @@
                         <span class="text-muted small">Stock #{{ vehicle.stock_number or vehicle.id }}</span>
                     </div>
                     <h1 class="h2 fw-bold mb-1">{{ vehicle.title }} for Sale</h1>
-                    <p class="vehicle-price mb-3">{{ vehicle.display_price | format_price }}</p>
+                    {% set savings = vehicle.savings_info() %}
+                    {% if savings %}
+                    <p class="retail-price-strike-lg mb-0">Retail Value: {{ savings.retail | format_price }}</p>
+                    {% endif %}
+                    <p class="vehicle-price mb-2">{{ vehicle.display_price | format_price }}</p>
+                    {% if savings %}
+                    <div class="savings-banner mb-3">
+                        <div class="savings-banner-icon"><i class="bi bi-piggy-bank-fill" aria-hidden="true"></i></div>
+                        <div>
+                            <div class="savings-banner-amount">You Save {{ savings.savings | format_price }}</div>
+                            <div class="savings-banner-sub">{{ savings.percent }}% below average retail value</div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="mb-3"></div>
+                    {% endif %}
 
                     <div class="row g-2 mb-4 text-center vehicle-quick-stats">
                         <div class="col-4 border-end">
@@ -502,7 +517,17 @@
                             <p class="quick-specs mb-2">
                                 <i class="bi bi-speedometer2 me-1"></i> {{ rv.mileage | format_mileage }}
                             </p>
-                            <p class="price mb-0">{{ rv.display_price | format_price }}</p>
+                            {% set rv_savings = rv.savings_info() %}
+                            {% if rv_savings %}
+                            <div class="savings-callout">
+                                <i class="bi bi-tags-fill" aria-hidden="true"></i>
+                                Save {{ rv_savings.savings | format_price }} <span class="savings-callout-pct">({{ rv_savings.percent }}% below retail)</span>
+                            </div>
+                            {% endif %}
+                            <p class="price mb-0">
+                                {% if rv_savings %}<span class="retail-price-strike">{{ rv_savings.retail | format_price }}</span>{% endif %}
+                                {{ rv.display_price | format_price }}
+                            </p>
                         </div>
                     </a>
                 </div>

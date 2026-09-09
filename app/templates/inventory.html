@@ -170,8 +170,16 @@
                                     {% if vehicle.drivetrain %}<span class="mx-1">|</span><span itemprop="driveWheelConfiguration">{{ vehicle.drivetrain }}</span>{% endif %}
                                     {% if vehicle.fuel_type %}<span class="mx-1">|</span><span itemprop="fuelType">{{ vehicle.fuel_type }}</span>{% endif %}
                                 </p>
+                                {% set savings = vehicle.savings_info() %}
+                                {% if savings %}
+                                <div class="savings-callout">
+                                    <i class="bi bi-tags-fill" aria-hidden="true"></i>
+                                    Save {{ format_price(savings.savings) }} <span class="savings-callout-pct">({{ savings.percent }}% below retail)</span>
+                                </div>
+                                {% endif %}
                                 <p class="price mb-0" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
                                     <span itemprop="priceCurrency" content="USD"></span>
+                                    {% if savings %}<span class="retail-price-strike">{{ format_price(savings.retail) }}</span>{% endif %}
                                     <span itemprop="price" content="{{ vehicle.display_price }}">{{ format_price(vehicle.display_price) }}</span>
                                 </p>
                             </div>

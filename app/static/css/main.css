@@ -1271,6 +1271,83 @@ body.gallery-lightbox-open {
     color: var(--primary);
 }
 
+/* Retail value savings comparison (eye-catching "below retail" callouts) */
+.savings-callout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: linear-gradient(135deg, #0f9d58 0%, #34c759 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.76rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    margin-bottom: 0.4rem;
+    line-height: 1.3;
+}
+
+.savings-callout-pct {
+    font-weight: 600;
+    opacity: 0.92;
+}
+
+.retail-price-strike {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    font-weight: 500;
+    margin-right: 0.4rem;
+}
+
+.retail-price-strike-lg {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.1rem;
+}
+
+.savings-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: linear-gradient(135deg, #0f9d58 0%, #22c55e 60%, #34c759 100%);
+    color: #fff;
+    border-radius: var(--border-radius);
+    padding: 0.85rem 1.1rem;
+    box-shadow: 0 8px 24px rgba(15, 157, 88, 0.35);
+    animation: savings-banner-pulse 2.4s ease-in-out infinite;
+}
+
+.savings-banner-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.savings-banner-amount {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.savings-banner-sub {
+    font-size: 0.85rem;
+    opacity: 0.95;
+    font-weight: 600;
+}
+
+@keyframes savings-banner-pulse {
+    0%, 100% { box-shadow: 0 8px 24px rgba(15, 157, 88, 0.35); }
+    50% { box-shadow: 0 8px 32px rgba(15, 157, 88, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .savings-banner {
+        animation: none;
+    }
+}
+
 .specs-table dt {
     font-weight: 600;
     color: var(--text-muted);

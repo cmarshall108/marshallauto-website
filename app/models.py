@@ -84,6 +84,10 @@ class Vehicle(db.Model):
     # Video walkaround (YouTube/Vimeo link or direct .mp4/.webm file URL)
     video_url = db.Column(db.String(500), nullable=True)
 
+    # Retail clean-title comparison value (e.g. JD Power / NADAguides), entered by staff
+    # via the vehicle form's public lookup, or set later by an automated valuation API.
+    market_value = db.Column(db.Numeric(10, 2), nullable=True)
+
     # Facebook Page publish tracking (not Marketplace listing IDs — Meta has no public Marketplace create API)
     facebook_post_id = db.Column(db.String(64), nullable=True)
     facebook_posted_at = db.Column(db.DateTime, nullable=True)
@@ -133,6 +137,29 @@ class Vehicle(db.Model):
         if not self.features:
             return []
         return [f.strip() for f in self.features.split(',') if f.strip()]
+
+    def savings_info(self):
+        """Savings vs. retail clean-title market value, or None if not applicable.
+
+        Only returned when a market value is on file and it's meaningfully
+        (>1%) above our price — avoids showing an awkward $0/negative "savings".
+        """
+        if self.market_value is None or self.display_price is None:
+            return None
+        retail = float(self.market_value)
+        ours = float(self.display_price)
+        if retail <= 0 or ours <= 0:
+            return None
+        savings = retail - ours
+        percent = (savings / retail) * 100
+        if percent < 1:
+            return None
+        return {
+            'retail': retail,
+            'price': ours,
+            'savings': savings,
+            'percent': round(percent),
+        }
 
     @property
     def is_available(self):

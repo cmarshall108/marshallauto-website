@@ -107,7 +107,17 @@
                             <i class="bi bi-speedometer2 me-1"></i> {{ vehicle.mileage | format_mileage }}
                             {% if vehicle.drivetrain %}<span class="mx-1">|</span><i class="bi bi-gear-wide me-1"></i> {{ vehicle.drivetrain }}{% endif %}
                         </p>
-                        <p class="price mb-0">{{ vehicle.display_price | format_price }}</p>
+                        {% set savings = vehicle.savings_info() %}
+                        {% if savings %}
+                        <div class="savings-callout">
+                            <i class="bi bi-tags-fill" aria-hidden="true"></i>
+                            Save {{ savings.savings | format_price }} <span class="savings-callout-pct">({{ savings.percent }}% below retail)</span>
+                        </div>
+                        {% endif %}
+                        <p class="price mb-0">
+                            {% if savings %}<span class="retail-price-strike">{{ savings.retail | format_price }}</span>{% endif %}
+                            {{ vehicle.display_price | format_price }}
+                        </p>
                     </div>
                 </a>
             </div>

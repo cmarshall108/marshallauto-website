@@ -1152,6 +1152,7 @@ def _vehicle_from_form(form):
         stock_number=form.stock_number.data.strip().upper() if form.stock_number.data else None,
         price=form.price.data,
         sale_price=form.sale_price.data,
+        market_value=form.market_value.data,
         mileage=form.mileage.data,
         condition=form.condition.data,
         title_status=form.title_status.data,
@@ -1182,6 +1183,7 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.stock_number = form.stock_number.data.strip().upper() if form.stock_number.data else None
     vehicle.price = form.price.data
     vehicle.sale_price = form.sale_price.data
+    vehicle.market_value = form.market_value.data
     vehicle.mileage = form.mileage.data
     vehicle.condition = form.condition.data
     vehicle.title_status = form.title_status.data

@@ -24,6 +24,15 @@ class VehicleForm(FlaskForm):
 
     price = DecimalField('Price *', validators=[DataRequired(), NumberRange(min=0)])
     sale_price = DecimalField('Sale Price', validators=[Optional(), NumberRange(min=0)])
+    market_value = DecimalField(
+        'Retail Clean-Title Value (JD Power / NADAguides)',
+        validators=[Optional(), NumberRange(min=0)],
+        description=(
+            'Look this vehicle up at jdpower.com/cars or nadaguides.com and enter the '
+            'clean-title retail value here. When set higher than our price, the site '
+            'shows shoppers an eye-catching "below retail" savings comparison.'
+        ),
+    )
     mileage = IntegerField('Mileage *', validators=[DataRequired(), NumberRange(min=0)])
     condition = SelectField('Condition', choices=[
         ('used', 'Used'),
