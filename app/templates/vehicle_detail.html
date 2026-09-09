@@ -243,8 +243,11 @@
                     </div>
                     <h1 class="h2 fw-bold mb-1">{{ vehicle.title }} for Sale</h1>
                     {% set savings = vehicle.savings_info() %}
-                    {% if savings %}
-                    <p class="retail-price-strike-lg mb-0">Retail Value: {{ savings.retail | format_price }}</p>
+                    {% if vehicle.market_value is not none %}
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="small text-muted text-uppercase fw-semibold">JD Power Retail Clean Title Value</div>
+                        <div class="h4 fw-bold mb-0">{{ vehicle.market_value | format_price }}</div>
+                    </div>
                     {% endif %}
                     <p class="vehicle-price mb-2">{{ vehicle.display_price | format_price }}</p>
                     {% if savings %}
