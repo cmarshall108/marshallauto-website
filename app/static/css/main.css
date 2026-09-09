@@ -1712,7 +1712,9 @@ body.gallery-lightbox-open {
     .inventory-grid {
         grid-template-columns: 1fr;
         gap: 1rem;
-    }gallery-toolbar {
+    }
+
+    .gallery-toolbar {
         width: 100%;
         justify-content: stretch;
     }
@@ -1733,8 +1735,6 @@ body.gallery-lightbox-open {
     .vehicle-gallery.is-spin-mode .gallery-swipe-hint {
         bottom: 2.55rem;
     }
-
-    .
 
     .vehicle-card .card-img-wrapper {
         height: 210px;

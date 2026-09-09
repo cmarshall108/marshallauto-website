@@ -67,26 +67,26 @@
                         <input type="hidden" name="source" value="sell-your-car">
                         <div class="mb-3">
                             <label class="form-label">Your Name</label>
-                            <input type="text" name="name" class="form-control" required>
+                            <input type="text" name="name" class="form-control" autocomplete="name" required>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label">Email</label>
-                                <input type="email" name="email" class="form-control" required>
+                                <input type="email" name="email" class="form-control" autocomplete="email" inputmode="email" required>
                             </div>
                             <div class="col-6">
                                 <label class="form-label">Phone</label>
-                                <input type="tel" name="phone" class="form-control">
+                                <input type="tel" name="phone" class="form-control" autocomplete="tel" inputmode="tel">
                             </div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label">Vehicle Year</label>
-                                <input type="number" name="year" class="form-control">
+                                <input type="number" name="year" class="form-control" inputmode="numeric" min="1900" max="2100">
                             </div>
                             <div class="col-6">
                                 <label class="form-label">Make & Model</label>
-                                <input type="text" name="vehicle_model" class="form-control">
+                                <input type="text" name="vehicle_model" class="form-control" autocomplete="off">
                             </div>
                         </div>
                         <div class="mb-3">
