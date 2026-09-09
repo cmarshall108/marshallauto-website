@@ -108,6 +108,20 @@ def create_app(config_class=None):
     # Live "now" callable so footer year stays current without restart
     app.jinja_env.globals['now'] = lambda: datetime.now(timezone.utc)
 
+    # Cache-busted static asset URLs: static files are cached for a week (immutable)
+    # by set_security_headers below, so CSS/JS edits need a version query string or
+    # visitors silently keep serving the old file until that cache expires.
+    def asset_url(filename):
+        from flask import url_for
+        try:
+            path = os.path.join(app.static_folder, filename)
+            version = str(int(os.path.getmtime(path)))
+        except OSError:
+            version = '0'
+        return f"{url_for('static', filename=filename)}?v={version}"
+
+    app.jinja_env.globals['asset_url'] = asset_url
+
     # Security headers
     @app.after_request
     def set_security_headers(response):

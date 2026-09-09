@@ -375,7 +375,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/admin-vehicle-form.js') }}"></script>
+<script src="{{ asset_url('js/admin-vehicle-form.js') }}"></script>
 <script>
 (function () {
   var btn = document.getElementById('copy-marketplace-draft-btn');
