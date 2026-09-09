@@ -1,7 +1,9 @@
 import os
 import re
 import secrets
+import shutil
 import smtplib
+import subprocess
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
@@ -344,11 +346,98 @@ def parse_video_url(raw_url):
             'embed_url': f'https://player.vimeo.com/video/{match.group(1)}',
             'video_id': match.group(1),
         }
+    # Locally-stored (self-hosted, compressed) video — relative /static/... path, no scheme.
+    if url.startswith('/') and url.lower().endswith(('.mp4', '.webm', '.ogg', '.mov', '.m4v')):
+        return {'kind': 'file', 'embed_url': url, 'video_id': None}
     from urllib.parse import urlparse
     parsed = urlparse(url)
-    if parsed.scheme in ('http', 'https') and parsed.path.lower().endswith(('.mp4', '.webm', '.ogg', '.mov')):
+    if parsed.scheme in ('http', 'https') and parsed.path.lower().endswith(('.mp4', '.webm', '.ogg', '.mov', '.m4v')):
         return {'kind': 'file', 'embed_url': url, 'video_id': None}
     return None
+
+
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'mov', 'm4v'}
+# Heavy compression target: this VPS has very limited disk space. Favor small files
+# over quality — 854px-wide H.264, low bitrate, mono audio. Fine for a short walkaround clip.
+VIDEO_MAX_WIDTH = 854
+VIDEO_CRF = 32
+VIDEO_AUDIO_BITRATE = '64k'
+
+
+def _ffmpeg_path():
+    return shutil.which('ffmpeg')
+
+
+def save_uploaded_video(file_obj, subfolder='vehicles/videos'):
+    """Save an uploaded walkaround video, heavily compressed via ffmpeg.
+
+    Returns the stored filename, or None if the upload was rejected/failed
+    (missing/invalid file, or ffmpeg unavailable/failed — caller should flash a
+    message rather than silently keeping an uncompressed file on a low-disk VPS).
+    """
+    if not file_obj or not getattr(file_obj, 'filename', None):
+        return None
+    if not allowed_file(file_obj.filename, ALLOWED_VIDEO_EXTENSIONS):
+        return None
+
+    ffmpeg = _ffmpeg_path()
+    if not ffmpeg:
+        current_app.logger.error(
+            'ffmpeg not found on PATH — refusing to store an uncompressed video (disk space is limited).'
+        )
+        return None
+
+    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], subfolder)
+    os.makedirs(upload_path, exist_ok=True)
+
+    token = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(6)}"
+    ext = file_obj.filename.rsplit('.', 1)[1].lower()
+    raw_path = os.path.join(upload_path, f'{token}_raw.{ext}')
+    final_name = f'{token}.mp4'
+    final_path = os.path.join(upload_path, final_name)
+
+    file_obj.save(raw_path)
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg, '-y', '-i', raw_path,
+                '-vf', f"scale='min({VIDEO_MAX_WIDTH},iw)':-2",
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(VIDEO_CRF),
+                '-c:a', 'aac', '-b:a', VIDEO_AUDIO_BITRATE, '-ac', '1',
+                '-movflags', '+faststart',
+                final_path,
+            ],
+            capture_output=True,
+            timeout=600,
+        )
+        if result.returncode != 0 or not os.path.exists(final_path):
+            current_app.logger.error(
+                'Video compression failed: %s', result.stderr.decode('utf-8', 'ignore')[-800:]
+            )
+            return None
+        return final_name
+    except (subprocess.SubprocessError, OSError) as exc:
+        current_app.logger.error('Video compression failed: %s', exc)
+        return None
+    finally:
+        if os.path.exists(raw_path):
+            try:
+                os.remove(raw_path)
+            except OSError:
+                pass
+
+
+def delete_local_video_file(video_url):
+    """Remove a self-hosted compressed video from disk when a vehicle is deleted/sold."""
+    if not video_url or not video_url.startswith('/static/uploads/vehicles/videos/'):
+        return  # external link (YouTube/Vimeo/etc.) — nothing stored on this VPS
+    try:
+        filename = os.path.basename(video_url)
+        path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vehicles', 'videos', filename)
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError as exc:
+        current_app.logger.warning('Failed to delete video file %s: %s', video_url, exc)
 
 
 def send_lead_confirmation(lead):
@@ -781,7 +870,10 @@ def structured_data_vehicle(vehicle):
             ),
         }
         if video_info['kind'] == 'file':
-            video_data['contentUrl'] = video_info['embed_url']
+            url = video_info['embed_url']
+            if url.startswith('/'):
+                url = f"{current_app.config['SITE_URL'].rstrip('/')}{url}"
+            video_data['contentUrl'] = url
         else:
             video_data['embedUrl'] = video_info['embed_url']
         data['video'] = video_data

@@ -65,6 +65,11 @@ class VehicleForm(FlaskForm):
         validators=[Optional(), Length(max=500)],
         description='YouTube, Vimeo, or a direct .mp4/.webm link showing a walkaround of the vehicle.',
     )
+    video_file = FileField(
+        'Or Upload a Video File',
+        description='Uploaded here is heavily compressed automatically (this VPS has limited disk space). Replaces the URL above.',
+    )
+    remove_video = BooleanField('Remove current video', default=False)
 
     seo_title = StringField('SEO Title', validators=[Optional(), Length(max=160)])
     seo_description = TextAreaField('SEO Description', validators=[Optional(), Length(max=320)])

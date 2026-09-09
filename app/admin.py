@@ -29,8 +29,8 @@ from app.facebook_publish import (
 )
 from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
 from app.utils import (
-    client_ip, is_safe_redirect, rate_limit_exceeded,
-    save_uploaded_image, save_uploaded_pdf,
+    client_ip, delete_local_video_file, is_safe_redirect, rate_limit_exceeded,
+    save_uploaded_image, save_uploaded_pdf, save_uploaded_video,
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
 from app.vin_decode import decode_vin, normalize_vin
@@ -427,6 +427,10 @@ def vehicle_new():
         db.session.add(vehicle)
         db.session.flush()
         vehicle.ensure_slug()
+        _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
+        if vehicle.status == 'sold':
+            delete_local_video_file(vehicle.video_url)
+            vehicle.video_url = None
         db.session.commit()
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         # Refresh images relationship after image commit
@@ -461,8 +465,14 @@ def vehicle_edit(id):
     form = VehicleForm(obj=vehicle)
     fb_status = configuration_status()
     if form.validate_on_submit():
+        was_sold = vehicle.status == 'sold'
         _apply_vehicle_form(vehicle, form)
         vehicle.ensure_slug()
+        _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
+        if vehicle.status == 'sold' and not was_sold:
+            # Vehicle just sold — the walkaround video no longer needs to take up VPS storage.
+            delete_local_video_file(vehicle.video_url)
+            vehicle.video_url = None
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         db.session.commit()
         db.session.refresh(vehicle)
@@ -537,6 +547,7 @@ def vehicle_delete(id):
     for report in list(vehicle.carfax_reports):
         if report.filename:
             _delete_carfax_file(report.filename)
+    delete_local_video_file(vehicle.video_url)
     db.session.delete(vehicle)
     db.session.commit()
     flash('Vehicle deleted.', 'success')
@@ -1156,7 +1167,6 @@ def _vehicle_from_form(form):
         mpg_highway=form.mpg_highway.data,
         description=form.description.data,
         features=form.features.data,
-        video_url=form.video_url.data.strip() if form.video_url.data else None,
         seo_title=form.seo_title.data,
         seo_description=form.seo_description.data,
         meta_keywords=form.meta_keywords.data,
@@ -1187,10 +1197,38 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.mpg_highway = form.mpg_highway.data
     vehicle.description = form.description.data
     vehicle.features = form.features.data
-    vehicle.video_url = form.video_url.data.strip() if form.video_url.data else None
     vehicle.seo_title = form.seo_title.data
     vehicle.seo_description = form.seo_description.data
     vehicle.meta_keywords = form.meta_keywords.data
+
+
+def _apply_video_to_vehicle(vehicle, form, video_file):
+    """Apply video upload/URL/removal from the vehicle form (one video per vehicle).
+
+    File upload takes precedence over the pasted URL. Any previously self-hosted
+    (compressed) file is deleted from disk before being replaced, since VPS storage
+    is very limited.
+    """
+    if form.remove_video.data:
+        delete_local_video_file(vehicle.video_url)
+        vehicle.video_url = None
+        return
+    if video_file and getattr(video_file, 'filename', None):
+        filename = save_uploaded_video(video_file)
+        if filename:
+            delete_local_video_file(vehicle.video_url)
+            vehicle.video_url = f'/static/uploads/vehicles/videos/{filename}'
+        else:
+            flash(
+                'Video upload could not be processed (unsupported file or the server could not '
+                'compress it). The existing video, if any, was kept.',
+                'warning',
+            )
+        return
+    new_url = (form.video_url.data or '').strip() or None
+    if new_url != vehicle.video_url:
+        delete_local_video_file(vehicle.video_url)
+        vehicle.video_url = new_url
 
 
 def _handle_vehicle_images(vehicle, files):

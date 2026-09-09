@@ -17,6 +17,16 @@ UNIT_DIR=/etc/systemd/system
 command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
 
+# ffmpeg compresses uploaded vehicle walkaround videos (this VPS has limited disk space).
+# Video uploads are refused (not stored uncompressed) if ffmpeg is missing.
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y && apt-get install -y --no-install-recommends ffmpeg
+  else
+    echo "WARNING: ffmpeg not found and apt-get unavailable; vehicle video uploads will be rejected until it is installed." >&2
+  fi
+fi
+
 chmod +x "$ROOT/start_ubuntu_prod.sh" "$ROOT/deploy/auto_deploy.sh" "$ROOT/deploy/healthcheck.sh"
 
 for unit in marshallauto.service marshallauto-deploy.service marshallauto-deploy.timer \
