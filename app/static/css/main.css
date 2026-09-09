@@ -447,6 +447,7 @@ a:hover {
 .feature-icon {
     width: 64px;
     height: 64px;
+    flex-shrink: 0;
     background-color: rgba(13, 110, 253, 0.1);
     border-radius: 50%;
     display: inline-flex;
