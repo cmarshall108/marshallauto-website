@@ -1,0 +1,11 @@
+[Unit]
+Description=Restart the site if the health endpoint stops responding
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Unit=marshallauto-healthcheck.service
+
+[Install]
+WantedBy=timers.target

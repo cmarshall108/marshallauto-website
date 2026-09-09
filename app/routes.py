@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app import db
 from app.forms import ContactForm
 from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, VehicleImage
+from app.spam_filter import check_lead_spam_for_request
 from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_price,
     notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
@@ -833,13 +834,33 @@ def _create_lead_from_form(form, source='contact'):
         if not exists:
             vehicle_id = None
     attr = _attribution_from_request()
+    name = (form.name.data or '').strip()[:128]
+    email = (form.email.data or '').strip()[:128]
+    phone = (form.phone.data or '').strip()[:32] or None
+    message = (form.message.data or '').strip() or None
+
+    spam = check_lead_spam_for_request(
+        current_app.config,
+        name=name,
+        email=email,
+        phone=phone or '',
+        message=message or '',
+        user_ip=client_ip(),
+        user_agent=request.headers.get('User-Agent', ''),
+        referrer=request.headers.get('Referer', ''),
+        permalink=request.url,
+    )
+
     lead = Lead(
-        name=(form.name.data or '').strip()[:128],
-        email=(form.email.data or '').strip()[:128],
-        phone=(form.phone.data or '').strip()[:32] or None,
-        message=(form.message.data or '').strip() or None,
+        name=name,
+        email=email,
+        phone=phone,
+        message=message,
         vehicle_id=vehicle_id,
         source=(source or 'contact')[:64],
+        is_spam=spam.is_spam,
+        spam_score=spam.score,
+        spam_reasons=spam.reason_text[:512] or None,
         utm_source=attr['utm_source'],
         utm_medium=attr['utm_medium'],
         utm_campaign=attr['utm_campaign'],
@@ -857,7 +878,13 @@ def _create_lead_from_form(form, source='contact'):
         db.session.rollback()
         current_app.logger.exception('Lead save failed (source=%s)', source)
         return None
-    notify_new_lead(lead)
+    if spam.is_spam:
+        # Kept in the admin spam folder for review, but no notification email.
+        current_app.logger.info(
+            'Lead %s quarantined as spam (score=%s): %s', lead.id, spam.score, spam.reason_text
+        )
+    else:
+        notify_new_lead(lead)
     return lead
 
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll GitHub for new commits every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Unit=marshallauto-deploy.service
+
+[Install]
+WantedBy=timers.target

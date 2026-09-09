@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+import click
 from dotenv import load_dotenv
 
 # Load .env from project root (not just cwd) so production launches are reliable.
@@ -69,6 +70,21 @@ def highlight_enqueue_all_cmd():
     for vehicle in vehicles:
         total += enqueue_vehicle_highlight_jobs(vehicle.id, force=force, only_missing=not force)
     print(f'Queued/kept {total} highlight job(s) across {len(vehicles)} vehicle(s). force={force}')
+
+
+@app.cli.command('leads-spam-scan')
+@click.option('--delete', is_flag=True, help='Delete matching spam leads instead of moving them to the spam folder.')
+@click.option('--rescan-all', is_flag=True, help='Also re-score leads already in the spam folder.')
+@click.option('--dry-run', is_flag=True, help='Report what would happen without changing anything.')
+def leads_spam_scan(delete, rescan_all, dry_run):
+    """Re-score existing leads with the current spam rules and clean up the spam."""
+    from app.spam_filter import rescan_leads
+    stats = rescan_leads(app.config, delete=delete, rescan_all=rescan_all, dry_run=dry_run)
+    print(
+        f"{'[dry run] ' if dry_run else ''}"
+        f"scanned={stats['scanned']} spam={stats['spam']} "
+        f"flagged={stats['flagged']} deleted={stats['deleted']} restored={stats['cleared']}"
+    )
 
 
 @app.cli.command('seed')

@@ -148,6 +148,16 @@ def create_app(config_class=None):
     # Health check (no DB dependency for basic liveness)
     @app.get('/healthz')
     def healthz():
+        # ?deep=1 also verifies the database, used by the deploy rollback gate.
+        from flask import request
+        if request.args.get('deep'):
+            from sqlalchemy import text
+            try:
+                db.session.execute(text('SELECT 1'))
+            except Exception as exc:
+                app.logger.error('Deep health check failed: %s', exc)
+                return {'status': 'error', 'database': 'unavailable'}, 503
+            return {'status': 'ok', 'database': 'ok'}, 200
         return {'status': 'ok'}, 200
 
     # Bootstrap schema + defaults (safe for SQLite/dev; production should use migrations)
@@ -243,6 +253,9 @@ def _ensure_schema_columns(app):
                     ('fbclid', 'ALTER TABLE leads ADD COLUMN fbclid VARCHAR(255)'),
                     ('landing_path', 'ALTER TABLE leads ADD COLUMN landing_path VARCHAR(512)'),
                     ('referrer', 'ALTER TABLE leads ADD COLUMN referrer VARCHAR(512)'),
+                    ('is_spam', 'ALTER TABLE leads ADD COLUMN is_spam BOOLEAN DEFAULT 0 NOT NULL'),
+                    ('spam_score', 'ALTER TABLE leads ADD COLUMN spam_score INTEGER DEFAULT 0 NOT NULL'),
+                    ('spam_reasons', 'ALTER TABLE leads ADD COLUMN spam_reasons VARCHAR(512)'),
                 ]:
                     _add_column(conn, 'leads', col, ddl)
     except Exception as e:

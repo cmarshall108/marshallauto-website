@@ -4,7 +4,23 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">Customer Leads</h2>
+    <h2 class="fw-bold mb-0">{% if view == 'spam' %}Spam Leads{% else %}Customer Leads{% endif %}</h2>
+    <div class="d-flex gap-2">
+        <div class="btn-group">
+            <a href="{{ url_for('admin.leads') }}" class="btn btn-sm {% if view != 'spam' %}btn-primary{% else %}btn-outline-primary{% endif %}">Inbox ({{ inbox_count }})</a>
+            <a href="{{ url_for('admin.leads', view='spam') }}" class="btn btn-sm {% if view == 'spam' %}btn-primary{% else %}btn-outline-primary{% endif %}">Spam ({{ spam_count }})</a>
+        </div>
+        {% if view == 'spam' and spam_count %}
+        <form action="{{ url_for('admin.leads_empty_spam') }}" method="POST" onsubmit="return confirm('Permanently delete all spam leads?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Empty Spam</button>
+        </form>
+        {% endif %}
+        <form action="{{ url_for('admin.leads_rescan_spam') }}" method="POST" onsubmit="return confirm('Re-check all existing leads for spam?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Rescan Leads</button>
+        </form>
+    </div>
 </div>
 
 <div class="table-card p-4">
@@ -44,16 +60,33 @@
                         {% else %}
                         <span class="badge bg-primary">New</span>
                         {% endif %}
+                        {% if lead.spam_score %}
+                        <br>
+                        <span class="badge {% if lead.is_spam %}bg-danger{% else %}bg-warning text-dark{% endif %}"
+                              title="{{ lead.spam_reasons }}">
+                            {% if lead.is_spam %}Spam{% else %}Suspicious{% endif %} {{ lead.spam_score }}
+                        </span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if not lead.is_read %}
                         <form action="{{ url_for('admin.lead_mark_read', id=lead.id) }}" method="POST" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="view" value="{{ view }}">
                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
                         </form>
                         {% endif %}
+                        <form action="{{ url_for('admin.lead_toggle_spam', id=lead.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="view" value="{{ view }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                    title="{% if lead.is_spam %}Not spam{% else %}Mark as spam{% endif %}">
+                                <i class="bi {% if lead.is_spam %}bi-inbox{% else %}bi-shield-exclamation{% endif %}"></i>
+                            </button>
+                        </form>
                         <form action="{{ url_for('admin.lead_delete', id=lead.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this lead?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="view" value="{{ view }}">
                             <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
                         </form>
                     </td>
@@ -70,14 +103,14 @@
     {% if pagination.pages > 1 %}
     <nav>
         <ul class="pagination justify-content-center mb-0">
-            {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=pagination.prev_num) }}">Previous</a></li>{% endif %}
+            {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=pagination.prev_num, view=view if view == 'spam' else None) }}">Previous</a></li>{% endif %}
             {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                 {% if page_num %}
                     {% if page_num == pagination.page %}<li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                    {% else %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=page_num) }}">{{ page_num }}</a></li>{% endif %}
+                    {% else %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=page_num, view=view if view == 'spam' else None) }}">{{ page_num }}</a></li>{% endif %}
                 {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
             {% endfor %}
-            {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=pagination.next_num) }}">Next</a></li>{% endif %}
+            {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.leads', page=pagination.next_num, view=view if view == 'spam' else None) }}">Next</a></li>{% endif %}
         </ul>
     </nav>
     {% endif %}

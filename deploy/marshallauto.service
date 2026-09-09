@@ -1,0 +1,21 @@
+[Unit]
+Description=Marshall Auto website (Flask + highlight worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/marshallauto-website
+ExecStart=/opt/marshallauto-website/start_ubuntu_prod.sh
+Restart=always
+RestartSec=2
+# Never give up restarting: the site must stay online.
+StartLimitIntervalSec=0
+KillMode=mixed
+TimeoutStopSec=20
+StandardOutput=append:/var/log/marshallauto.log
+StandardError=append:/var/log/marshallauto.log
+
+[Install]
+WantedBy=multi-user.target

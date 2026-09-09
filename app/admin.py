@@ -25,6 +25,7 @@ from app.facebook_publish import (
     apply_publish_result, build_marketplace_draft, configuration_status,
     maybe_auto_post_vehicle, post_vehicle_to_page,
 )
+from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
 from app.utils import (
     client_ip, is_safe_redirect, rate_limit_exceeded,
     save_uploaded_image, save_uploaded_pdf,
@@ -94,12 +95,17 @@ def dashboard():
         'total_vehicles': Vehicle.query.count(),
         'available_vehicles': Vehicle.query.filter_by(status='available').count(),
         'sold_vehicles': Vehicle.query.filter_by(status='sold').count(),
-        'pending_leads': Lead.query.filter_by(is_read=False).count(),
-        'total_leads': Lead.query.count(),
+        'pending_leads': Lead.query.filter_by(is_read=False, is_spam=False).count(),
+        'total_leads': Lead.query.filter(Lead.is_spam.is_(False)).count(),
         'service_records': ServiceRecord.query.count(),
         'carfax_reports': CarfaxReport.query.count(),
     }
-    recent_leads = Lead.query.order_by(Lead.created_at.desc()).limit(10).all()
+    recent_leads = (
+        Lead.query.filter(Lead.is_spam.is_(False))
+        .order_by(Lead.created_at.desc())
+        .limit(10)
+        .all()
+    )
     avg_rating = (
         Review.query.filter_by(is_approved=True)
         .with_entities(func.avg(Review.rating))
@@ -645,9 +651,22 @@ def analytics():
 @login_required
 def leads():
     page = request.args.get('page', 1, type=int)
-    pagination = Lead.query.order_by(Lead.created_at.desc()).paginate(
+    view = 'spam' if request.args.get('view') == 'spam' else 'inbox'
+    query = Lead.query.filter(Lead.is_spam.is_(view == 'spam'))
+    pagination = query.order_by(Lead.created_at.desc()).paginate(
         page=page, per_page=25, error_out=False)
-    return render_template('admin/leads.html', pagination=pagination)
+    return render_template(
+        'admin/leads.html',
+        pagination=pagination,
+        view=view,
+        spam_count=Lead.query.filter(Lead.is_spam.is_(True)).count(),
+        inbox_count=Lead.query.filter(Lead.is_spam.is_(False)).count(),
+    )
+
+
+def _leads_redirect():
+    view = request.form.get('view') or request.args.get('view')
+    return redirect(url_for('admin.leads', view='spam' if view == 'spam' else None))
 
 
 @admin_bp.route('/leads/<int:id>/read', methods=['POST'])
@@ -657,7 +676,42 @@ def lead_mark_read(id):
     lead.is_read = True
     db.session.commit()
     flash('Lead marked as read.', 'success')
-    return redirect(url_for('admin.leads'))
+    return _leads_redirect()
+
+
+@admin_bp.route('/leads/<int:id>/spam', methods=['POST'])
+@login_required
+def lead_toggle_spam(id):
+    lead = db.session.get(Lead, id) or abort(404)
+    lead.is_spam = not lead.is_spam
+    if not lead.is_spam:
+        # Keeps the rescan job from re-flagging a lead a human just restored.
+        lead.spam_reasons = MANUAL_CLEAR_MARKER
+        lead.spam_score = 0
+    db.session.commit()
+    flash('Lead moved to spam.' if lead.is_spam else 'Lead restored to the inbox.', 'success')
+    return _leads_redirect()
+
+
+@admin_bp.route('/leads/spam/empty', methods=['POST'])
+@login_required
+def leads_empty_spam():
+    deleted = Lead.query.filter(Lead.is_spam.is_(True)).delete(synchronize_session=False)
+    db.session.commit()
+    flash(f'Deleted {deleted} spam lead(s).', 'success')
+    return redirect(url_for('admin.leads', view='spam'))
+
+
+@admin_bp.route('/leads/spam/rescan', methods=['POST'])
+@login_required
+def leads_rescan_spam():
+    delete = request.form.get('delete') == '1'
+    stats = rescan_leads(current_app.config, delete=delete)
+    if delete:
+        flash(f"Scanned {stats['scanned']} lead(s); deleted {stats['deleted']} spam lead(s).", 'success')
+    else:
+        flash(f"Scanned {stats['scanned']} lead(s); moved {stats['flagged']} to spam.", 'success')
+    return redirect(url_for('admin.leads', view='spam'))
 
 
 @admin_bp.route('/leads/<int:id>/delete', methods=['POST'])
@@ -667,7 +721,7 @@ def lead_delete(id):
     db.session.delete(lead)
     db.session.commit()
     flash('Lead deleted.', 'success')
-    return redirect(url_for('admin.leads'))
+    return _leads_redirect()
 
 
 # ------------------------------ SETTINGS ------------------------------

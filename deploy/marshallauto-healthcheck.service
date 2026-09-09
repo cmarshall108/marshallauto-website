@@ -1,0 +1,7 @@
+[Unit]
+Description=Marshall Auto website health check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/marshallauto-website/deploy/healthcheck.sh

@@ -69,6 +69,25 @@ class Config:
     LOGIN_RATE_WINDOW = 300        # seconds
     CONTACT_RATE_LIMIT = 8
     CONTACT_RATE_WINDOW = 600
+    # Lead spam scoring (app/spam_filter.py); raise the threshold to be more permissive
+    LEAD_SPAM_THRESHOLD = int(os.environ.get('LEAD_SPAM_THRESHOLD', 5))
+    LEAD_SPAM_SUSPICIOUS_THRESHOLD = int(os.environ.get('LEAD_SPAM_SUSPICIOUS_THRESHOLD', 3))
+    LEAD_SPAM_ALLOWED_HOSTS = [
+        h.strip().lower() for h in (os.environ.get('LEAD_SPAM_ALLOWED_HOSTS') or '').split(',') if h.strip()
+    ]
+    # libphonenumber regions treated as local; numbers elsewhere score higher
+    LEAD_SPAM_PHONE_REGIONS = os.environ.get('LEAD_SPAM_PHONE_REGIONS') or 'US,CA'
+    # Languages a real customer might write in (langid detection)
+    LEAD_SPAM_LANGUAGES = os.environ.get('LEAD_SPAM_LANGUAGES') or 'en,es'
+    # DNS MX lookup on the submitted email domain (adds latency to each submit)
+    LEAD_SPAM_CHECK_EMAIL_MX = (os.environ.get('LEAD_SPAM_CHECK_EMAIL_MX') or '').lower() in ('1', 'true', 'yes')
+    # Optional Akismet integration (https://akismet.com); unset = disabled
+    AKISMET_API_KEY = os.environ.get('AKISMET_API_KEY')
+    AKISMET_SITE_URL = os.environ.get('AKISMET_SITE_URL')
+    AKISMET_TIMEOUT = float(os.environ.get('AKISMET_TIMEOUT', 3))
+    AKISMET_IS_TEST = (os.environ.get('AKISMET_IS_TEST') or '').lower() in ('1', 'true', 'yes')
+    # Let an Akismet "ham" verdict rescue a lead the local rules flagged
+    AKISMET_TRUST_HAM = (os.environ.get('AKISMET_TRUST_HAM') or '').lower() in ('1', 'true', 'yes')
     # First-party analytics beacon (pageviews + events)
     ANALYTICS_RATE_LIMIT = int(os.environ.get('ANALYTICS_RATE_LIMIT', 120))
     ANALYTICS_RATE_WINDOW = int(os.environ.get('ANALYTICS_RATE_WINDOW', 60))

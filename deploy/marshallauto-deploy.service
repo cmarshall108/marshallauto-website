@@ -1,0 +1,9 @@
+[Unit]
+Description=Check GitHub for new commits and deploy them
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/marshallauto-website
+ExecStart=/opt/marshallauto-website/deploy/auto_deploy.sh
+TimeoutStartSec=900

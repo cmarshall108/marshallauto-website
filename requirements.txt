@@ -12,6 +12,12 @@ blinker==1.8.2
 gunicorn==23.0.0
 psycopg[binary]==3.2.3
 certifi>=2024.2.2
+# Lead spam filtering
+phonenumbers>=9.0,<10
+disposable-email-domains>=0.0.250
+py3langid>=0.4,<1
+tldextract>=5.1,<6
+requests>=2.31,<3
 # Photo highlights (local OpenCV worker). Loose pins for broader Python/wheel support.
 numpy>=1.26,<3
 opencv-python-headless>=4.8,<5
