@@ -134,6 +134,10 @@
                     <div class="vehicle-card" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
                         <meta itemprop="position" content="{{ loop.index }}">
                         <meta itemprop="url" content="{{ site_url }}{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}">
+                        <button type="button" class="favorite-btn js-favorite-btn" data-slug="{{ vehicle.slug }}" aria-label="Save {{ vehicle.title }} to favorites"><i class="bi bi-heart"></i></button>
+                        <label class="compare-chip" title="Add to compare">
+                            <input type="checkbox" class="js-compare-checkbox" data-slug="{{ vehicle.slug }}"> <span>Compare</span>
+                        </label>
                         <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="text-decoration-none text-dark" itemprop="item" itemscope itemtype="https://schema.org/Car">
                             <div class="card-img-wrapper">
                                 {% set img = vehicle.primary_image() %}

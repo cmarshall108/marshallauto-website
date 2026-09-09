@@ -60,6 +60,12 @@ class VehicleForm(FlaskForm):
     description = TextAreaField('Description')
     features = TextAreaField('Features (comma-separated)')
 
+    video_url = StringField(
+        'Video Walkaround URL',
+        validators=[Optional(), Length(max=500)],
+        description='YouTube, Vimeo, or a direct .mp4/.webm link showing a walkaround of the vehicle.',
+    )
+
     seo_title = StringField('SEO Title', validators=[Optional(), Length(max=160)])
     seo_description = TextAreaField('SEO Description', validators=[Optional(), Length(max=320)])
     meta_keywords = StringField('Meta Keywords', validators=[Optional(), Length(max=255)])
@@ -209,3 +215,16 @@ class ReviewForm(FlaskForm):
     is_approved = BooleanField('Approved', default=True)
     is_featured = BooleanField('Featured on homepage')
     submit = SubmitField('Save Review')
+
+
+class BlogPostForm(FlaskForm):
+    title = StringField('Title *', validators=[DataRequired(), Length(max=200)])
+    excerpt = TextAreaField('Excerpt', validators=[Optional(), Length(max=320)])
+    content = TextAreaField('Content *', validators=[DataRequired()])
+    cover_image_url = StringField('Cover Image URL', validators=[Optional(), Length(max=500)])
+    author_name = StringField('Author Name', validators=[Optional(), Length(max=128)])
+    is_published = BooleanField('Published', default=False)
+    seo_title = StringField('SEO Title', validators=[Optional(), Length(max=160)])
+    seo_description = TextAreaField('SEO Description', validators=[Optional(), Length(max=320)])
+    submit = SubmitField('Save Post')
+

@@ -1,4 +1,6 @@
 import os
+from datetime import timedelta
+from decimal import InvalidOperation
 from functools import wraps
 
 from flask import (
@@ -11,12 +13,12 @@ from sqlalchemy.orm import selectinload
 
 from app import db
 from app.forms import (
-    CarfaxReportForm, LoginForm, ReviewForm, ServiceRecordForm,
+    BlogPostForm, CarfaxReportForm, LoginForm, ReviewForm, ServiceRecordForm,
     SiteSettingForm, VehicleForm,
 )
 from app.models import (
-    CarfaxReport, Lead, Review, ServiceRecord, SiteSetting, User,
-    Vehicle, VehicleImage, VehicleImageHighlight,
+    AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
+    SiteSetting, User, Vehicle, VehicleImage, VehicleImageHighlight, utcnow,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -121,7 +123,50 @@ def dashboard():
     review_count = Review.query.filter_by(is_approved=True).count()
     stats['avg_rating'] = round(avg_rating, 2) if avg_rating else None
     stats['review_count'] = review_count
-    return render_template('admin/dashboard.html', stats=stats, recent_leads=recent_leads)
+
+    since_30d = utcnow() - timedelta(days=30)
+    top_searches = (
+        db.session.query(AnalyticsEvent.label, func.count(AnalyticsEvent.id).label('cnt'))
+        .filter(
+            AnalyticsEvent.event_name == 'search',
+            AnalyticsEvent.created_at >= since_30d,
+            AnalyticsEvent.label.isnot(None),
+            AnalyticsEvent.label != '',
+        )
+        .group_by(AnalyticsEvent.label)
+        .order_by(func.count(AnalyticsEvent.id).desc())
+        .limit(5)
+        .all()
+    )
+    top_vehicle_rows = (
+        db.session.query(PageView.vehicle_id, func.count(PageView.id).label('cnt'))
+        .filter(
+            PageView.page_type == 'vehicle_detail',
+            PageView.vehicle_id.isnot(None),
+            PageView.created_at >= since_30d,
+        )
+        .group_by(PageView.vehicle_id)
+        .order_by(func.count(PageView.id).desc())
+        .limit(5)
+        .all()
+    )
+    vehicles_by_id = {
+        v.id: v for v in Vehicle.query.filter(
+            Vehicle.id.in_([r.vehicle_id for r in top_vehicle_rows])
+        ).all()
+    } if top_vehicle_rows else {}
+    most_viewed_vehicles = [
+        {'vehicle': vehicles_by_id.get(r.vehicle_id), 'views': r.cnt}
+        for r in top_vehicle_rows if vehicles_by_id.get(r.vehicle_id)
+    ]
+
+    return render_template(
+        'admin/dashboard.html',
+        stats=stats,
+        recent_leads=recent_leads,
+        top_searches=top_searches,
+        most_viewed_vehicles=most_viewed_vehicles,
+    )
 
 
 # ------------------------------ REVIEWS ------------------------------
@@ -198,6 +243,76 @@ def review_delete(id):
     return redirect(url_for('admin.reviews'))
 
 
+# ------------------------------ BLOG ------------------------------
+
+@admin_bp.route('/blog')
+@login_required
+def blog_posts():
+    page = request.args.get('page', 1, type=int)
+    pagination = BlogPost.query.order_by(BlogPost.created_at.desc()).paginate(
+        page=page, per_page=25, error_out=False)
+    return render_template('admin/blog_posts.html', pagination=pagination)
+
+
+@admin_bp.route('/blog/new', methods=['GET', 'POST'])
+@login_required
+def blog_post_new():
+    form = BlogPostForm()
+    if form.validate_on_submit():
+        post = BlogPost(
+            title=form.title.data.strip(),
+            excerpt=(form.excerpt.data or '').strip() or None,
+            content=form.content.data,
+            cover_image_url=(form.cover_image_url.data or '').strip() or None,
+            author_name=(form.author_name.data or '').strip() or None,
+            is_published=bool(form.is_published.data),
+            seo_title=(form.seo_title.data or '').strip() or None,
+            seo_description=(form.seo_description.data or '').strip() or None,
+        )
+        if post.is_published:
+            post.published_at = utcnow()
+        db.session.add(post)
+        db.session.flush()
+        post.ensure_slug()
+        db.session.commit()
+        flash('Blog post added.', 'success')
+        return redirect(url_for('admin.blog_posts'))
+    return render_template('admin/blog_post_form.html', form=form, title='Add Blog Post')
+
+
+@admin_bp.route('/blog/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def blog_post_edit(id):
+    post = db.session.get(BlogPost, id) or abort(404)
+    form = BlogPostForm(obj=post)
+    if form.validate_on_submit():
+        was_published = post.is_published
+        post.title = form.title.data.strip()
+        post.excerpt = (form.excerpt.data or '').strip() or None
+        post.content = form.content.data
+        post.cover_image_url = (form.cover_image_url.data or '').strip() or None
+        post.author_name = (form.author_name.data or '').strip() or None
+        post.is_published = bool(form.is_published.data)
+        post.seo_title = (form.seo_title.data or '').strip() or None
+        post.seo_description = (form.seo_description.data or '').strip() or None
+        if post.is_published and not was_published:
+            post.published_at = utcnow()
+        db.session.commit()
+        flash('Blog post updated.', 'success')
+        return redirect(url_for('admin.blog_posts'))
+    return render_template('admin/blog_post_form.html', form=form, post=post, title='Edit Blog Post')
+
+
+@admin_bp.route('/blog/<int:id>/delete', methods=['POST'])
+@login_required
+def blog_post_delete(id):
+    post = db.session.get(BlogPost, id) or abort(404)
+    db.session.delete(post)
+    db.session.commit()
+    flash('Blog post deleted.', 'success')
+    return redirect(url_for('admin.blog_posts'))
+
+
 # ------------------------------ VEHICLES ------------------------------
 
 @admin_bp.route('/vehicles')
@@ -211,6 +326,93 @@ def vehicles():
     pagination = query.order_by(Vehicle.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False)
     return render_template('admin/vehicles.html', pagination=pagination, status=status)
+
+
+CSV_IMPORT_FIELDS = [
+    'year', 'make', 'model', 'trim', 'vin', 'stock_number', 'price', 'sale_price',
+    'mileage', 'condition', 'title_status', 'status', 'body_style', 'exterior_color',
+    'interior_color', 'engine', 'transmission', 'drivetrain', 'fuel_type',
+    'mpg_city', 'mpg_highway', 'description', 'features',
+]
+CSV_REQUIRED_FIELDS = ['year', 'make', 'model', 'price', 'mileage']
+
+
+@admin_bp.route('/vehicles/import', methods=['GET', 'POST'])
+@login_required
+def vehicle_import():
+    import csv
+    import io
+
+    if request.method == 'POST':
+        file = request.files.get('csv_file')
+        if not file or not file.filename:
+            flash('Please choose a CSV file to upload.', 'danger')
+            return redirect(url_for('admin.vehicle_import'))
+        try:
+            raw = file.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            flash('Could not read that file. Please upload a UTF-8 CSV file.', 'danger')
+            return redirect(url_for('admin.vehicle_import'))
+
+        reader = csv.DictReader(io.StringIO(raw))
+        created = 0
+        errors = []
+        for idx, row in enumerate(reader, start=2):  # header is row 1
+            row = {(k or '').strip().lower(): (v or '').strip() for k, v in row.items()}
+            missing = [f for f in CSV_REQUIRED_FIELDS if not row.get(f)]
+            if missing:
+                errors.append(f"Row {idx}: missing required field(s) {', '.join(missing)}")
+                continue
+            try:
+                vehicle = Vehicle(
+                    year=int(row['year']),
+                    make=row['make'][:64],
+                    model=row['model'][:64],
+                    trim=row.get('trim')[:128] or None if row.get('trim') else None,
+                    vin=(row.get('vin') or '').upper()[:17] or None,
+                    stock_number=(row.get('stock_number') or '').upper()[:32] or None,
+                    price=row['price'],
+                    sale_price=row.get('sale_price') or None,
+                    mileage=int(row['mileage']),
+                    condition=(row.get('condition') or 'used').lower() or 'used',
+                    title_status=(row.get('title_status') or 'clean').lower() or 'clean',
+                    status=(row.get('status') or 'available').lower() or 'available',
+                    body_style=row.get('body_style')[:64] or None if row.get('body_style') else None,
+                    exterior_color=row.get('exterior_color')[:64] or None if row.get('exterior_color') else None,
+                    interior_color=row.get('interior_color')[:64] or None if row.get('interior_color') else None,
+                    engine=row.get('engine')[:128] or None if row.get('engine') else None,
+                    transmission=row.get('transmission')[:128] or None if row.get('transmission') else None,
+                    drivetrain=row.get('drivetrain') or None,
+                    fuel_type=row.get('fuel_type')[:32] or None if row.get('fuel_type') else None,
+                    mpg_city=int(row['mpg_city']) if row.get('mpg_city') else None,
+                    mpg_highway=int(row['mpg_highway']) if row.get('mpg_highway') else None,
+                    description=row.get('description') or None,
+                    features=row.get('features') or None,
+                )
+            except (ValueError, TypeError, InvalidOperation) as exc:
+                errors.append(f"Row {idx}: invalid value ({exc})")
+                continue
+            db.session.add(vehicle)
+            db.session.flush()
+            vehicle.ensure_slug()
+            created += 1
+
+        if created:
+            db.session.commit()
+        else:
+            db.session.rollback()
+
+        if created:
+            flash(f'Imported {created} vehicle(s).', 'success')
+        if errors:
+            flash(
+                f'{len(errors)} row(s) skipped: ' + '; '.join(errors[:10]) +
+                (' …' if len(errors) > 10 else ''),
+                'warning',
+            )
+        return redirect(url_for('admin.vehicles'))
+
+    return render_template('admin/vehicle_import.html', fields=CSV_IMPORT_FIELDS, required=CSV_REQUIRED_FIELDS)
 
 
 @admin_bp.route('/vehicles/new', methods=['GET', 'POST'])
@@ -954,6 +1156,7 @@ def _vehicle_from_form(form):
         mpg_highway=form.mpg_highway.data,
         description=form.description.data,
         features=form.features.data,
+        video_url=form.video_url.data.strip() if form.video_url.data else None,
         seo_title=form.seo_title.data,
         seo_description=form.seo_description.data,
         meta_keywords=form.meta_keywords.data,
@@ -984,6 +1187,7 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.mpg_highway = form.mpg_highway.data
     vehicle.description = form.description.data
     vehicle.features = form.features.data
+    vehicle.video_url = form.video_url.data.strip() if form.video_url.data else None
     vehicle.seo_title = form.seo_title.data
     vehicle.seo_description = form.seo_description.data
     vehicle.meta_keywords = form.meta_keywords.data

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{{ og_image or (site_url ~ '/static/images/og-default.jpg') }}{% endblock %}
+{% block twitter_image %}{{ og_image or (site_url ~ '/static/images/og-default.jpg') }}{% endblock %}
+
+{% block structured_data_block %}
+{% if structured_article %}
+<script type="application/ld+json">{{ structured_article | tojson | safe }}</script>
+{% endif %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-5">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('main.blog_list') }}">Blog</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
+            </ol>
+        </nav>
+        <h1 class="fw-bold mb-2">{{ post.title }}</h1>
+        <p class="text-muted mb-0">
+            {% if post.author_name %}By {{ post.author_name }} &middot; {% endif %}
+            {{ (post.published_at or post.created_at).strftime('%B %-d, %Y') }}
+        </p>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                {% if post.cover_image_url %}
+                <img src="{{ post.cover_image_url }}" class="img-fluid rounded-4 shadow-sm mb-4" alt="{{ post.title }}">
+                {% endif %}
+                <div class="blog-post-content">
+                    {{ post.content | safe }}
+                </div>
+                <hr class="my-5">
+                <div class="text-center">
+                    <a href="{{ url_for('main.blog_list') }}" class="btn btn-outline-primary">&larr; Back to Blog</a>
+                    <a href="{{ url_for('main.inventory') }}" class="btn btn-primary">Browse Inventory</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

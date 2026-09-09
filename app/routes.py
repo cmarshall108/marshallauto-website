@@ -12,12 +12,13 @@ from sqlalchemy.orm import selectinload
 from app import db
 from app.forms import ContactForm
 from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, VehicleImage
+from app.models import BlogPost
 from app.spam_filter import check_lead_spam_for_request
 from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_price,
     notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
-    structured_data_breadcrumb, structured_data_faq, structured_data_how_to,
-    structured_data_item_list, structured_data_local_business,
+    send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
+    structured_data_how_to, structured_data_item_list, structured_data_local_business,
     structured_data_vehicle, structured_data_website,
 )
 
@@ -810,6 +811,69 @@ def vehicle_detail(slug):
     )
 
 
+@main.route('/api/vehicles-summary')
+def api_vehicles_summary():
+    """JSON vehicle summaries for client-side favorites/compare/recently-viewed (localStorage)."""
+    raw_slugs = (request.args.get('slugs') or '').split(',')
+    slugs = [s.strip() for s in raw_slugs if s.strip()][:24]
+    if not slugs:
+        return jsonify({'vehicles': []})
+    vehicles = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter(Vehicle.slug.in_(slugs))
+        .all()
+    )
+    by_slug = {v.slug: v for v in vehicles}
+    ordered = [by_slug[s] for s in slugs if s in by_slug]
+    return jsonify({'vehicles': [
+        {
+            'slug': v.slug,
+            'title': v.title,
+            'url': url_for('main.vehicle_detail', slug=v.slug),
+            'image': v.primary_image_url(),
+            'price': format_price(v.display_price),
+            'price_raw': float(v.display_price) if v.display_price is not None else None,
+            'mileage': format_mileage(v.mileage),
+            'year': v.year,
+            'make': v.make,
+            'model': v.model,
+            'trim': v.trim or '',
+            'body_style': v.body_style or '',
+            'fuel_type': v.fuel_type or '',
+            'drivetrain': v.drivetrain or '',
+            'transmission': v.transmission or '',
+            'exterior_color': v.exterior_color or '',
+            'condition': v.condition,
+            'title_status': v.title_status,
+            'status': v.status,
+        }
+        for v in ordered
+    ]})
+
+
+@main.route('/saved-vehicles')
+def saved_vehicles():
+    return render_template(
+        'saved_vehicles.html',
+        meta_title=f"Saved Vehicles | {current_app.config['BUSINESS_NAME']}",
+        meta_description='Vehicles you have saved for later.',
+        robots_content='noindex, follow',
+        page_type='saved_vehicles',
+    )
+
+
+@main.route('/compare')
+def compare_vehicles():
+    return render_template(
+        'compare.html',
+        meta_title=f"Compare Vehicles | {current_app.config['BUSINESS_NAME']}",
+        meta_description='Compare specs and pricing side-by-side for vehicles you are considering.',
+        robots_content='noindex, follow',
+        page_type='compare',
+    )
+
+
 def _attribution_from_request():
     """Capture marketing attribution params (no PII)."""
     def clip(key, maxlen=128):
@@ -889,6 +953,7 @@ def _create_lead_from_form(form, source='contact'):
         )
     else:
         notify_new_lead(lead)
+        send_lead_confirmation(lead)
     return lead
 
 
@@ -1088,6 +1153,76 @@ def sell_your_car():
     )
 
 
+@main.route('/blog')
+def blog_list():
+    page = request.args.get('page', 1, type=int)
+    pagination = (
+        BlogPost.query
+        .filter_by(is_published=True)
+        .order_by(BlogPost.published_at.desc().nullslast(), BlogPost.created_at.desc())
+        .paginate(page=page, per_page=9, error_out=False)
+    )
+    breadcrumbs = structured_data_breadcrumb([
+        ("Home", current_app.config['SITE_URL']),
+        ("Blog", url_for('main.blog_list', _external=True))
+    ])
+    return render_template(
+        'blog.html',
+        pagination=pagination,
+        breadcrumbs=breadcrumbs,
+        structured_local=structured_data_local_business(),
+        structured_website=structured_data_website(),
+        meta_title=f"Car Buying Guides & News | {current_app.config['BUSINESS_NAME']}",
+        meta_description=(
+            f"Tips, buying guides, and news from {current_app.config['BUSINESS_NAME']} in "
+            f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}."
+        ),
+        page_type='blog',
+    )
+
+
+@main.route('/blog/<slug>')
+def blog_post_detail(slug):
+    post = BlogPost.query.filter_by(slug=slug, is_published=True).first_or_404()
+    breadcrumbs = structured_data_breadcrumb([
+        ("Home", current_app.config['SITE_URL']),
+        ("Blog", url_for('main.blog_list', _external=True)),
+        (post.title, url_for('main.blog_post_detail', slug=post.slug, _external=True))
+    ])
+    site = current_app.config['SITE_URL'].rstrip('/')
+    structured_article = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": post.title,
+        "description": post.seo_description or post.excerpt or '',
+        "author": {"@type": "Organization", "name": post.author_name or current_app.config['BUSINESS_NAME']},
+        "publisher": {
+            "@type": "Organization",
+            "name": current_app.config['BUSINESS_NAME'],
+            "logo": {"@type": "ImageObject", "url": f"{site}/static/images/logo-icon.png"},
+        },
+        "datePublished": post.published_at.strftime('%Y-%m-%dT%H:%M:%S') if post.published_at else None,
+        "dateModified": post.updated_at.strftime('%Y-%m-%dT%H:%M:%S') if post.updated_at else None,
+        "mainEntityOfPage": f"{site}/blog/{post.slug}",
+    }
+    if post.cover_image_url:
+        structured_article['image'] = [post.cover_image_url]
+    structured_article = {k: v for k, v in structured_article.items() if v not in (None, '', [])}
+
+    return render_template(
+        'blog_post.html',
+        post=post,
+        breadcrumbs=breadcrumbs,
+        structured_local=structured_data_local_business(),
+        structured_website=structured_data_website(),
+        structured_article=structured_article,
+        meta_title=post.seo_title or f"{post.title} | {current_app.config['BUSINESS_NAME']}",
+        meta_description=post.seo_description or post.excerpt or '',
+        og_image=post.cover_image_url,
+        page_type='blog',
+    )
+
+
 @main.route('/carfax/<int:report_id>/download')
 def carfax_download(report_id):
     """
@@ -1109,6 +1244,20 @@ def carfax_download(report_id):
     return send_from_directory(directory, filename, as_attachment=False, mimetype='application/pdf')
 
 
+@main.route('/feeds/vehicles.xml')
+def vehicle_feed():
+    """Vehicle inventory feed (RSS 2.0 + Google 'g:' namespace fields)."""
+    vehicles = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(status='available')
+        .order_by(Vehicle.created_at.desc())
+        .all()
+    )
+    response = make_response(render_template('vehicle_feed.xml', vehicles=vehicles))
+    response.headers['Content-Type'] = 'application/rss+xml'
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
 
 
 @main.route('/sitemap.xml')
@@ -1138,7 +1287,16 @@ def sitemap():
         {'loc': url_for('main.sell_your_car', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
         {'loc': url_for('main.contact', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
         {'loc': url_for('main.service_area', _external=True), 'priority': '0.80', 'changefreq': 'weekly', 'lastmod': today},
+        {'loc': url_for('main.blog_list', _external=True), 'priority': '0.60', 'changefreq': 'weekly', 'lastmod': today},
     ]
+
+    for post in BlogPost.query.filter_by(is_published=True).all():
+        pages.append({
+            'loc': url_for('main.blog_post_detail', slug=post.slug, _external=True),
+            'priority': '0.55',
+            'changefreq': 'monthly',
+            'lastmod': (post.updated_at or post.created_at).strftime('%Y-%m-%d'),
+        })
 
     top_makes = _available_makes()[:8]
     body_styles = _available_body_styles()
@@ -1219,6 +1377,9 @@ Disallow: /admin/*
 Disallow: /static/uploads/carfax/
 Disallow: /carfax/
 Disallow: /healthz
+Disallow: /api/
+Disallow: /saved-vehicles
+Disallow: /compare
 Allow: /
 Allow: /inventory/
 Allow: /inventory/used-cars-for-sale-in-*
@@ -1229,6 +1390,7 @@ Allow: /about
 Allow: /financing
 Allow: /sell-your-car
 Allow: /contact
+Allow: /blog
 Allow: /sitemap.xml
 
 Sitemap: {sitemap_url}

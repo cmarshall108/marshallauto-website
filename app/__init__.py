@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, request
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -18,6 +18,23 @@ load_dotenv(_ENV_PATH if _ENV_PATH.is_file() else _ROOT / '.env')
 
 from config import get_config
 from app.utils import format_mileage, format_price, is_low_mileage
+
+# Reasonably strict CSP covering the third-party origins this site actually loads
+# (Bootstrap/fonts CDN, GTM/GA4, Facebook Pixel, Google Maps embed, YouTube/Vimeo video embeds).
+# Inline scripts are still allowed ('unsafe-inline') because several first-party bootstrap/
+# analytics snippets are inline; tightening further would require a nonce-based rewrite.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com "
+    "https://www.google-analytics.com https://connect.facebook.net; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+    "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
+    "img-src 'self' data: https: blob:; "
+    "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com; "
+    "frame-src 'self' https://www.googletagmanager.com https://www.google.com https://maps.google.com "
+    "https://www.youtube-nocookie.com https://player.vimeo.com; "
+    "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+)
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -98,6 +115,9 @@ def create_app(config_class=None):
         response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
         response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
         response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+        response.headers.setdefault('Content-Security-Policy', CONTENT_SECURITY_POLICY)
+        if request.is_secure:
+            response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
         # Cache static assets aggressively; HTML stays short-lived
         if request_is_static(response):
             response.headers.setdefault('Cache-Control', 'public, max-age=604800, immutable')

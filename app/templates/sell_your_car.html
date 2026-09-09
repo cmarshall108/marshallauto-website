@@ -100,4 +100,95 @@
         </div>
     </div>
 </section>
+
+<section class="section-padding bg-light-brand">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow p-4 p-md-5">
+                    <h2 class="section-title text-center mb-2">Get an Instant Trade-In Estimate</h2>
+                    <p class="text-muted text-center mb-4">A quick ballpark range based on year, mileage, and condition. Not an official offer — submit the form above for a precise, no-obligation quote.</p>
+                    <form id="trade-in-estimator" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="ti-year">Vehicle Year</label>
+                            <input type="number" id="ti-year" class="form-control" inputmode="numeric" min="1990" max="2100" placeholder="e.g. 2018" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="ti-mileage">Mileage</label>
+                            <input type="number" id="ti-mileage" class="form-control" inputmode="numeric" min="0" placeholder="e.g. 60000" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="ti-condition">Condition</label>
+                            <select id="ti-condition" class="form-select">
+                                <option value="1.1">Excellent</option>
+                                <option value="1.0" selected>Good</option>
+                                <option value="0.85">Fair</option>
+                                <option value="0.65">Poor / Not Running</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary w-100">Get Estimate</button>
+                        </div>
+                    </form>
+                    <div id="ti-result" class="mt-4 text-center d-none">
+                        <p class="text-muted mb-1">Estimated Trade-In Range</p>
+                        <p class="display-6 fw-bold text-primary mb-1" id="ti-range"></p>
+                        <p class="small text-muted mb-3">This is a rough self-estimate only, not an official offer. Actual value depends on inspection, market demand, and vehicle history.</p>
+                        <a href="#" id="ti-cta" class="btn btn-outline-primary">Get My Exact Offer</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        var form = document.getElementById('trade-in-estimator');
+        if (!form) return;
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var year = parseInt(document.getElementById('ti-year').value, 10);
+            var mileage = parseInt(document.getElementById('ti-mileage').value, 10);
+            var condition = parseFloat(document.getElementById('ti-condition').value);
+            if (!year || isNaN(mileage)) return;
+
+            var age = Math.max(0, new Date().getFullYear() - year);
+            var base = 30000 * Math.pow(0.86, age);
+            var expectedMileage = age * 12000;
+            var mileageDiff = mileage - expectedMileage;
+            var mileageAdj = 1 - Math.max(-0.3, Math.min(0.3, mileageDiff / 150000));
+            var estimate = base * mileageAdj * condition;
+            estimate = Math.max(300, Math.min(45000, estimate));
+            var low = Math.round((estimate * 0.85) / 100) * 100;
+            var high = Math.round((estimate * 1.1) / 100) * 100;
+
+            document.getElementById('ti-range').textContent = '$' + low.toLocaleString() + ' - $' + high.toLocaleString();
+            document.getElementById('ti-result').classList.remove('d-none');
+
+            var yearField = document.querySelector('input[name="year"]');
+            var msgField = document.querySelector('textarea[name="message"]');
+            if (yearField && !yearField.value) yearField.value = year;
+            if (msgField && !msgField.value) {
+                msgField.value = 'Mileage: ' + mileage.toLocaleString() + ' miles. Rough self-estimate: $' +
+                    low.toLocaleString() + ' - $' + high.toLocaleString() + '.';
+            }
+        });
+
+        var cta = document.getElementById('ti-cta');
+        if (cta) {
+            cta.addEventListener('click', function (e) {
+                e.preventDefault();
+                var nameField = document.querySelector('input[name="name"]');
+                var appraisalForm = nameField ? nameField.closest('form') : null;
+                if (appraisalForm) {
+                    appraisalForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (nameField) nameField.focus();
+                }
+            });
+        }
+    })();
+</script>
 {% endblock %}

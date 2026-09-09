@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block robots %}{{ robots_content }}{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-5">
+    <div class="container">
+        <h1 class="fw-bold mb-2">Saved Vehicles</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Saved Vehicles</li>
+            </ol>
+        </nav>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div id="saved-vehicles-empty" class="text-center py-5 d-none">
+            <i class="bi bi-heart fs-1 text-muted"></i>
+            <h4 class="mt-3">No saved vehicles yet</h4>
+            <p class="text-muted">Tap the heart icon on any vehicle to save it here for later.</p>
+            <a href="{{ url_for('main.inventory') }}" class="btn btn-primary">Browse Inventory</a>
+        </div>
+        <div id="saved-vehicles-grid" class="inventory-grid"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.VehicleTools) {
+            window.VehicleTools.renderListPage({
+                gridId: 'saved-vehicles-grid',
+                emptyId: 'saved-vehicles-empty',
+                slugs: window.VehicleTools.getFavorites(),
+                showRemove: true,
+                removeFn: window.VehicleTools.toggleFavorite,
+            });
+        }
+    });
+</script>
+{% endblock %}

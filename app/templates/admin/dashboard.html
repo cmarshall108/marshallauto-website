@@ -111,4 +111,41 @@
     <p class="text-muted mb-0">No leads yet.</p>
     {% endif %}
 </div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-6">
+        <div class="table-card p-4 h-100">
+            <h4 class="fw-bold mb-3">Top Search Terms <small class="text-muted fw-normal">(last 30 days)</small></h4>
+            {% if top_searches %}
+            <ol class="list-group list-group-numbered">
+                {% for label, cnt in top_searches %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ label }}
+                    <span class="badge bg-primary rounded-pill">{{ cnt }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-muted mb-0">No search activity recorded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="table-card p-4 h-100">
+            <h4 class="fw-bold mb-3">Most Viewed Vehicles <small class="text-muted fw-normal">(last 30 days)</small></h4>
+            {% if most_viewed_vehicles %}
+            <ol class="list-group list-group-numbered">
+                {% for row in most_viewed_vehicles %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('main.vehicle_detail', slug=row.vehicle.slug) }}" target="_blank">{{ row.vehicle.title }}</a>
+                    <span class="badge bg-primary rounded-pill">{{ row.views }} views</span>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-muted mb-0">No vehicle views recorded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}

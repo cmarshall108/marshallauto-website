@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Vehicle inventory feed using the common RSS 2.0 + Google "g:" namespace pattern.
+  NOTE: Google Vehicle Ads / Merchant Center onboarding requires an approved
+  Merchant Center account, verified business location, and may require submitting
+  inventory in Google's current officially-documented format (CSV or API) rather
+  than a raw XML URL. Verify field names/requirements against Google's current
+  Vehicle Ads documentation before relying on this feed for ad campaigns.
+-->
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+    <channel>
+        <title>{{ business_name }} — Vehicle Inventory</title>
+        <link>{{ site_url }}{{ url_for('main.inventory') }}</link>
+        <description>Current used vehicle inventory at {{ business_name }}.</description>
+        {% for vehicle in vehicles %}
+        <item>
+            <g:id>{{ vehicle.id }}</g:id>
+            <title>{{ vehicle.title }}</title>
+            <description>{{ (vehicle.seo_description or vehicle.description or vehicle.title) | striptags }}</description>
+            <link>{{ site_url }}{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}</link>
+            <g:image_link>{{ vehicle.primary_image_url(absolute=True) }}</g:image_link>
+            <g:price>{{ vehicle.display_price }} USD</g:price>
+            <g:availability>{{ 'in stock' if vehicle.status == 'available' else 'out of stock' }}</g:availability>
+            <g:condition>{{ 'used' }}</g:condition>
+            <g:brand>{{ vehicle.make }}</g:brand>
+            <g:vehicle_model>{{ vehicle.model }}</g:vehicle_model>
+            <g:vehicle_year>{{ vehicle.year }}</g:vehicle_year>
+            <g:mileage>{{ vehicle.mileage }} mi</g:mileage>
+            {% if vehicle.vin %}<g:vin>{{ vehicle.vin }}</g:vin>{% endif %}
+            {% if vehicle.transmission %}<g:transmission>{{ vehicle.transmission }}</g:transmission>{% endif %}
+            {% if vehicle.drivetrain %}<g:drivetrain>{{ vehicle.drivetrain }}</g:drivetrain>{% endif %}
+            {% if vehicle.fuel_type %}<g:fuel_type>{{ vehicle.fuel_type }}</g:fuel_type>{% endif %}
+            {% if vehicle.body_style %}<g:body_style>{{ vehicle.body_style }}</g:body_style>{% endif %}
+            {% if vehicle.exterior_color %}<g:color>{{ vehicle.exterior_color }}</g:color>{% endif %}
+            <g:address>
+                <g:street_address>{{ business_address }}</g:street_address>
+                <g:city>{{ business_city }}</g:city>
+                <g:region>{{ business_state }}</g:region>
+            </g:address>
+        </item>
+        {% endfor %}
+    </channel>
+</rss>

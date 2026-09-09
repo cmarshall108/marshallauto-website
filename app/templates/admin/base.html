@@ -22,6 +22,7 @@
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.service_record') %}active{% endif %}" href="{{ url_for('admin.service_records') }}"><i class="bi bi-wrench me-2"></i> Service Records</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.carfax_report') %}active{% endif %}" href="{{ url_for('admin.carfax_reports') }}"><i class="bi bi-file-earmark-text me-2"></i> CarFax Reports</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.review') %}active{% endif %}" href="{{ url_for('admin.reviews') }}"><i class="bi bi-star me-2"></i> Reviews</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.blog') %}active{% endif %}" href="{{ url_for('admin.blog_posts') }}"><i class="bi bi-journal-text me-2"></i> Blog</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.lead') %}active{% endif %}" href="{{ url_for('admin.leads') }}"><i class="bi bi-envelope me-2"></i> Leads</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.analytics' %}active{% endif %}" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i> Analytics</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i> Settings</a></li>
@@ -43,6 +44,7 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.service_records') }}"><i class="bi bi-wrench me-2"></i>Service Records</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.carfax_reports') }}"><i class="bi bi-file-earmark-text me-2"></i>CarFax Reports</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.reviews') }}"><i class="bi bi-star me-2"></i>Reviews</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.blog_posts') }}"><i class="bi bi-journal-text me-2"></i>Blog</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.leads') }}"><i class="bi bi-envelope me-2"></i>Leads</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i>Analytics</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i>Settings</a></li>

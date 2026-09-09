@@ -314,6 +314,82 @@ def notify_new_lead(lead):
         current_app.logger.error('Lead email failed: %s', e)
 
 
+_YOUTUBE_RE = re.compile(
+    r'(?:youtube\.com/(?:watch\?v=|embed/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{6,20})'
+)
+_VIMEO_RE = re.compile(r'vimeo\.com/(?:video/)?(\d+)')
+
+
+def parse_video_url(raw_url):
+    """Classify a vehicle walkaround video URL for safe embedding.
+
+    Returns {'kind': 'youtube'|'vimeo'|'file', 'embed_url': str, 'video_id': str|None} or None.
+    """
+    if not raw_url:
+        return None
+    url = raw_url.strip()
+    if not url:
+        return None
+    match = _YOUTUBE_RE.search(url)
+    if match:
+        return {
+            'kind': 'youtube',
+            'embed_url': f'https://www.youtube-nocookie.com/embed/{match.group(1)}',
+            'video_id': match.group(1),
+        }
+    match = _VIMEO_RE.search(url)
+    if match:
+        return {
+            'kind': 'vimeo',
+            'embed_url': f'https://player.vimeo.com/video/{match.group(1)}',
+            'video_id': match.group(1),
+        }
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme in ('http', 'https') and parsed.path.lower().endswith(('.mp4', '.webm', '.ogg', '.mov')):
+        return {'kind': 'file', 'embed_url': url, 'video_id': None}
+    return None
+
+
+def send_lead_confirmation(lead):
+    """Optionally email the customer a confirmation their message was received."""
+    if not current_app.config.get('SEND_LEAD_EMAIL'):
+        return
+    server = current_app.config.get('MAIL_SERVER')
+    sender = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('BUSINESS_EMAIL')
+    if not server or not sender or not lead.email:
+        return
+    try:
+        msg = EmailMessage()
+        business_name = current_app.config.get('BUSINESS_NAME', 'our dealership')
+        business_phone = current_app.config.get('BUSINESS_PHONE', '')
+        msg['Subject'] = f"We received your message — {business_name}"
+        msg['From'] = sender
+        msg['To'] = lead.email
+        body = (
+            f"Hi {lead.name.split(' ')[0] if lead.name else 'there'},\n\n"
+            f"Thanks for reaching out to {business_name}! We've received your message and "
+            f"a team member will follow up with you shortly.\n\n"
+            f"If you need immediate assistance, call us at {business_phone}.\n\n"
+            f"— {business_name}\n"
+        )
+        msg.set_content(body)
+        port = current_app.config.get('MAIL_PORT', 587)
+        use_tls = current_app.config.get('MAIL_USE_TLS', True)
+        use_ssl = current_app.config.get('MAIL_USE_SSL', False)
+        username = current_app.config.get('MAIL_USERNAME') or None
+        password = current_app.config.get('MAIL_PASSWORD') or None
+        smtp_cls = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+        with smtp_cls(server, port, timeout=10) as smtp:
+            if not use_ssl and use_tls:
+                smtp.starttls()
+            if username and password:
+                smtp.login(username, password)
+            smtp.send_message(msg)
+    except Exception as e:
+        current_app.logger.error('Lead confirmation email failed: %s', e)
+
+
 def _business_social_links():
     links = []
     for key in ['FACEBOOK_URL', 'INSTAGRAM_URL', 'YOUTUBE_URL']:
@@ -691,6 +767,24 @@ def structured_data_vehicle(vehicle):
             "@type": "EngineSpecification",
             "name": vehicle.engine
         }
+
+    video_info = parse_video_url(vehicle.video_url) if vehicle.video_url else None
+    if video_info:
+        video_data = {
+            "@type": "VideoObject",
+            "name": f"{vehicle.title} Walkaround Video",
+            "description": f"Video walkaround of this {vehicle.title} at {current_app.config['BUSINESS_NAME']}.",
+            "thumbnailUrl": images[:1],
+            "uploadDate": (
+                vehicle.created_at.strftime('%Y-%m-%dT%H:%M:%S')
+                if vehicle.created_at else utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+            ),
+        }
+        if video_info['kind'] == 'file':
+            video_data['contentUrl'] = video_info['embed_url']
+        else:
+            video_data['embedUrl'] = video_info['embed_url']
+        data['video'] = video_data
 
     approved_reviews = [r for r in (vehicle.reviews or []) if r.is_approved]
     if approved_reviews:

@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Import Vehicles from CSV{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">Import Vehicles from CSV</h2>
+    <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<div class="card border-0 shadow p-4 mb-4">
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label class="form-label">CSV File</label>
+            <input type="file" name="csv_file" class="form-control" accept=".csv,text/csv" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Import</button>
+    </form>
+</div>
+
+<div class="card border-0 shadow p-4">
+    <h5 class="fw-bold mb-3">CSV Format</h5>
+    <p class="text-muted">The first row must be a header with these column names (order does not matter). Required columns are marked with *. Photos are not imported via CSV — add them by editing each vehicle afterward.</p>
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <thead><tr><th>Column</th><th>Required</th></tr></thead>
+            <tbody>
+                {% for field in fields %}
+                <tr>
+                    <td><code>{{ field }}</code></td>
+                    <td>{{ 'Yes' if field in required else 'No' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted small mb-0">
+        <code>condition</code>: used, certified, or rebuilt. <code>title_status</code>: clean, rebuilt, or salvage.
+        <code>status</code>: available, pending, or sold. <code>features</code>: comma-separated list.
+    </p>
+</div>
+{% endblock %}

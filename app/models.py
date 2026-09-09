@@ -81,6 +81,9 @@ class Vehicle(db.Model):
     meta_keywords = db.Column(db.String(255), nullable=True)
     slug = db.Column(db.String(256), unique=True, nullable=True, index=True)
 
+    # Video walkaround (YouTube/Vimeo link or direct .mp4/.webm file URL)
+    video_url = db.Column(db.String(500), nullable=True)
+
     # Facebook Page publish tracking (not Marketplace listing IDs — Meta has no public Marketplace create API)
     facebook_post_id = db.Column(db.String(64), nullable=True)
     facebook_posted_at = db.Column(db.DateTime, nullable=True)
@@ -185,6 +188,11 @@ class Vehicle(db.Model):
 
     def __repr__(self):
         return f'<Vehicle {self.title}>'
+
+    def video_info(self):
+        """Classified embed info for the walkaround video, or None."""
+        from app.utils import parse_video_url
+        return parse_video_url(self.video_url) if self.video_url else None
 
 
 class VehicleImage(db.Model):
@@ -593,3 +601,39 @@ class AnalyticsEvent(db.Model):
 
     def __repr__(self):
         return f'<AnalyticsEvent {self.event_name}>'
+
+
+class BlogPost(db.Model):
+    """Buying guides / articles for long-tail organic content."""
+    __tablename__ = 'blog_posts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    title = db.Column(db.String(200), nullable=False)
+    slug = db.Column(db.String(220), unique=True, nullable=True, index=True)
+    excerpt = db.Column(db.String(320), nullable=True)
+    content = db.Column(db.Text, nullable=False)
+    cover_image_url = db.Column(db.String(500), nullable=True)
+    author_name = db.Column(db.String(128), nullable=True)
+    is_published = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    published_at = db.Column(db.DateTime, nullable=True)
+    seo_title = db.Column(db.String(160), nullable=True)
+    seo_description = db.Column(db.String(320), nullable=True)
+
+    def ensure_slug(self):
+        if self.slug:
+            return
+        from app.utils import slugify
+        base = slugify(self.title) or 'post'
+        candidate = base
+        i = 2
+        while BlogPost.query.filter(BlogPost.slug == candidate, BlogPost.id != self.id).first():
+            candidate = f"{base}-{i}"
+            i += 1
+        self.slug = candidate
+
+    def __repr__(self):
+        return f'<BlogPost {self.title}>'
+

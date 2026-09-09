@@ -203,6 +203,23 @@
                     </div>
                 </div>
                 {% endif %}
+
+                {% set video = vehicle.video_info() %}
+                {% if video %}
+                <div class="vehicle-video-walkaround mt-3">
+                    <h2 class="h5 fw-bold mb-2"><i class="bi bi-play-circle-fill me-2 text-primary"></i>Video Walkaround</h2>
+                    <div class="ratio ratio-16x9 rounded-4 overflow-hidden shadow-sm">
+                        {% if video.kind == 'file' %}
+                        <video controls preload="metadata" playsinline poster="{{ vehicle.primary_image_url() }}">
+                            <source src="{{ video.embed_url }}">
+                            Your browser does not support embedded video.
+                        </video>
+                        {% else %}
+                        <iframe src="{{ video.embed_url }}" title="{{ vehicle.title }} video walkaround" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Vehicle Summary -->
@@ -240,6 +257,16 @@
                             <div class="fw-bold">{{ vehicle.drivetrain or 'N/A' }}</div>
                             <small class="text-muted">Drivetrain</small>
                         </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-secondary flex-fill js-favorite-btn" data-slug="{{ vehicle.slug }}" aria-label="Save {{ vehicle.title }} to favorites">
+                            <i class="bi bi-heart"></i> Save
+                        </button>
+                        <label class="btn btn-outline-secondary flex-fill mb-0">
+                            <input type="checkbox" class="js-compare-checkbox d-none" data-slug="{{ vehicle.slug }}">
+                            <i class="bi bi-columns-gap"></i> Compare
+                        </label>
                     </div>
 
                     <div class="d-grid gap-2 mb-3 d-none d-lg-grid">
