@@ -194,6 +194,61 @@
     </div>
 </section>
 
+<!-- Service Area / Local SEO -->
+{% if areas %}
+<section class="section-padding bg-light-brand">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Used Cars Near You in {{ business_city }}, {{ business_state }}</h2>
+            <p class="section-subtitle mx-auto">{{ business_name }} proudly serves car shoppers throughout central North Carolina. Browse used cars, trucks, and SUVs for sale near your city:</p>
+        </div>
+        <div class="row g-3 justify-content-center">
+            {% for city, state in areas %}
+            <div class="col-6 col-md-4 col-lg-3 text-center">
+                <a href="{{ url_for('main.inventory_by_city', city=city.lower().replace(' ', '-'), state=state.lower()) }}" class="btn btn-outline-primary w-100">{{ city }}, {{ state }}</a>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-4">
+            <a href="{{ url_for('main.service_area') }}" class="fw-semibold">View All Service Areas &rarr;</a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- FAQ -->
+{% if home_faqs %}
+<section class="section-padding">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h2 class="section-title text-center mb-4">Frequently Asked Questions</h2>
+                <div class="accordion" id="homeFaqAccordion">
+                    {% for question, answer in home_faqs %}
+                    <div class="accordion-item">
+                        <h3 class="accordion-header" id="home-faq-h-{{ loop.index }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#home-faq-{{ loop.index }}"
+                                    aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                                    aria-controls="home-faq-{{ loop.index }}">
+                                {{ question }}
+                            </button>
+                        </h3>
+                        <div id="home-faq-{{ loop.index }}"
+                             class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                             aria-labelledby="home-faq-h-{{ loop.index }}"
+                             data-bs-parent="#homeFaqAccordion">
+                            <div class="accordion-body text-muted">{{ answer }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
 <!-- CTA -->
 <section class="cta-section text-center">
     <div class="container">

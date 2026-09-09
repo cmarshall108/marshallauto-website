@@ -36,6 +36,13 @@ from app.vin_decode import decode_vin, normalize_vin
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 
 
+@admin_bp.after_request
+def _admin_no_index(response):
+    """Keep admin pages out of search results even if a URL is discovered/linked."""
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    return response
+
+
 def admin_required(f):
     """Decorator requiring an authenticated active admin user."""
     @wraps(f)

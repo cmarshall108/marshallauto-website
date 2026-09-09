@@ -418,6 +418,8 @@ def index():
         list_url=current_app.config['SITE_URL'],
     ) if featured else None
 
+    areas = current_app.config.get('SERVICE_AREAS', [])[:9]
+
     return render_template(
         'index.html',
         featured=featured,
@@ -433,6 +435,8 @@ def index():
         meta_title=SiteSetting.get('site_title'),
         meta_description=SiteSetting.get('meta_description'),
         page_type='home',
+        areas=areas,
+        home_faqs=home_faqs,
     )
 
 
