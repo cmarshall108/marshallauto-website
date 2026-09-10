@@ -614,6 +614,196 @@
     </div>
 </div>
 
+{# ---- Listing performance (days on lot / sell-through) ---- #}
+<div class="table-card p-3 p-md-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h5 class="fw-bold mb-0">Listing performance</h5>
+            <p class="small text-muted mb-0">
+                How long inventory sits before it sells, and what's aging on the lot right now
+                {% if inventory.sold_count %}· based on {{ inventory.sold_count }} vehicle(s) sold in this range{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="stat-card analytics-kpi h-100">
+                <p class="text-muted small mb-1">Vehicles Sold</p>
+                <div class="stat-value">{{ inventory.sold_count }}</div>
+                <p class="small text-muted mb-0 mt-2">In selected date range</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card analytics-kpi h-100">
+                <p class="text-muted small mb-1">Avg. Days to Sell</p>
+                <div class="stat-value">{% if inventory.avg_days_to_sell is not none %}{{ inventory.avg_days_to_sell }}{% else %}—{% endif %}</div>
+                <p class="small text-muted mb-0 mt-2">Listing date to sale date</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card analytics-kpi h-100">
+                <p class="text-muted small mb-1">Median Days to Sell</p>
+                <div class="stat-value">{% if inventory.median_days_to_sell is not none %}{{ inventory.median_days_to_sell }}{% else %}—{% endif %}</div>
+                <p class="small text-muted mb-0 mt-2">Less skewed by outliers</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card analytics-kpi h-100">
+                <p class="text-muted small mb-1">Avg. Age of Current Inventory</p>
+                <div class="stat-value">{% if inventory.avg_current_age is not none %}{{ inventory.avg_current_age }}{% else %}—{% endif %}</div>
+                <p class="small text-muted mb-0 mt-2">{{ inventory.available_count }} listed / pending now</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-5">
+            <h6 class="fw-bold mb-1">Current inventory aging</h6>
+            <p class="small text-muted mb-3">How long available/pending vehicles have been listed</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartAging" height="160" aria-label="Inventory aging chart"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <h6 class="fw-bold mb-1">Oldest listings</h6>
+            <p class="small text-muted mb-3">Available/pending vehicles that have been listed the longest</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th class="text-end">Days listed</th>
+                            <th class="text-end">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in inventory.aging_top %}
+                        <tr>
+                            <td>
+                                {% if v.slug %}
+                                <a href="{{ url_for('main.vehicle_detail', slug=v.slug) }}" target="_blank" rel="noopener">{{ v.title }}</a>
+                                {% else %}
+                                {{ v.title }}
+                                {% endif %}
+                                <span class="badge bg-light text-dark border ms-1">{{ v.status }}</span>
+                            </td>
+                            <td class="text-end fw-semibold {% if v.days >= 90 %}text-danger{% elif v.days >= 60 %}text-warning{% endif %}">{{ v.days }}</td>
+                            <td class="text-end">{% if v.price is not none %}${{ '{:,.0f}'.format(v.price) }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No available or pending vehicles.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <h6 class="fw-bold mb-1">Fastest sellers</h6>
+            <p class="small text-muted mb-3">Sold quickest in this range</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th class="text-end">Days to sell</th>
+                            <th class="text-end">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in inventory.fastest_sellers %}
+                        <tr>
+                            <td>{% if v.slug %}<a href="{{ url_for('main.vehicle_detail', slug=v.slug) }}" target="_blank" rel="noopener">{{ v.title }}</a>{% else %}{{ v.title }}{% endif %}</td>
+                            <td class="text-end fw-semibold text-success">{{ v.days }}</td>
+                            <td class="text-end">{% if v.price is not none %}${{ '{:,.0f}'.format(v.price) }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No vehicles sold in this range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h6 class="fw-bold mb-1">Slowest sellers</h6>
+            <p class="small text-muted mb-3">Took the longest to sell in this range</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th class="text-end">Days to sell</th>
+                            <th class="text-end">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in inventory.slowest_sellers %}
+                        <tr>
+                            <td>{% if v.slug %}<a href="{{ url_for('main.vehicle_detail', slug=v.slug) }}" target="_blank" rel="noopener">{{ v.title }}</a>{% else %}{{ v.title }}{% endif %}</td>
+                            <td class="text-end fw-semibold text-danger">{{ v.days }}</td>
+                            <td class="text-end">{% if v.price is not none %}${{ '{:,.0f}'.format(v.price) }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No vehicles sold in this range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <h6 class="fw-bold mb-1">Avg. days to sell by body style</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr><th>Body style</th><th class="text-end">Sold</th><th class="text-end">Avg. days</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for b in inventory.by_body_style %}
+                        <tr>
+                            <td>{{ b.label }}</td>
+                            <td class="text-end">{{ b.count }}</td>
+                            <td class="text-end fw-semibold">{{ b.avg_days }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No data.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h6 class="fw-bold mb-1">Avg. days to sell by make</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr><th>Make</th><th class="text-end">Sold</th><th class="text-end">Avg. days</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for m in inventory.by_make %}
+                        <tr>
+                            <td>{{ m.label }}</td>
+                            <td class="text-end">{{ m.count }}</td>
+                            <td class="text-end fw-semibold">{{ m.avg_days }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No data.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <p class="small text-muted mt-3 mb-0">
+        Sell-through metrics only include vehicles sold since this tracking was added — older sales without a recorded sold date are excluded.
+    </p>
+</div>
+
 {# ---- Events ---- #}
 <div class="row g-4 mb-4">
     <div class="col-lg-5">
@@ -987,6 +1177,28 @@
                 scales: {
                     x: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
                     y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartAging')) {
+        new Chart(el('chartAging'), {
+            type: 'bar',
+            data: {
+                labels: charts.aging_labels || [],
+                datasets: [{
+                    label: 'Vehicles',
+                    data: charts.aging_counts || [],
+                    backgroundColor: ['rgba(25,135,84,0.75)', 'rgba(13,110,253,0.7)', 'rgba(253,126,20,0.75)', 'rgba(220,53,69,0.75)'],
+                    borderRadius: 4,
+                }],
+            },
+            options: Object.assign({}, commonOpts, {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
                 },
             }),
         });

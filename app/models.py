@@ -59,6 +59,8 @@ class Vehicle(db.Model):
     condition = db.Column(db.String(20), default='used', nullable=False)  # used, certified, rebuilt
     title_status = db.Column(db.String(20), default='clean', nullable=False, index=True)  # clean, rebuilt, salvage
     status = db.Column(db.String(20), default='available', nullable=False, index=True)  # available, sold, pending
+    # Set automatically the first time status transitions to 'sold' — powers days-on-lot / sell-through stats
+    sold_at = db.Column(db.DateTime, nullable=True, index=True)
 
     # Details
     body_style = db.Column(db.String(64), nullable=True, index=True)
@@ -164,6 +166,14 @@ class Vehicle(db.Model):
     @property
     def is_available(self):
         return self.status == 'available'
+
+    @property
+    def days_on_lot(self):
+        """Days since listing was created; for sold vehicles, days until it sold."""
+        if not self.created_at:
+            return None
+        end = self.sold_at if (self.status == 'sold' and self.sold_at) else utcnow()
+        return max((end - self.created_at).days, 0)
 
     @property
     def is_low_mileage(self):

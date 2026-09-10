@@ -566,6 +566,8 @@ def build_analytics_dashboard(args):
     engaged_views = base_q().filter(PageView.is_engaged.is_(True)).count()
     bounce_views = base_q().filter(PageView.is_bounce.is_(True)).count()
 
+    inventory_data = build_inventory_analytics(start, end)
+
     duration_row = base_q().with_entities(
         func.coalesce(func.avg(PageView.duration_seconds), 0),
         func.coalesce(func.avg(PageView.scroll_depth_pct), 0),
@@ -1094,6 +1096,8 @@ def build_analytics_dashboard(args):
             'browser_views': [b['views'] for b in browsers_data[:8]],
             'event_labels': [e['label'] for e in events_data[:12]],
             'event_counts': [e['count'] for e in events_data[:12]],
+            'aging_labels': inventory_data['aging_labels'],
+            'aging_counts': inventory_data['aging_counts'],
         },
         'top_pages': top_pages_data,
         'page_types': page_types_data,
@@ -1115,6 +1119,109 @@ def build_analytics_dashboard(args):
         'scroll_dist': scroll_dist,
         'page_type_choices': PAGE_TYPE_LABELS,
         'has_data': total_views > 0 or total_events > 0,
+        'inventory': inventory_data,
+    }
+
+
+def build_inventory_analytics(start, end):
+    """Listing-duration / sell-through stats: how fast inventory moves.
+
+    Unlike the page-view metrics above, this is derived from vehicle records
+    themselves (created_at / sold_at), not from analytics beacons.
+    """
+    sold_vehicles = (
+        Vehicle.query
+        .filter(Vehicle.status == 'sold', Vehicle.sold_at.isnot(None))
+        .filter(Vehicle.sold_at >= start, Vehicle.sold_at <= end)
+        .all()
+    )
+
+    rows = []
+    for v in sold_vehicles:
+        days = v.days_on_lot
+        if days is None:
+            continue
+        rows.append({
+            'id': v.id,
+            'title': v.title,
+            'slug': v.slug,
+            'body_style': v.body_style or 'Other',
+            'make': v.make,
+            'price': float(v.display_price) if v.display_price is not None else None,
+            'days': days,
+            'sold_at': v.sold_at,
+            'listed_at': v.created_at,
+        })
+
+    durations = [r['days'] for r in rows]
+    sold_count = len(rows)
+    avg_days_to_sell = round(sum(durations) / sold_count, 1) if sold_count else None
+    median_days_to_sell = None
+    if durations:
+        s = sorted(durations)
+        mid = len(s) // 2
+        median_days_to_sell = s[mid] if len(s) % 2 else round((s[mid - 1] + s[mid]) / 2, 1)
+
+    fastest_sellers = sorted(rows, key=lambda r: r['days'])[:10]
+    slowest_sellers = sorted(rows, key=lambda r: r['days'], reverse=True)[:10]
+
+    def _grouped(key):
+        buckets = defaultdict(list)
+        for r in rows:
+            buckets[r[key]].append(r['days'])
+        return sorted(
+            [
+                {'label': label, 'count': len(days), 'avg_days': round(sum(days) / len(days), 1)}
+                for label, days in buckets.items()
+            ],
+            key=lambda x: -x['count'],
+        )
+
+    by_body_style = _grouped('body_style')
+    by_make = _grouped('make')[:10]
+
+    # Aging of currently listed (not yet sold) inventory
+    available = Vehicle.query.filter(Vehicle.status.in_(['available', 'pending'])).all()
+    aging_buckets = [
+        ('0–30 days', 0, 30),
+        ('31–60 days', 31, 60),
+        ('61–90 days', 61, 90),
+        ('90+ days', 91, 10 ** 6),
+    ]
+    aging_counts = {label: 0 for label, _, _ in aging_buckets}
+    aging_rows = []
+    for v in available:
+        days = v.days_on_lot
+        if days is None:
+            continue
+        aging_rows.append({
+            'id': v.id,
+            'title': v.title,
+            'slug': v.slug,
+            'status': v.status,
+            'days': days,
+            'price': float(v.display_price) if v.display_price is not None else None,
+        })
+        for label, lo, hi in aging_buckets:
+            if lo <= days <= hi:
+                aging_counts[label] += 1
+                break
+    aging_rows.sort(key=lambda r: -r['days'])
+    avg_current_age = round(sum(r['days'] for r in aging_rows) / len(aging_rows), 1) if aging_rows else None
+
+    return {
+        'sold_count': sold_count,
+        'avg_days_to_sell': avg_days_to_sell,
+        'median_days_to_sell': median_days_to_sell,
+        'fastest_sellers': fastest_sellers,
+        'slowest_sellers': slowest_sellers,
+        'by_body_style': by_body_style,
+        'by_make': by_make,
+        'aging_labels': [label for label, _, _ in aging_buckets],
+        'aging_counts': [aging_counts[label] for label, _, _ in aging_buckets],
+        'aging_top': aging_rows[:15],
+        'avg_current_age': avg_current_age,
+        'available_count': len(aging_rows),
     }
 
 

@@ -429,6 +429,7 @@ def vehicle_new():
         vehicle.ensure_slug()
         _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
         if vehicle.status == 'sold':
+            vehicle.sold_at = vehicle.sold_at or utcnow()
             delete_local_video_file(vehicle.video_url)
             vehicle.video_url = None
         db.session.commit()
@@ -470,9 +471,14 @@ def vehicle_edit(id):
         vehicle.ensure_slug()
         _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
         if vehicle.status == 'sold' and not was_sold:
-            # Vehicle just sold — the walkaround video no longer needs to take up VPS storage.
+            # Vehicle just sold — track when, for days-on-lot analytics, and the
+            # walkaround video no longer needs to take up VPS storage.
+            vehicle.sold_at = utcnow()
             delete_local_video_file(vehicle.video_url)
             vehicle.video_url = None
+        elif vehicle.status != 'sold' and was_sold:
+            # Relisted — clear the stale sold timestamp so it doesn't skew stats.
+            vehicle.sold_at = None
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         db.session.commit()
         db.session.refresh(vehicle)
