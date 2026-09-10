@@ -66,6 +66,7 @@ def create_app(config_class=None):
     # Ensure upload directories exist
     os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'vehicles'), exist_ok=True)
     os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'carfax'), exist_ok=True)
+    os.makedirs(os.path.join(app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses'), exist_ok=True)
 
     db.init_app(app)
     migrate.init_app(app, db)

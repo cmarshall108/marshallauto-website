@@ -182,6 +182,79 @@ def save_uploaded_pdf(file_obj):
     return filename
 
 
+def _save_license_image_bytes(raw_bytes):
+    """Shared save path for license images, whatever the source (file or camera capture)."""
+    import io
+
+    try:
+        img = Image.open(io.BytesIO(raw_bytes))
+        img.verify()
+        img = Image.open(io.BytesIO(raw_bytes))  # re-open after verify() invalidates the handle
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+
+    img = ImageOps.exif_transpose(img)
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    # Cap resolution — this is a document photo, not a gallery image; no need for full camera res.
+    max_width = 1600
+    if img.width > max_width:
+        ratio = max_width / float(img.width)
+        img = img.resize((max_width, max(1, int(img.height * ratio))), Image.Resampling.LANCZOS)
+
+    filename = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}.jpg"
+    upload_path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
+    os.makedirs(upload_path, exist_ok=True)
+    try:
+        img.save(os.path.join(upload_path, filename), format='JPEG', quality=85, optimize=True)
+        return filename
+    except Exception as e:
+        current_app.logger.error('License image save failed: %s', e)
+        return None
+
+
+def save_uploaded_license_image(file_obj):
+    """Save a driver's license photo/scan uploaded as a regular file field."""
+    if not file_obj or not getattr(file_obj, 'filename', None):
+        return None
+    if not allowed_file(file_obj.filename, current_app.config['ALLOWED_IMAGE_EXTENSIONS']):
+        return None
+    if not _validate_image_magic(file_obj):
+        current_app.logger.warning('Rejected non-image license upload: %s', file_obj.filename)
+        return None
+    file_obj.seek(0)
+    return _save_license_image_bytes(file_obj.read())
+
+
+def save_license_image_data_url(data_url):
+    """Save a driver's license photo captured in-browser (getUserMedia -> canvas -> base64 data URL)."""
+    import base64
+
+    if not data_url or not isinstance(data_url, str) or not data_url.startswith('data:image/'):
+        return None
+    try:
+        header, encoded = data_url.split(',', 1)
+        raw_bytes = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError):
+        return None
+    # Reasonable cap so a rogue/huge payload can't be posted as "base64 text"
+    if len(raw_bytes) > 15 * 1024 * 1024:
+        return None
+    return _save_license_image_bytes(raw_bytes)
+
+
+def delete_license_image(filename):
+    if not filename:
+        return
+    try:
+        path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses', os.path.basename(filename))
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
 def slugify(text):
     text = str(text).lower().strip()
     text = re.sub(r'[^\w\s-]', '', text)

@@ -14,11 +14,11 @@ from sqlalchemy.orm import selectinload
 from app import db
 from app.forms import (
     BlogPostForm, CarfaxReportForm, LoginForm, ReviewForm, ServiceRecordForm,
-    SiteSettingForm, VehicleForm,
+    SiteSettingForm, TestDriveEditForm, TestDriveForm, TestDriveReturnForm, VehicleForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
-    SiteSetting, User, Vehicle, VehicleImage, VehicleImageHighlight, utcnow,
+    SiteSetting, TestDrive, User, Vehicle, VehicleImage, VehicleImageHighlight, utcnow,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -29,8 +29,9 @@ from app.facebook_publish import (
 )
 from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
 from app.utils import (
-    client_ip, delete_local_video_file, is_safe_redirect, rate_limit_exceeded,
-    save_uploaded_image, save_uploaded_pdf, save_uploaded_video,
+    client_ip, delete_license_image, delete_local_video_file, is_safe_redirect,
+    rate_limit_exceeded, save_license_image_data_url, save_uploaded_image,
+    save_uploaded_license_image, save_uploaded_pdf, save_uploaded_video,
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
 from app.vin_decode import decode_vin, normalize_vin
@@ -108,6 +109,7 @@ def dashboard():
         'total_leads': Lead.query.filter(Lead.is_spam.is_(False)).count(),
         'service_records': ServiceRecord.query.count(),
         'carfax_reports': CarfaxReport.query.count(),
+        'active_test_drives': TestDrive.query.filter_by(status='out').count(),
     }
     recent_leads = (
         Lead.query.filter(Lead.is_spam.is_(False))
@@ -853,6 +855,147 @@ def carfax_report_delete(id):
     db.session.commit()
     flash('CarFax report deleted.', 'success')
     return redirect(url_for('admin.carfax_reports'))
+
+
+# ------------------------------ TEST DRIVES ------------------------------
+
+def _apply_test_drive_license(test_drive, form):
+    """Save a license image from either a file upload or an in-browser camera capture."""
+    if form.license_image.data and getattr(form.license_image.data, 'filename', None):
+        new_filename = save_uploaded_license_image(form.license_image.data)
+    elif (form.license_image_data.data or '').strip():
+        new_filename = save_license_image_data_url(form.license_image_data.data)
+    else:
+        new_filename = None
+    if new_filename:
+        if test_drive.license_image_filename:
+            delete_license_image(test_drive.license_image_filename)
+        test_drive.license_image_filename = new_filename
+
+
+@admin_bp.route('/test-drives')
+@login_required
+def test_drives():
+    page = request.args.get('page', 1, type=int)
+    status = (request.args.get('status') or '').strip()
+    query = TestDrive.query
+    if status in ('out', 'returned', 'cancelled'):
+        query = query.filter_by(status=status)
+    pagination = query.order_by(TestDrive.started_at.desc()).paginate(page=page, per_page=25, error_out=False)
+    return render_template(
+        'admin/test_drives.html',
+        pagination=pagination,
+        status=status,
+        active_count=TestDrive.query.filter_by(status='out').count(),
+    )
+
+
+@admin_bp.route('/test-drives/new', methods=['GET', 'POST'])
+@login_required
+def test_drive_new():
+    form = TestDriveForm()
+    form.vehicle_id.choices = _vehicle_choices()
+    preselect_vehicle_id = request.args.get('vehicle_id', type=int)
+    if request.method == 'GET' and preselect_vehicle_id:
+        form.vehicle_id.data = preselect_vehicle_id
+    if form.validate_on_submit():
+        test_drive = TestDrive(
+            vehicle_id=form.vehicle_id.data,
+            customer_name=form.customer_name.data.strip(),
+            customer_phone=(form.customer_phone.data or '').strip() or None,
+            customer_email=(form.customer_email.data or '').strip() or None,
+            license_number=(form.license_number.data or '').strip() or None,
+            license_state=(form.license_state.data or '').strip() or None,
+            salesperson=(form.salesperson.data or '').strip() or None,
+            start_mileage=form.start_mileage.data,
+            notes=form.notes.data,
+            started_at=utcnow(),
+            status='out',
+        )
+        _apply_test_drive_license(test_drive, form)
+        db.session.add(test_drive)
+        db.session.commit()
+        flash('Test drive checked out.', 'success')
+        return redirect(url_for('admin.test_drives'))
+    return render_template('admin/test_drive_form.html', form=form, test_drive=None, title='Check Out Test Drive')
+
+
+@admin_bp.route('/test-drives/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def test_drive_edit(id):
+    test_drive = db.session.get(TestDrive, id) or abort(404)
+    form = TestDriveEditForm(obj=test_drive)
+    if form.validate_on_submit():
+        was_out = test_drive.status == 'out'
+        test_drive.customer_name = form.customer_name.data.strip()
+        test_drive.customer_phone = (form.customer_phone.data or '').strip() or None
+        test_drive.customer_email = (form.customer_email.data or '').strip() or None
+        test_drive.license_number = (form.license_number.data or '').strip() or None
+        test_drive.license_state = (form.license_state.data or '').strip() or None
+        test_drive.salesperson = (form.salesperson.data or '').strip() or None
+        test_drive.start_mileage = form.start_mileage.data
+        test_drive.end_mileage = form.end_mileage.data
+        test_drive.status = form.status.data
+        test_drive.notes = form.notes.data
+        _apply_test_drive_license(test_drive, form)
+        if test_drive.status == 'returned' and was_out and not test_drive.returned_at:
+            test_drive.returned_at = utcnow()
+        elif test_drive.status == 'out':
+            test_drive.returned_at = None
+        db.session.commit()
+        flash('Test drive updated.', 'success')
+        return redirect(url_for('admin.test_drives'))
+    return render_template('admin/test_drive_form.html', form=form, test_drive=test_drive, title='Edit Test Drive')
+
+
+@admin_bp.route('/test-drives/<int:id>/return', methods=['GET', 'POST'])
+@login_required
+def test_drive_return(id):
+    test_drive = db.session.get(TestDrive, id) or abort(404)
+    form = TestDriveReturnForm()
+    if request.method == 'GET':
+        form.end_mileage.data = test_drive.start_mileage
+    if form.validate_on_submit():
+        test_drive.end_mileage = form.end_mileage.data
+        test_drive.notes = (
+            f"{test_drive.notes}\n{form.notes.data}".strip() if form.notes.data else test_drive.notes
+        )
+        test_drive.returned_at = utcnow()
+        test_drive.status = 'returned'
+        db.session.commit()
+        flash('Vehicle marked as returned.', 'success')
+        return redirect(url_for('admin.test_drives'))
+    return render_template('admin/test_drive_return.html', form=form, test_drive=test_drive)
+
+
+@admin_bp.route('/test-drives/<int:id>/delete', methods=['POST'])
+@login_required
+def test_drive_delete(id):
+    test_drive = db.session.get(TestDrive, id) or abort(404)
+    if test_drive.license_image_filename:
+        delete_license_image(test_drive.license_image_filename)
+    db.session.delete(test_drive)
+    db.session.commit()
+    flash('Test drive record deleted.', 'success')
+    return redirect(url_for('admin.test_drives'))
+
+
+@admin_bp.route('/test-drives/<int:id>/license-image')
+@login_required
+def test_drive_license_image(id):
+    """Serve the stored license photo — never web-servable directly (private upload dir)."""
+    test_drive = db.session.get(TestDrive, id) or abort(404)
+    if not test_drive.license_image_filename:
+        abort(404)
+    directory = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
+    return send_from_directory(directory, test_drive.license_image_filename)
+
+
+@admin_bp.route('/test-drives/<int:id>/print')
+@login_required
+def test_drive_print(id):
+    test_drive = db.session.get(TestDrive, id) or abort(404)
+    return render_template('admin/test_drive_print.html', test_drive=test_drive)
 
 
 # ------------------------------ ANALYTICS ------------------------------

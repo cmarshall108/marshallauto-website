@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">{{ title }}</h2>
+    <a href="{{ url_for('admin.test_drives') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<form method="POST" enctype="multipart/form-data" class="card border-0 shadow p-4" id="test-drive-form">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+        {% if not test_drive %}
+        <div class="col-md-6">
+            <label class="form-label">Vehicle *</label>
+            {{ form.vehicle_id(class="form-select") }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Starting Mileage *</label>
+            {{ form.start_mileage(class="form-control") }}
+        </div>
+        {% else %}
+        <div class="col-md-4">
+            <label class="form-label">Vehicle</label>
+            <input type="text" class="form-control" value="{{ test_drive.vehicle.title if test_drive.vehicle else '' }}" disabled>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Starting Mileage *</label>
+            {{ form.start_mileage(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Returning Mileage</label>
+            {{ form.end_mileage(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Status</label>
+            {{ form.status(class="form-select") }}
+        </div>
+        {% endif %}
+
+        <div class="col-md-4">
+            <label class="form-label">Customer Name *</label>
+            {{ form.customer_name(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Phone</label>
+            {{ form.customer_phone(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Email</label>
+            {{ form.customer_email(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Driver's License #</label>
+            {{ form.license_number(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">License State</label>
+            {{ form.license_state(class="form-control", placeholder="e.g. GA") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Salesperson</label>
+            {{ form.salesperson(class="form-control") }}
+        </div>
+
+        <div class="col-12">
+            <hr>
+            <label class="form-label fw-semibold">Driver's License Photo / Scan</label>
+            <p class="small text-muted mb-2">
+                Capture with a webcam or a document scanner set up as a camera device, take a photo on a
+                phone/tablet, or upload a file already scanned to this computer.
+            </p>
+
+            {% if test_drive and test_drive.license_image_filename %}
+            <div class="mb-2">
+                <span class="small text-muted">Current file on record:</span>
+                <a href="{{ url_for('admin.test_drive_license_image', id=test_drive.id) }}" target="_blank" rel="noopener">view</a>
+            </div>
+            {% endif %}
+
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button type="button" id="td-camera-start" class="btn btn-outline-primary btn-sm"><i class="bi bi-camera me-1"></i> Use Camera / Scanner</button>
+                <button type="button" id="td-camera-capture" class="btn btn-primary btn-sm d-none"><i class="bi bi-camera-fill me-1"></i> Capture</button>
+                <button type="button" id="td-camera-retake" class="btn btn-outline-secondary btn-sm d-none"><i class="bi bi-arrow-counterclockwise me-1"></i> Retake</button>
+                <button type="button" id="td-camera-stop" class="btn btn-outline-danger btn-sm d-none"><i class="bi bi-x-lg me-1"></i> Cancel</button>
+            </div>
+
+            <div id="td-camera-wrap" class="d-none mb-2" style="max-width: 420px;">
+                <video id="td-camera-video" autoplay playsinline class="w-100 rounded border"></video>
+            </div>
+            <canvas id="td-camera-canvas" class="d-none"></canvas>
+            <div id="td-camera-preview-wrap" class="d-none mb-2" style="max-width: 420px;">
+                <img id="td-camera-preview" class="w-100 rounded border" alt="Captured license photo">
+            </div>
+            <p id="td-camera-error" class="small text-danger d-none"></p>
+
+            {{ form.license_image_data(id="license_image_data") }}
+
+            <div>
+                <label class="form-label small text-muted">Or upload a file</label>
+                {{ form.license_image(class="form-control", accept="image/*", capture="environment") }}
+            </div>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label">Notes</label>
+            {{ form.notes(class="form-control", rows="3") }}
+        </div>
+    </div>
+    <div class="mt-4">
+        {{ form.submit(class="btn btn-primary btn-lg") }}
+        <a href="{{ url_for('admin.test_drives') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ asset_url('js/admin-test-drive.js') }}"></script>
+{% endblock %}

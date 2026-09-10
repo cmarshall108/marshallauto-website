@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Mark Returned{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">Mark Test Drive Returned</h2>
+    <a href="{{ url_for('admin.test_drives') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<div class="card border-0 shadow p-4" style="max-width: 560px;">
+    <p class="mb-1"><strong>Customer:</strong> {{ test_drive.customer_name }}</p>
+    <p class="mb-1"><strong>Vehicle:</strong> {{ test_drive.vehicle.title if test_drive.vehicle else 'Vehicle #' ~ test_drive.vehicle_id }}</p>
+    <p class="mb-3"><strong>Checked out:</strong> {{ test_drive.started_at.strftime('%m/%d/%Y %I:%M %p') if test_drive.started_at else '—' }}
+        (starting mileage {{ test_drive.start_mileage or '—' }})</p>
+
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            <label class="form-label">Returning Mileage *</label>
+            {{ form.end_mileage(class="form-control") }}
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Return Notes</label>
+            {{ form.notes(class="form-control", rows="3", placeholder="Condition, fuel level, any issues...") }}
+        </div>
+        {{ form.submit(class="btn btn-success btn-lg") }}
+        <a href="{{ url_for('admin.test_drives') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+    </form>
+</div>
+{% endblock %}

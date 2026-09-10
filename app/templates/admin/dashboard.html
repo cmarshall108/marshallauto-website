@@ -53,6 +53,15 @@
     </div>
     <div class="col-md-4 col-lg-3">
         <div class="stat-card">
+            <p class="text-muted small mb-1">Test Drives Out</p>
+            <div class="stat-value">{{ stats.active_test_drives }}</div>
+            {% if stats.active_test_drives %}
+            <a href="{{ url_for('admin.test_drives', status='out') }}" class="small">View active →</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-3">
+        <div class="stat-card">
             <p class="text-muted small mb-1">Avg Rating</p>
             <div class="stat-value">{{ stats.avg_rating if stats.avg_rating else '—' }}</div>
         </div>

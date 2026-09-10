@@ -1,0 +1,93 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Test Drives{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h2 class="fw-bold mb-0">Test Drives</h2>
+    <a href="{{ url_for('admin.test_drive_new') }}" class="btn btn-primary"><i class="bi bi-signpost-split me-1"></i> Check Out a Vehicle</a>
+</div>
+
+<div class="table-card p-3 p-md-4">
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a href="{{ url_for('admin.test_drives') }}" class="btn btn-sm {% if not status %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+        <a href="{{ url_for('admin.test_drives', status='out') }}" class="btn btn-sm {% if status == 'out' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+            Out {% if active_count %}<span class="badge bg-danger ms-1">{{ active_count }}</span>{% endif %}
+        </a>
+        <a href="{{ url_for('admin.test_drives', status='returned') }}" class="btn btn-sm {% if status == 'returned' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Returned</a>
+        <a href="{{ url_for('admin.test_drives', status='cancelled') }}" class="btn btn-sm {% if status == 'cancelled' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Cancelled</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Customer</th>
+                    <th>License</th>
+                    <th>Vehicle</th>
+                    <th>Salesperson</th>
+                    <th>Out</th>
+                    <th>Back</th>
+                    <th class="text-end">Miles</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for td in pagination.items %}
+                <tr>
+                    <td>
+                        {% if td.status == 'out' %}<span class="badge bg-danger">Out</span>
+                        {% elif td.status == 'returned' %}<span class="badge bg-success">Returned</span>
+                        {% else %}<span class="badge bg-secondary">Cancelled</span>{% endif %}
+                    </td>
+                    <td>
+                        <div class="fw-semibold">{{ td.customer_name }}</div>
+                        <div class="small text-muted">{{ td.customer_phone or '' }} {{ td.customer_email or '' }}</div>
+                    </td>
+                    <td>
+                        {% if td.license_image_filename %}
+                        <a href="{{ url_for('admin.test_drive_license_image', id=td.id) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-image"></i></a>
+                        {% endif %}
+                        <div class="small text-muted">{{ td.masked_license_number or '—' }} {{ td.license_state or '' }}</div>
+                    </td>
+                    <td><a href="{{ url_for('admin.vehicle_edit', id=td.vehicle_id) }}">{{ td.vehicle.title if td.vehicle else 'Vehicle #' ~ td.vehicle_id }}</a></td>
+                    <td>{{ td.salesperson or '—' }}</td>
+                    <td class="small">{{ td.started_at.strftime('%m/%d %I:%M %p') if td.started_at else '—' }}</td>
+                    <td class="small">{{ td.returned_at.strftime('%m/%d %I:%M %p') if td.returned_at else '—' }}</td>
+                    <td class="text-end">{% if td.miles_driven is not none %}{{ td.miles_driven }}{% else %}—{% endif %}</td>
+                    <td class="text-nowrap">
+                        {% if td.status == 'out' %}
+                        <a href="{{ url_for('admin.test_drive_return', id=td.id) }}" class="btn btn-sm btn-success" title="Mark returned"><i class="bi bi-check2-circle"></i></a>
+                        {% endif %}
+                        <a href="{{ url_for('admin.test_drive_print', id=td.id) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Print"><i class="bi bi-printer"></i></a>
+                        <a href="{{ url_for('admin.test_drive_edit', id=td.id) }}" class="btn btn-sm btn-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                        <form action="{{ url_for('admin.test_drive_delete', id=td.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this test drive record?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-4">No test drives found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center mb-0 mt-3">
+            {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.test_drives', page=pagination.prev_num, status=status) }}">Previous</a></li>{% endif %}
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}<li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.test_drives', page=page_num, status=status) }}">{{ page_num }}</a></li>{% endif %}
+                {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('admin.test_drives', page=pagination.next_num, status=status) }}">Next</a></li>{% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

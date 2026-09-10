@@ -120,6 +120,47 @@ class CarfaxReportForm(FlaskForm):
     submit = SubmitField('Save CarFax Report')
 
 
+class TestDriveForm(FlaskForm):
+    vehicle_id = SelectField('Vehicle *', coerce=int, validators=[DataRequired()])
+    customer_name = StringField('Customer Name *', validators=[DataRequired(), Length(max=128)])
+    customer_phone = StringField('Phone', validators=[Optional(), Length(max=32)])
+    customer_email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
+    license_number = StringField("Driver's License #", validators=[Optional(), Length(max=64)])
+    license_state = StringField('License State', validators=[Optional(), Length(max=32)])
+    license_image = FileField("Driver's License Photo / Scan")
+    license_image_data = HiddenField()  # base64 snapshot from in-browser camera capture, if used
+    salesperson = StringField('Salesperson', validators=[Optional(), Length(max=128)])
+    start_mileage = IntegerField('Starting Mileage *', validators=[DataRequired(), NumberRange(min=0)])
+    notes = TextAreaField('Notes')
+    submit = SubmitField('Check Out Vehicle')
+
+
+class TestDriveReturnForm(FlaskForm):
+    end_mileage = IntegerField('Returning Mileage *', validators=[DataRequired(), NumberRange(min=0)])
+    notes = TextAreaField('Return Notes')
+    submit = SubmitField('Mark Returned')
+
+
+class TestDriveEditForm(FlaskForm):
+    customer_name = StringField('Customer Name *', validators=[DataRequired(), Length(max=128)])
+    customer_phone = StringField('Phone', validators=[Optional(), Length(max=32)])
+    customer_email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
+    license_number = StringField("Driver's License #", validators=[Optional(), Length(max=64)])
+    license_state = StringField('License State', validators=[Optional(), Length(max=32)])
+    license_image = FileField("Driver's License Photo / Scan")
+    license_image_data = HiddenField()
+    salesperson = StringField('Salesperson', validators=[Optional(), Length(max=128)])
+    start_mileage = IntegerField('Starting Mileage *', validators=[DataRequired(), NumberRange(min=0)])
+    end_mileage = IntegerField('Returning Mileage', validators=[Optional(), NumberRange(min=0)])
+    status = SelectField('Status', choices=[
+        ('out', 'Out'),
+        ('returned', 'Returned'),
+        ('cancelled', 'Cancelled'),
+    ])
+    notes = TextAreaField('Notes')
+    submit = SubmitField('Save Test Drive')
+
+
 class SiteSettingForm(FlaskForm):
     site_title = StringField('Site Title', validators=[DataRequired(), Length(max=160)])
     site_tagline = StringField('Site Tagline', validators=[Optional(), Length(max=255)])

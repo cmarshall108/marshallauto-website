@@ -32,6 +32,9 @@ class Config:
 
     # Uploads
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
+    # Sensitive documents (driver's license scans, etc.) — kept outside app/static so they
+    # are never directly web-servable; only reachable via an authenticated admin route.
+    PRIVATE_UPLOAD_FOLDER = os.path.join(basedir, 'instance', 'private_uploads')
     # Total request body size (all images in one form submit). Default 256MB for bulk vehicle photos.
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 256 * 1024 * 1024))
     ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}

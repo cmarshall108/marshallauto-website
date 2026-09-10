@@ -424,6 +424,63 @@ class CarfaxReport(db.Model):
         return f'<CarfaxReport for vehicle {self.vehicle_id}>'
 
 
+class TestDrive(db.Model):
+    """Dealer test-drive checkout/return log: customer, license copy, mileage, timing."""
+    __tablename__ = 'test_drives'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, index=True)
+
+    customer_name = db.Column(db.String(128), nullable=False)
+    customer_phone = db.Column(db.String(32), nullable=True)
+    customer_email = db.Column(db.String(120), nullable=True)
+    license_number = db.Column(db.String(64), nullable=True)
+    license_state = db.Column(db.String(32), nullable=True)
+    # Scanned/photographed license copy — stored outside app/static (see PRIVATE_UPLOAD_FOLDER)
+    license_image_filename = db.Column(db.String(256), nullable=True)
+
+    salesperson = db.Column(db.String(128), nullable=True)
+    start_mileage = db.Column(db.Integer, nullable=True)
+    end_mileage = db.Column(db.Integer, nullable=True)
+    started_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    returned_at = db.Column(db.DateTime, nullable=True)
+    status = db.Column(db.String(20), default='out', nullable=False, index=True)  # out, returned, cancelled
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    vehicle = db.relationship('Vehicle', backref=db.backref('test_drives', lazy='dynamic'))
+
+    @property
+    def masked_license_number(self):
+        """Last 4 characters only, for at-a-glance list views."""
+        if not self.license_number:
+            return None
+        digits = self.license_number.strip()
+        if len(digits) <= 4:
+            return digits
+        return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
+
+    @property
+    def miles_driven(self):
+        if self.start_mileage is not None and self.end_mileage is not None:
+            return max(self.end_mileage - self.start_mileage, 0)
+        return None
+
+    @property
+    def duration_minutes(self):
+        end = self.returned_at if self.returned_at else (utcnow() if self.status == 'out' else None)
+        if not end or not self.started_at:
+            return None
+        return int((end - self.started_at).total_seconds() // 60)
+
+    @property
+    def is_out(self):
+        return self.status == 'out'
+
+    def __repr__(self):
+        return f'<TestDrive {self.customer_name} / vehicle {self.vehicle_id}>'
+
+
 class SiteSetting(db.Model):
     __tablename__ = 'site_settings'
 

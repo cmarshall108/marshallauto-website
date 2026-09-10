@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Drive Agreement — {{ test_drive.customer_name }}</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 2rem; max-width: 800px; margin: 0 auto; }
+        h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+        .subtitle { color: #555; margin-bottom: 1.5rem; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+        td, th { border: 1px solid #ccc; padding: 6px 10px; text-align: left; font-size: 0.95rem; }
+        th { background: #f2f2f2; width: 35%; }
+        .sig-line { margin-top: 3rem; border-top: 1px solid #333; width: 60%; padding-top: 4px; font-size: 0.9rem; color: #444; }
+        .no-print { margin-bottom: 1.5rem; }
+        @media print {
+            .no-print { display: none; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">Print</button>
+    </div>
+
+    <h1>Test Drive Agreement / Log</h1>
+    <p class="subtitle">{{ config.BUSINESS_NAME or 'Marshall Auto' }}</p>
+
+    <table>
+        <tr><th>Customer Name</th><td>{{ test_drive.customer_name }}</td></tr>
+        <tr><th>Phone</th><td>{{ test_drive.customer_phone or '—' }}</td></tr>
+        <tr><th>Email</th><td>{{ test_drive.customer_email or '—' }}</td></tr>
+        <tr><th>Driver's License #</th><td>{{ test_drive.license_number or '—' }} {{ test_drive.license_state or '' }}</td></tr>
+        <tr><th>Vehicle</th><td>{{ test_drive.vehicle.title if test_drive.vehicle else 'Vehicle #' ~ test_drive.vehicle_id }}</td></tr>
+        <tr><th>VIN</th><td>{{ test_drive.vehicle.vin if test_drive.vehicle else '—' }}</td></tr>
+        <tr><th>Salesperson</th><td>{{ test_drive.salesperson or '—' }}</td></tr>
+        <tr><th>Checked Out</th><td>{{ test_drive.started_at.strftime('%m/%d/%Y %I:%M %p') if test_drive.started_at else '—' }}</td></tr>
+        <tr><th>Starting Mileage</th><td>{{ test_drive.start_mileage if test_drive.start_mileage is not none else '—' }}</td></tr>
+        <tr><th>Returned</th><td>{{ test_drive.returned_at.strftime('%m/%d/%Y %I:%M %p') if test_drive.returned_at else '—' }}</td></tr>
+        <tr><th>Returning Mileage</th><td>{{ test_drive.end_mileage if test_drive.end_mileage is not none else '—' }}</td></tr>
+        <tr><th>Miles Driven</th><td>{{ test_drive.miles_driven if test_drive.miles_driven is not none else '—' }}</td></tr>
+        <tr><th>Notes</th><td>{{ test_drive.notes or '—' }}</td></tr>
+    </table>
+
+    <p>
+        I acknowledge that I am test driving the above vehicle at my own risk and agree to return it in the
+        same condition, with a full tank of fuel, at the agreed time. I confirm the driver's license
+        information above is accurate and belongs to me.
+    </p>
+
+    <div class="sig-line">Customer Signature &amp; Date</div>
+</body>
+</html>
