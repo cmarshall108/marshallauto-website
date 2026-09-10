@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 from flask_login import UserMixin
@@ -22,6 +22,12 @@ class User(UserMixin, db.Model):
     is_active_user = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
+    # Brute-force protection: temporary account lockout after repeated failed logins
+    failed_login_attempts = db.Column(db.Integer, default=0, nullable=False)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    last_login_ip = db.Column(db.String(64), nullable=True)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -32,6 +38,22 @@ class User(UserMixin, db.Model):
     def is_active(self):
         """Flask-Login uses this to block deactivated accounts."""
         return bool(self.is_active_user)
+
+    @property
+    def is_locked(self):
+        return bool(self.locked_until and self.locked_until > utcnow())
+
+    def register_failed_login(self, max_attempts=5, lockout_minutes=15):
+        """Lock the account for a cool-down period once too many bad passwords are entered."""
+        self.failed_login_attempts = (self.failed_login_attempts or 0) + 1
+        if self.failed_login_attempts >= max_attempts:
+            self.locked_until = utcnow() + timedelta(minutes=lockout_minutes)
+
+    def register_successful_login(self, ip=None):
+        self.failed_login_attempts = 0
+        self.locked_until = None
+        self.last_login_at = utcnow()
+        self.last_login_ip = ip
 
     def __repr__(self):
         return f'<User {self.username}>'

@@ -70,6 +70,10 @@ class Config:
     # Simple in-process rate limits (per worker)
     LOGIN_RATE_LIMIT = 10          # attempts
     LOGIN_RATE_WINDOW = 300        # seconds
+    # Per-account lockout (persisted on the User row) — protects a known/guessed
+    # username even if an attacker spreads attempts across many IPs.
+    LOGIN_LOCKOUT_THRESHOLD = int(os.environ.get('LOGIN_LOCKOUT_THRESHOLD', 5))
+    LOGIN_LOCKOUT_MINUTES = int(os.environ.get('LOGIN_LOCKOUT_MINUTES', 15))
     CONTACT_RATE_LIMIT = 8
     CONTACT_RATE_WINDOW = 600
     # Lead spam scoring (app/spam_filter.py); raise the threshold to be more permissive

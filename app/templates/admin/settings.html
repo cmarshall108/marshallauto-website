@@ -183,8 +183,37 @@
 </form>
 
 <div class="card border-0 shadow p-4 mt-4">
-    <h4 class="fw-bold mb-3">Admin Credentials</h4>
-    <p class="text-muted">To change the admin username or password, update the <code>ADMIN_USERNAME</code> and <code>ADMIN_PASSWORD</code> environment variables and restart the application.</p>
-    <p class="text-muted mb-0">For security, always use a strong, unique password in production.</p>
+    <h4 class="fw-bold mb-3">Admin Account Security</h4>
+    <p class="text-muted small mb-3">
+        Signed in as <strong>{{ current_user.username }}</strong>
+        {% if current_user.last_login_at %}
+        · last login {{ current_user.last_login_at.strftime('%m/%d/%Y %I:%M %p') }}
+        {% if current_user.last_login_ip %}from {{ current_user.last_login_ip }}{% endif %}
+        {% endif %}
+    </p>
+    <form method="POST" action="{{ url_for('admin.change_password') }}" class="row g-3" autocomplete="off">
+        {{ password_form.hidden_tag() }}
+        <div class="col-md-4">
+            <label class="form-label">Current Password</label>
+            {{ password_form.current_password(class="form-control", autocomplete="current-password") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">New Password</label>
+            {{ password_form.new_password(class="form-control", autocomplete="new-password") }}
+            <div class="form-text">{{ password_form.new_password.description }}</div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Confirm New Password</label>
+            {{ password_form.confirm_password(class="form-control", autocomplete="new-password") }}
+        </div>
+        <div class="col-12">
+            {{ password_form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+    <p class="text-muted small mb-0 mt-3">
+        The username is set via the <code>ADMIN_USERNAME</code> environment variable (restart required to change it).
+        After {{ config.LOGIN_LOCKOUT_THRESHOLD }} failed login attempts, this account locks for
+        {{ config.LOGIN_LOCKOUT_MINUTES }} minutes.
+    </p>
 </div>
 {% endblock %}

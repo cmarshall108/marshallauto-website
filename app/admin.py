@@ -13,8 +13,9 @@ from sqlalchemy.orm import selectinload
 
 from app import db
 from app.forms import (
-    BlogPostForm, CarfaxReportForm, LoginForm, ReviewForm, ServiceRecordForm,
-    SiteSettingForm, TestDriveEditForm, TestDriveForm, TestDriveReturnForm, VehicleForm,
+    BlogPostForm, CarfaxReportForm, ChangePasswordForm, LoginForm, ReviewForm,
+    ServiceRecordForm, SiteSettingForm, TestDriveEditForm, TestDriveForm,
+    TestDriveReturnForm, VehicleForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
@@ -78,13 +79,33 @@ def login():
             flash('Too many login attempts. Please try again later.', 'danger')
             return render_template('admin/login.html', form=form), 429
 
-        user = User.query.filter_by(username=form.username.data.strip()).first()
+        username = form.username.data.strip()
+        user = User.query.filter_by(username=username).first()
+
+        # Per-account lockout — protects a known/guessed username even if an
+        # attacker spreads attempts across many IPs (the per-IP limit above won't catch that).
+        if user and user.is_locked:
+            current_app.logger.warning('Admin login blocked (account locked): %s from %s', username, client_ip())
+            flash('This account is temporarily locked due to repeated failed logins. Please try again later.', 'danger')
+            return render_template('admin/login.html', form=form), 429
+
         if user and user.is_active and user.check_password(form.password.data):
+            user.register_successful_login(client_ip())
+            db.session.commit()
+            current_app.logger.info('Admin login succeeded: %s from %s', username, client_ip())
             login_user(user, remember=bool(form.remember.data))
             next_page = request.args.get('next')
             if next_page and is_safe_redirect(next_page):
                 return redirect(next_page)
             return redirect(url_for('admin.dashboard'))
+
+        if user:
+            user.register_failed_login(
+                current_app.config.get('LOGIN_LOCKOUT_THRESHOLD', 5),
+                current_app.config.get('LOGIN_LOCKOUT_MINUTES', 15),
+            )
+            db.session.commit()
+        current_app.logger.warning('Failed admin login attempt: %s from %s', username, client_ip())
         flash('Invalid username or password.', 'danger')
     return render_template('admin/login.html', form=form)
 
@@ -1201,7 +1222,33 @@ def settings():
         'admin/settings.html',
         form=form,
         facebook_status=configuration_status(),
+        password_form=ChangePasswordForm(),
     )
+
+
+@admin_bp.route('/settings/password', methods=['POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        if not current_user.check_password(form.current_password.data):
+            current_app.logger.warning(
+                'Admin password change rejected (wrong current password): %s from %s',
+                current_user.username, client_ip(),
+            )
+            flash('Current password is incorrect.', 'danger')
+            return redirect(url_for('admin.settings'))
+        current_user.set_password(form.new_password.data)
+        current_user.failed_login_attempts = 0
+        current_user.locked_until = None
+        db.session.commit()
+        current_app.logger.info('Admin password changed: %s from %s', current_user.username, client_ip())
+        flash('Password updated successfully.', 'success')
+    else:
+        for errors in form.errors.values():
+            for err in errors:
+                flash(err, 'danger')
+    return redirect(url_for('admin.settings'))
 
 
 # ------------------------------ HELPERS ------------------------------

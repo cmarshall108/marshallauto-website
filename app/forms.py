@@ -5,6 +5,7 @@ from wtforms import (
     TextAreaField,
 )
 from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional, ValidationError
+from wtforms.validators import EqualTo
 
 
 class LoginForm(FlaskForm):
@@ -12,6 +13,20 @@ class LoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired(), Length(max=128)])
     remember = BooleanField('Remember me')
     submit = SubmitField('Log In')
+
+
+class ChangePasswordForm(FlaskForm):
+    current_password = PasswordField('Current Password', validators=[DataRequired(), Length(max=128)])
+    new_password = PasswordField(
+        'New Password',
+        validators=[DataRequired(), Length(min=10, max=128)],
+        description='At least 10 characters. Mix in numbers/symbols for a stronger password.',
+    )
+    confirm_password = PasswordField(
+        'Confirm New Password',
+        validators=[DataRequired(), EqualTo('new_password', message='Passwords must match.')],
+    )
+    submit = SubmitField('Change Password')
 
 
 class VehicleForm(FlaskForm):

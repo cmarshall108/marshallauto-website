@@ -200,8 +200,17 @@ def create_app(config_class=None):
         if not app.config.get('TESTING'):
             db.create_all()
             _ensure_schema_columns(app)
-            _ensure_admin_exists(app)
-            _ensure_default_settings()
+            # Guarded individually: a pending `flask db upgrade` (schema not yet caught up
+            # with the models below) must not prevent the app — and thus the migration
+            # command itself — from loading.
+            try:
+                _ensure_admin_exists(app)
+            except Exception as e:
+                app.logger.warning('Admin bootstrap skipped (schema pending migration?): %s', e)
+            try:
+                _ensure_default_settings()
+            except Exception as e:
+                app.logger.warning('Default settings bootstrap skipped: %s', e)
 
     return app
 
