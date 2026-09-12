@@ -31,6 +31,9 @@
         <tr><th>Phone</th><td>{{ test_drive.customer_phone or '—' }}</td></tr>
         <tr><th>Email</th><td>{{ test_drive.customer_email or '—' }}</td></tr>
         <tr><th>Driver's License #</th><td>{{ test_drive.license_number or '—' }} {{ test_drive.license_state or '' }}</td></tr>
+        <tr><th>Date of Birth</th><td>{{ test_drive.license_date_of_birth or '—' }}</td></tr>
+        <tr><th>License Expiration</th><td>{{ test_drive.license_expiration_date or '—' }}</td></tr>
+        <tr><th>License Address</th><td>{{ test_drive.license_address or '—' }}</td></tr>
         <tr><th>Vehicle</th><td>{{ test_drive.vehicle.title if test_drive.vehicle else 'Vehicle #' ~ test_drive.vehicle_id }}</td></tr>
         <tr><th>VIN</th><td>{{ test_drive.vehicle.vin if test_drive.vehicle else '—' }}</td></tr>
         <tr><th>Salesperson</th><td>{{ test_drive.salesperson or '—' }}</td></tr>

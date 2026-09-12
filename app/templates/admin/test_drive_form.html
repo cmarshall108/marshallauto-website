@@ -63,6 +63,18 @@
             <label class="form-label">Salesperson</label>
             {{ form.salesperson(class="form-control") }}
         </div>
+        <div class="col-md-4">
+            <label class="form-label">Date of Birth</label>
+            {{ form.license_date_of_birth(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Expiration Date</label>
+            {{ form.license_expiration_date(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">License Address</label>
+            {{ form.license_address(class="form-control") }}
+        </div>
 
         <div class="col-12">
             <hr>
@@ -94,6 +106,7 @@
                 <img id="td-camera-preview" class="w-100 rounded border" alt="Captured license photo">
             </div>
             <p id="td-camera-error" class="small text-danger d-none"></p>
+            <div id="td-license-analysis" class="alert d-none mb-3" role="status" aria-live="polite"></div>
 
             {{ form.license_image_data(id="license_image_data") }}
 
@@ -116,5 +129,6 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>window.testDriveLicenseAnalysisUrl = {{ url_for('admin.test_drive_analyze_license')|tojson }};</script>
 <script src="{{ asset_url('js/admin-test-drive.js') }}"></script>
 {% endblock %}

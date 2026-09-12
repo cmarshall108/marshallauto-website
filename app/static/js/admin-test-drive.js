@@ -19,12 +19,68 @@
     const previewWrap = document.getElementById('td-camera-preview-wrap');
     const preview = document.getElementById('td-camera-preview');
     const errorEl = document.getElementById('td-camera-error');
+    const analysisEl = document.getElementById('td-license-analysis');
     const dataField = document.getElementById('license_image_data');
     const fileInput = document.querySelector('input[type="file"][name="license_image"]');
 
     if (!startBtn || !dataField) return;
 
     let stream = null;
+    let analysisRequest = 0;
+
+    function setField(name, value) {
+        const field = document.querySelector(`[name="${name}"]`);
+        if (field && value && !field.value.trim()) field.value = value;
+    }
+
+    function showAnalysis(message, style) {
+        if (!analysisEl) return;
+        analysisEl.className = `alert alert-${style} mb-3`;
+        analysisEl.textContent = message;
+    }
+
+    async function analyzeLicense() {
+        const url = window.testDriveLicenseAnalysisUrl;
+        if (!url || (!dataField.value && !(fileInput && fileInput.files.length))) return;
+        const requestId = ++analysisRequest;
+        showAnalysis('Analyzing license image...', 'info');
+        const body = new FormData();
+        const csrf = document.querySelector('input[name="csrf_token"]');
+        if (csrf) body.append('csrf_token', csrf.value);
+        if (fileInput && fileInput.files.length) {
+            body.append('license_image', fileInput.files[0]);
+        } else {
+            body.append('license_image_data', dataField.value);
+        }
+        try {
+            const response = await fetch(url, { method: 'POST', body });
+            const result = await response.json();
+            if (requestId !== analysisRequest) return;
+            if (!response.ok || !result.ok) throw new Error(result.error || 'Analysis failed');
+
+            const details = result.details || {};
+            setField('customer_name', details.customer_name);
+            setField('license_number', details.license_number);
+            setField('license_state', details.license_state);
+            setField('license_date_of_birth', details.date_of_birth);
+            setField('license_expiration_date', details.expiration_date);
+            setField('license_address', details.address);
+
+            const authenticity = result.authenticity || {};
+            const reasons = (authenticity.reasons || []).join(' ');
+            if (authenticity.status === 'suspicious') {
+                showAnalysis(`Potential authenticity concern. Verify this license manually before proceeding. ${reasons}`, 'danger');
+            } else if (authenticity.status === 'appears_authentic') {
+                showAnalysis(`Visual screening found no obvious alteration. Confirm the physical license and customer identity. ${reasons}`, 'success');
+            } else {
+                showAnalysis(`Authenticity could not be determined from this image. Verify the physical license manually. ${reasons}`, 'warning');
+            }
+        } catch (error) {
+            if (requestId === analysisRequest) {
+                showAnalysis(error.message || 'License analysis failed. Enter the details manually.', 'warning');
+            }
+        }
+    }
 
     function showError(message) {
         if (!errorEl) return;
@@ -82,6 +138,7 @@
         retakeBtn.classList.remove('d-none');
         if (fileInput) fileInput.value = '';
         stopStream();
+        analyzeLicense();
     }
 
     function retake() {
@@ -101,6 +158,7 @@
             if (fileInput.files && fileInput.files.length) {
                 dataField.value = '';
                 previewWrap.classList.add('d-none');
+                analyzeLicense();
             }
         });
     }

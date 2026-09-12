@@ -58,6 +58,10 @@ class Config:
     PHOTO_HIGHLIGHTS_ENGINE = (os.environ.get('PHOTO_HIGHLIGHTS_ENGINE') or 'grok').strip().lower()
     PHOTO_HIGHLIGHTS_GROK_MODEL = (os.environ.get('PHOTO_HIGHLIGHTS_GROK_MODEL') or 'grok-4.5').strip()
     XAI_API_KEY = (os.environ.get('XAI_API_KEY') or os.environ.get('GROK_API_KEY') or '').strip()
+    LICENSE_GROK_MODEL = (os.environ.get('LICENSE_GROK_MODEL') or 'grok-4.5').strip()
+    LICENSE_GROK_TIMEOUT = float(os.environ.get('LICENSE_GROK_TIMEOUT', '45'))
+    LICENSE_ANALYSIS_RATE_LIMIT = int(os.environ.get('LICENSE_ANALYSIS_RATE_LIMIT', '20'))
+    LICENSE_ANALYSIS_RATE_WINDOW = int(os.environ.get('LICENSE_ANALYSIS_RATE_WINDOW', '300'))
     # Legacy optional YOLO path (unused when engine=grok)
     PHOTO_HIGHLIGHTS_USE_YOLO = os.environ.get('PHOTO_HIGHLIGHTS_USE_YOLO', 'false').lower() in (
         '1', 'true', 'yes', 'on',

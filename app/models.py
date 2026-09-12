@@ -458,6 +458,9 @@ class TestDrive(db.Model):
     customer_email = db.Column(db.String(120), nullable=True)
     license_number = db.Column(db.String(64), nullable=True)
     license_state = db.Column(db.String(32), nullable=True)
+    license_date_of_birth = db.Column(db.Date, nullable=True)
+    license_expiration_date = db.Column(db.Date, nullable=True)
+    license_address = db.Column(db.String(255), nullable=True)
     # Scanned/photographed license copy — stored outside app/static (see PRIVATE_UPLOAD_FOLDER)
     license_image_filename = db.Column(db.String(256), nullable=True)
 

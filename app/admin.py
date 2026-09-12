@@ -1,4 +1,6 @@
 import os
+import base64
+import binascii
 from datetime import timedelta
 from decimal import InvalidOperation
 from functools import wraps
@@ -24,6 +26,7 @@ from app.models import (
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
 )
+from app.license_analysis import MAX_LICENSE_IMAGE_BYTES, analyze_license_image
 from app.facebook_publish import (
     apply_publish_result, build_marketplace_draft, configuration_status,
     maybe_auto_post_vehicle, post_vehicle_to_page,
@@ -894,6 +897,42 @@ def _apply_test_drive_license(test_drive, form):
         test_drive.license_image_filename = new_filename
 
 
+def _license_analysis_bytes():
+    upload = request.files.get('license_image')
+    if upload and getattr(upload, 'filename', None):
+        raw_bytes = upload.read(MAX_LICENSE_IMAGE_BYTES + 1)
+    else:
+        data_url = (request.form.get('license_image_data') or '').strip()
+        if not data_url.startswith('data:image/') or ',' not in data_url:
+            raise ValueError('Select or capture a license image first')
+        try:
+            raw_bytes = base64.b64decode(data_url.split(',', 1)[1], validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError('The captured license image is invalid') from exc
+    if len(raw_bytes) > MAX_LICENSE_IMAGE_BYTES:
+        raise ValueError('The license image must be 15 MB or smaller')
+    return raw_bytes
+
+
+@admin_bp.route('/test-drives/analyze-license', methods=['POST'])
+@login_required
+def test_drive_analyze_license():
+    if rate_limit_exceeded(
+        f'license-analysis:{current_user.get_id()}',
+        current_app.config.get('LICENSE_ANALYSIS_RATE_LIMIT', 20),
+        current_app.config.get('LICENSE_ANALYSIS_RATE_WINDOW', 300),
+    ):
+        return jsonify({'ok': False, 'error': 'Too many analysis requests. Please wait and try again.'}), 429
+    try:
+        result = analyze_license_image(_license_analysis_bytes())
+    except ValueError as exc:
+        return jsonify({'ok': False, 'error': str(exc)}), 400
+    except RuntimeError as exc:
+        current_app.logger.warning('License analysis unavailable: %s', exc)
+        return jsonify({'ok': False, 'error': 'License analysis is unavailable. Enter the details manually.'}), 503
+    return jsonify({'ok': True, **result})
+
+
 @admin_bp.route('/test-drives')
 @login_required
 def test_drives():
@@ -927,6 +966,9 @@ def test_drive_new():
             customer_email=(form.customer_email.data or '').strip() or None,
             license_number=(form.license_number.data or '').strip() or None,
             license_state=(form.license_state.data or '').strip() or None,
+            license_date_of_birth=form.license_date_of_birth.data,
+            license_expiration_date=form.license_expiration_date.data,
+            license_address=(form.license_address.data or '').strip() or None,
             salesperson=(form.salesperson.data or '').strip() or None,
             start_mileage=form.start_mileage.data,
             notes=form.notes.data,
@@ -953,6 +995,9 @@ def test_drive_edit(id):
         test_drive.customer_email = (form.customer_email.data or '').strip() or None
         test_drive.license_number = (form.license_number.data or '').strip() or None
         test_drive.license_state = (form.license_state.data or '').strip() or None
+        test_drive.license_date_of_birth = form.license_date_of_birth.data
+        test_drive.license_expiration_date = form.license_expiration_date.data
+        test_drive.license_address = (form.license_address.data or '').strip() or None
         test_drive.salesperson = (form.salesperson.data or '').strip() or None
         test_drive.start_mileage = form.start_mileage.data
         test_drive.end_mileage = form.end_mileage.data

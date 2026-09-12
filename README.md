@@ -97,6 +97,8 @@ Set `DATABASE_URL` to a production PostgreSQL database for better performance an
 | `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` fallback-only |
 | `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.5`) |
 | `XAI_API_KEY` | xAI API key for Grok vision highlights (required for Grok engine) |
+| `LICENSE_GROK_MODEL` | xAI vision model for license extraction and visual screening (default `grok-4.5`) |
+| `LICENSE_GROK_TIMEOUT` | License-analysis request timeout in seconds (default `45`) |
 | `PHOTO_HIGHLIGHTS_GROK_REQUIRED` | If `true`, fail the job instead of OpenCV fallback when Grok errors |
 | `HIGHLIGHT_WORKER_POLL` | Worker idle poll seconds (default `2`) |
 | `HIGHLIGHT_WORKER_LEASE` | Job lease seconds (default `300`) |
