@@ -1547,15 +1547,15 @@ def _handle_vehicle_images(vehicle, files):
     existing = list(vehicle.images or [])
     order_offset = len(existing)
     new_image_ids = []
+    failed_names = []
     for idx, file in enumerate(files):
         if not file or not getattr(file, 'filename', None):
             continue
         filename, width, height = save_uploaded_image(file, subfolder='vehicles')
         if not filename:
+            failed_names.append(os.path.basename(file.filename))
             continue
-        is_primary = (len(existing) == 0 and idx == 0) or (
-            order_offset == 0 and idx == 0 and not any(i.is_primary for i in existing)
-        )
+        is_primary = not any(i.is_primary for i in existing)
         img = VehicleImage(
             vehicle_id=vehicle.id,
             filename=filename,
@@ -1571,6 +1571,12 @@ def _handle_vehicle_images(vehicle, files):
         if img.id:
             new_image_ids.append(img.id)
     db.session.commit()
+    if failed_names:
+        flash(
+            f"Could not save {len(failed_names)} photo(s): {', '.join(failed_names)}. "
+            'These photos were not added to the listing. Try uploading them again as JPEG images.',
+            'warning' if new_image_ids else 'danger',
+        )
     # Enqueue analysis outside the image commit so upload latency stays low
     if new_image_ids and current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True) \
             and current_app.config.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', True):

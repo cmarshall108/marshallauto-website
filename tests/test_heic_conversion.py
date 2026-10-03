@@ -8,7 +8,7 @@ from PIL import Image
 from werkzeug.datastructures import FileStorage
 
 from app import create_app, db
-from app.models import Vehicle, VehicleImage
+from app.models import User, Vehicle, VehicleImage
 from app.utils import convert_heic_vehicle_images, save_uploaded_image
 from config import TestingConfig
 
@@ -46,6 +46,77 @@ class HeicConversionTests(unittest.TestCase):
         with Image.open(os.path.join(self.folder, filename)) as img:
             self.assertEqual(img.format, 'JPEG')
         self.assertTrue(os.path.exists(os.path.join(self.folder, filename.replace('.jpg', '_card.jpg'))))
+
+    def test_existing_listing_accepts_replacement_photos(self):
+        from app.admin import _handle_vehicle_images
+
+        vehicle = Vehicle(year=2012, make='Dodge', model='Challenger', price=8999, mileage=63400)
+        db.session.add(vehicle)
+        db.session.commit()
+        self.assertEqual(list(vehicle.images), [])
+        with self.app.test_request_context():
+            _handle_vehicle_images(vehicle, [
+                FileStorage(stream=BytesIO(b'failed original upload'), filename='old.heic'),
+                FileStorage(stream=BytesIO(heic_bytes()), filename='replacement.HEIC'),
+            ])
+        db.session.refresh(vehicle)
+
+        self.assertEqual(len(vehicle.images), 1)
+        self.assertTrue(vehicle.primary_image().is_primary)
+        self.assertTrue(vehicle.primary_image_url().endswith('.jpg'))
+
+    def test_edit_existing_listing_saves_and_displays_new_photos(self):
+        vehicle = Vehicle(year=2012, make='Dodge', model='Challenger', price=8999, mileage=63400)
+        user = User(username='photo-admin')
+        user.set_password('test-password-only')
+        db.session.add_all([vehicle, user])
+        db.session.flush()
+        vehicle.ensure_slug()
+        db.session.commit()
+        client = self.app.test_client()
+        response = client.post('/admin/login', data={
+            'username': user.username, 'password': 'test-password-only',
+        })
+        self.assertEqual(response.status_code, 302)
+        jpeg = BytesIO()
+        Image.new('RGB', (800, 600), 'blue').save(jpeg, format='JPEG')
+        jpeg.seek(0)
+        response = client.post(f'/admin/vehicles/{vehicle.id}/edit', data={
+            'year': '2012', 'make': 'Dodge', 'model': 'Challenger',
+            'price': '8999', 'mileage': '63400', 'condition': 'used',
+            'title_status': 'rebuilt', 'status': 'available', 'drivetrain': '',
+            'images': [(BytesIO(heic_bytes()), 'new.HEIC'), (jpeg, 'new.jpg')],
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], '/admin/vehicles')
+        db.session.refresh(vehicle)
+        self.assertEqual(len(vehicle.images), 2)
+        self.assertTrue(vehicle.primary_image().is_primary)
+        response = client.get(f'/inventory/{vehicle.slug}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'data-gallery-count="2"', response.data)
+        for photo in vehicle.images:
+            self.assertIn(photo.url.encode(), response.data)
+            self.assertTrue(os.path.isfile(os.path.join(self.folder, photo.filename)))
+
+    def test_failed_upload_is_reported_instead_of_silently_skipped(self):
+        from flask import get_flashed_messages
+        from app.admin import _handle_vehicle_images
+
+        vehicle = Vehicle(year=2012, make='Dodge', model='Challenger', price=8999, mileage=63400)
+        db.session.add(vehicle)
+        db.session.commit()
+        with self.app.test_request_context():
+            _handle_vehicle_images(vehicle, [
+                FileStorage(stream=BytesIO(b'not an image'), filename='broken.heic'),
+            ])
+            messages = get_flashed_messages(with_categories=True)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0][0], 'danger')
+        self.assertIn('broken.heic', messages[0][1])
+        self.assertIn('not added to the listing', messages[0][1])
+        db.session.refresh(vehicle)
+        self.assertEqual(len(vehicle.images), 0)
 
     def test_existing_heic_rows_are_converted(self):
         vehicle = Vehicle(year=2020, make='Honda', model='Civic', price=15000, mileage=40000)
