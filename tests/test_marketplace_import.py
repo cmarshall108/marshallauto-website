@@ -224,6 +224,31 @@ class MarketplaceSyncTests(unittest.TestCase):
         self.assertEqual(self.source.last_error, 'Login required')
         self.assertGreater(self.source.next_check_at, utcnow())
 
+    def test_repeated_listing_updates_do_not_repeat_ai_analysis(self):
+        from app.highlight_jobs import claim_next_job, enqueue_vehicle_highlight_jobs, process_job
+        from app.models import PhotoHighlightJob
+
+        self.app.config.update(PHOTO_HIGHLIGHTS_ENABLED=True, PHOTO_HIGHLIGHTS_AUTO_ENQUEUE=True)
+        result = {'scene': 'exterior_side', 'highlights': [], 'analysis_version': 3, 'engine': 'grok'}
+        with patch('app.photo_highlights.analyze_vehicle_image', return_value=result) as analyze:
+            self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 2)
+            for image_index in range(2):
+                self.assertTrue(process_job(claim_next_job()))
+            analyzed_at = {image.id: image.highlight_analyzed_at for image in self.vehicle.images}
+            for price in ('11900', '11500', '11000'):
+                changed = parse_listing(listing_html(listing_price={'amount': price, 'currency': 'USD'}), URL)
+                self.source.next_check_at = utcnow() - timedelta(minutes=1)
+                db.session.commit()
+                with patch('app.marketplace_import.fetch_listing', return_value=changed), \
+                        patch('app.marketplace_import.download') as download:
+                    self.assertEqual(sync_due(), {'checked': 1, 'updated': 1, 'failed': 0})
+                    download.assert_not_called()
+                self.assertEqual(PhotoHighlightJob.query.count(), 2)
+                self.assertIsNone(claim_next_job())
+                self.assertEqual(analyze.call_count, 2)
+            self.assertEqual(self.vehicle.price, 11000)
+            self.assertEqual({image.id: image.highlight_analyzed_at for image in self.vehicle.images}, analyzed_at)
+
     def test_photo_replacement_keeps_staff_uploads(self):
         self.vehicle.images.append(VehicleImage(filename='manual.jpg', is_primary=False, order_index=2))
         removed = apply_photos(self.vehicle, self.photos[1:], self.photos)

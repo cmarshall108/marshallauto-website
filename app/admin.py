@@ -1584,13 +1584,12 @@ def _handle_vehicle_images(vehicle, files):
 
 
 def _enqueue_highlights_for_vehicle(vehicle, force=False):
-    """Queue missing analyses after vehicle create/update (features may have changed)."""
+    """Queue first-time photo analyses; reruns require an explicit force request."""
     if not vehicle or not current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True):
         return
     if not current_app.config.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', True) and not force:
         return
     try:
-        # Re-run when features change so CarPlay/leather bubbles stay accurate
         enqueue_vehicle_highlight_jobs(vehicle.id, force=force, only_missing=not force)
     except Exception as exc:
         current_app.logger.warning(

@@ -39,20 +39,22 @@ def enqueue_image_highlight_job(image_id: int, force: bool = False, priority: in
     image = db.session.get(VehicleImage, image_id)
     if not image:
         return None
+    if not force and (
+        image.highlight_status in ('ready', 'failed', 'skipped')
+        or image.highlight_analyzed_at is not None
+    ):
+        return None
 
     existing = (
         PhotoHighlightJob.query
-        .filter(
-            PhotoHighlightJob.vehicle_image_id == image_id,
-            PhotoHighlightJob.status.in_(tuple(ACTIVE_STATUSES)),
-        )
+        .filter_by(vehicle_image_id=image_id)
         .order_by(PhotoHighlightJob.id.desc())
         .first()
     )
     if existing and not force:
-        return existing
+        return existing if existing.status in ACTIVE_STATUSES else None
 
-    if force and existing:
+    if force and existing and existing.status in ACTIVE_STATUSES:
         existing.status = 'cancelled'
         existing.finished_at = utcnow()
         existing.last_error = 'Superseded by forced requeue'
@@ -97,7 +99,7 @@ def enqueue_vehicle_highlight_jobs(vehicle_id: int, force: bool = False, only_mi
     count = 0
     for image in vehicle.ordered_images():
         if only_missing and not force:
-            if image.highlight_status == 'ready' and (image.highlights or []):
+            if image.highlight_status == 'ready':
                 continue
             if image.highlight_status == 'processing':
                 # Ensure a job exists

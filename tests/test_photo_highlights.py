@@ -181,6 +181,103 @@ class AnalyzeSmokeTests(unittest.TestCase):
         self.assertEqual(result['highlights'][0]['label'], 'Grok Spot')
 
 
+class HighlightQueueTests(unittest.TestCase):
+    def setUp(self):
+        from app import create_app, db
+        from app.models import Vehicle, VehicleImage
+        from config import TestingConfig
+
+        self.app = create_app(TestingConfig)
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        db.create_all()
+        self.vehicle = Vehicle(year=2018, make='Toyota', model='Camry', price=12500, mileage=80000)
+        self.image = VehicleImage(filename='car.jpg')
+        self.vehicle.images.append(self.image)
+        db.session.add(self.vehicle)
+        db.session.commit()
+
+    def tearDown(self):
+        from app import db
+
+        db.session.remove()
+        db.drop_all()
+        db.engine.dispose()
+        self.ctx.pop()
+
+    def test_updates_do_not_requeue_finished_images_even_without_highlights(self):
+        from app import db
+        from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
+        from app.models import PhotoHighlightJob
+
+        for state in ('ready', 'failed', 'skipped'):
+            with self.subTest(state=state):
+                self.image.highlight_status = state
+                db.session.commit()
+                self.assertIsNone(enqueue_image_highlight_job(self.image.id))
+                self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 0)
+                self.assertEqual(PhotoHighlightJob.query.count(), 0)
+
+    def test_updates_do_not_reset_terminal_job_retry_budget(self):
+        from app import db
+        from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
+        from app.models import PhotoHighlightJob
+
+        job = enqueue_image_highlight_job(self.image.id)
+        for state in ('completed', 'failed', 'cancelled'):
+            with self.subTest(state=state):
+                job.status = state
+                job.attempts = job.max_attempts
+                self.image.highlight_status = 'pending'
+                db.session.commit()
+                self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 0)
+                self.assertEqual(PhotoHighlightJob.query.count(), 1)
+                self.assertEqual(job.attempts, job.max_attempts)
+
+    def test_analyzed_timestamp_prevents_requeue_when_status_changes(self):
+        from app import db
+        from app.highlight_jobs import enqueue_vehicle_highlight_jobs
+        from app.models import utcnow
+
+        self.image.highlight_analyzed_at = utcnow()
+        db.session.commit()
+        self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 0)
+
+    def test_new_photos_queue_once_and_updates_keep_active_job(self):
+        from app import db
+        from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
+        from app.models import PhotoHighlightJob, VehicleImage
+
+        self.image.highlight_status = 'ready'
+        new_image = VehicleImage(filename='new.jpg')
+        self.vehicle.images.append(new_image)
+        db.session.commit()
+        self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 1)
+        job = PhotoHighlightJob.query.one()
+        self.assertEqual(job.vehicle_image_id, new_image.id)
+        for state in ('queued', 'running'):
+            with self.subTest(state=state):
+                job.status = state
+                db.session.commit()
+                self.assertEqual(enqueue_image_highlight_job(new_image.id).id, job.id)
+                self.assertEqual(PhotoHighlightJob.query.count(), 1)
+
+    def test_force_allows_explicit_reanalysis(self):
+        from app import db
+        from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
+        from app.models import PhotoHighlightJob, utcnow
+
+        original = enqueue_image_highlight_job(self.image.id)
+        original.status = 'completed'
+        self.image.highlight_status = 'ready'
+        self.image.highlight_analyzed_at = utcnow()
+        db.session.commit()
+        self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id, force=True), 1)
+        self.assertEqual(PhotoHighlightJob.query.count(), 2)
+        self.assertEqual(original.status, 'completed')
+        self.assertEqual(self.image.highlight_status, 'pending')
+
+
 class EnqueueHelperTests(unittest.TestCase):
     def test_queue_stats_shape_with_mocks(self):
         from app import highlight_jobs
