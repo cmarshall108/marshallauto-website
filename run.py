@@ -101,6 +101,20 @@ def marketplace_sync(limit):
 app.cli.add_command(marketplace_sync, name='listing-sync')
 
 
+@app.cli.command('convert-heic')
+@click.option('--dry-run', is_flag=True, help='Only report how many HEIC photos would be converted.')
+def convert_heic(dry_run):
+    """Convert stored HEIC/HEIF vehicle photos to JPEG."""
+    from app.utils import convert_heic_vehicle_images
+    stats = convert_heic_vehicle_images(dry_run=dry_run)
+    click.echo(
+        f"{'[dry run] ' if dry_run else ''}"
+        f"found={stats['found']} converted={stats['converted']} failed={stats['failed']}"
+    )
+    if stats['failed']:
+        raise click.ClickException('Some photos could not be converted; see the log for details.')
+
+
 @app.cli.command('seed')
 def seed_data():
     """Seed sample data for development."""

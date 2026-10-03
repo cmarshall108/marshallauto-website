@@ -14,6 +14,14 @@ from flask import current_app, request
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:  # pragma: no cover - HEIC uploads will be rejected as unreadable
+    pass
+
+HEIC_EXTENSIONS = {'heic', 'heif'}
+
 # In-process rate limit buckets: key -> deque of timestamps
 _rate_buckets = defaultdict(deque)
 
@@ -95,8 +103,8 @@ def save_uploaded_image(file_obj, subfolder='vehicles', width=None, quality=None
         return None, None, None
 
     ext = file_obj.filename.rsplit('.', 1)[1].lower()
-    # Normalize extension for JPEG
-    if ext == 'jpeg':
+    # Browsers can't display HEIC, so store it (and plain .jpeg) as .jpg
+    if ext == 'jpeg' or ext in HEIC_EXTENSIONS:
         ext = 'jpg'
 
     width = width or current_app.config.get('IMAGE_WIDTHS', {}).get('detail', 1200)
@@ -108,22 +116,7 @@ def save_uploaded_image(file_obj, subfolder='vehicles', width=None, quality=None
     full_path = os.path.join(upload_path, filename)
 
     try:
-        img = Image.open(file_obj)
-        img = ImageOps.exif_transpose(img)
-        if img.mode in ('RGBA', 'P', 'LA'):
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'P':
-                img = img.convert('RGBA')
-            alpha = img.split()[-1] if img.mode in ('RGBA', 'LA') else None
-            background.paste(img, mask=alpha)
-            img = background
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        if img.width > width:
-            ratio = width / float(img.width)
-            new_height = max(1, int(img.height * ratio))
-            img = img.resize((width, new_height), Image.Resampling.LANCZOS)
+        img = _normalize_image(Image.open(file_obj), width)
 
         save_kwargs = {'optimize': True}
         if ext in ('jpg', 'jpeg', 'webp'):
@@ -140,6 +133,79 @@ def save_uploaded_image(file_obj, subfolder='vehicles', width=None, quality=None
     except Exception as e:
         current_app.logger.error('Image save failed: %s', e)
         return None, None, None
+
+
+def _normalize_image(img, width):
+    """Apply EXIF rotation, flatten to RGB, and cap the width."""
+    img = ImageOps.exif_transpose(img)
+    if img.mode in ('RGBA', 'P', 'LA'):
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        alpha = img.split()[-1] if img.mode in ('RGBA', 'LA') else None
+        background.paste(img, mask=alpha)
+        img = background
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    if img.width > width:
+        ratio = width / float(img.width)
+        new_height = max(1, int(img.height * ratio))
+        img = img.resize((width, new_height), Image.Resampling.LANCZOS)
+    return img
+
+
+def convert_heic_vehicle_images(dry_run=False):
+    """Re-encode stored HEIC/HEIF vehicle photos as JPEG and repoint their DB rows."""
+    from app import db
+    from app.admin import _delete_vehicle_image_file
+    from app.highlight_jobs import enqueue_image_highlight_job
+    from app.models import VehicleImage
+
+    stats = {'found': 0, 'converted': 0, 'failed': 0}
+    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vehicles')
+    width = current_app.config.get('IMAGE_WIDTHS', {}).get('detail', 1200)
+    quality = current_app.config.get('IMAGE_QUALITY', 85)
+    highlights_on = current_app.config.get('PHOTO_HIGHLIGHTS_ENABLED', True)
+
+    candidates = VehicleImage.query.filter(func.lower(VehicleImage.filename).like('%.hei_')).all()
+    for image in candidates:
+        old_name = os.path.basename(image.filename or '')
+        if '.' not in old_name or old_name.rsplit('.', 1)[1].lower() not in HEIC_EXTENSIONS:
+            continue
+        stats['found'] += 1
+        if dry_run:
+            continue
+
+        new_name = f"{old_name.rsplit('.', 1)[0]}.jpg"
+        if os.path.exists(os.path.join(upload_path, new_name)):
+            new_name = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(6)}.jpg"
+        try:
+            with Image.open(os.path.join(upload_path, old_name)) as src:
+                img = _normalize_image(src, width)
+            img.save(os.path.join(upload_path, new_name), format='JPEG', quality=quality, optimize=True)
+            _save_image_variants(img, upload_path, new_name)
+        except Exception as exc:
+            current_app.logger.error('HEIC conversion failed for image %s (%s): %s', image.id, old_name, exc)
+            stats['failed'] += 1
+            continue
+
+        image.filename = new_name
+        image.width, image.height = img.width, img.height
+        requeue = highlights_on and image.highlight_status in ('pending', 'failed')
+        if requeue:
+            image.highlight_status = 'pending'
+            image.highlight_error = None
+        db.session.commit()
+        _delete_vehicle_image_file(VehicleImage(filename=old_name))
+        stats['converted'] += 1
+
+        if requeue:
+            try:
+                enqueue_image_highlight_job(image.id, force=True)
+            except Exception as exc:
+                current_app.logger.warning('Failed to enqueue highlight job for image %s: %s', image.id, exc)
+    return stats
 
 
 def _save_image_variants(img, upload_path, filename):

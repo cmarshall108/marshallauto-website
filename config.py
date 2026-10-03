@@ -37,7 +37,8 @@ class Config:
     PRIVATE_UPLOAD_FOLDER = os.path.join(basedir, 'instance', 'private_uploads')
     # Total request body size (all images in one form submit). Default 256MB for bulk vehicle photos.
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 256 * 1024 * 1024))
-    ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    # HEIC/HEIF (iPhone) uploads are accepted but always re-encoded to JPEG on save.
+    ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif'}
     ALLOWED_PDF_EXTENSIONS = {'pdf'}
     IMAGE_WIDTHS = {
         'thumbnail': 300,
