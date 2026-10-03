@@ -87,6 +87,20 @@ def leads_spam_scan(delete, rescan_all, dry_run):
     )
 
 
+@app.cli.command('marketplace-sync')
+@click.option('--limit', type=click.IntRange(1, 100), default=10, show_default=True)
+def marketplace_sync(limit):
+    """Refresh due Craigslist/Facebook imports; schedule every 15 minutes."""
+    from app.marketplace_import import sync_due
+    counts = sync_due(limit=limit)
+    click.echo(f"checked={counts['checked']} synced={counts['updated']} failed={counts['failed']}")
+    if counts['failed']:
+        raise click.ClickException('Some listings could not be refreshed; see their admin sync status.')
+
+
+app.cli.add_command(marketplace_sync, name='listing-sync')
+
+
 @app.cli.command('seed')
 def seed_data():
     """Seed sample data for development."""

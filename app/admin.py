@@ -6,11 +6,12 @@ from decimal import InvalidOperation
 from functools import wraps
 
 from flask import (
-    Blueprint, abort, current_app, flash, jsonify, redirect, render_template,
+    Blueprint, Response, abort, current_app, flash, jsonify, redirect, render_template,
     request, send_from_directory, url_for,
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app import db
@@ -32,6 +33,10 @@ from app.facebook_publish import (
     maybe_auto_post_vehicle, post_vehicle_to_page,
 )
 from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
+from app.marketplace_import import (
+    MarketplaceError, attach_import, discard_photos, fetch_listing,
+    photo_thumbnail, photo_token, preview_token, read_preview, stage_photos,
+)
 from app.utils import (
     client_ip, delete_license_image, delete_local_video_file, is_safe_redirect,
     rate_limit_exceeded, save_license_image_data_url, save_uploaded_image,
@@ -441,35 +446,94 @@ def vehicle_import():
     return render_template('admin/vehicle_import.html', fields=CSV_IMPORT_FIELDS, required=CSV_REQUIRED_FIELDS)
 
 
+def _marketplace_preview(snapshot):
+    if not snapshot:
+        return None
+    return dict(snapshot, photos=[dict(photo, preview_url=url_for(
+        'admin.vehicle_marketplace_photo', token=photo_token(photo['url'], current_user.id),
+    )) for photo in snapshot['photos']])
+
+
+@admin_bp.route('/vehicles/marketplace/photo')
+@login_required
+def vehicle_marketplace_photo():
+    if rate_limit_exceeded(f'marketplace-photo:{current_user.id}', 120, 60):
+        abort(429)
+    try:
+        image = photo_thumbnail(request.args.get('token', ''), current_user.id)
+    except MarketplaceError:
+        abort(422)
+    return Response(image, mimetype='image/jpeg', headers={'Cache-Control': 'private, max-age=300'})
+
+
+@admin_bp.route('/vehicles/marketplace/preview', methods=['POST'])
+@login_required
+def vehicle_marketplace_preview():
+    if not request.form.get('permission'):
+        return jsonify(error='Confirm permission to import the listing and photos.'), 400
+    if rate_limit_exceeded(f'marketplace:{current_user.id}', 5, 60):
+        return jsonify(error='Too many imports. Please wait a minute.'), 429
+    try:
+        snapshot = fetch_listing(request.form.get('url', ''))
+    except MarketplaceError as exc:
+        return jsonify(error=str(exc)), 422
+    except ValueError:
+        return jsonify(error='Invalid listing URL or data. Use a public Craigslist vehicle or Facebook Marketplace item URL.'), 422
+    return jsonify(snapshot=_marketplace_preview(snapshot), token=preview_token(snapshot, current_user.id))
+
+
 @admin_bp.route('/vehicles/new', methods=['GET', 'POST'])
 @login_required
 def vehicle_new():
     form = VehicleForm()
     fb_status = configuration_status()
+    snapshot = None
+    import_valid = True
+    if form.marketplace_token.data:
+        try:
+            snapshot = read_preview(form.marketplace_token.data, current_user.id)
+        except MarketplaceError as exc:
+            flash(str(exc), 'danger')
+            import_valid = False
     if request.method == 'GET' and fb_status.get('auto_post_on_create') and fb_status.get('configured'):
         form.post_to_facebook.data = True
-    if form.validate_on_submit():
-        vehicle = _vehicle_from_form(form)
-        db.session.add(vehicle)
-        db.session.flush()
-        vehicle.ensure_slug()
-        _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
-        if vehicle.status == 'sold':
-            vehicle.sold_at = vehicle.sold_at or utcnow()
-            delete_local_video_file(vehicle.video_url)
-            vehicle.video_url = None
-        db.session.commit()
-        _handle_vehicle_images(vehicle, request.files.getlist('images'))
-        # Refresh images relationship after image commit
-        db.session.refresh(vehicle)
-        _enqueue_highlights_for_vehicle(vehicle)
-        _maybe_publish_vehicle_to_facebook(
-            vehicle,
-            is_new=True,
-            force=bool(form.post_to_facebook.data),
-        )
-        flash('Vehicle added successfully.', 'success')
-        return redirect(url_for('admin.vehicles'))
+    if form.validate_on_submit() and import_valid:
+        created_photos = []
+        try:
+            if form.marketplace_url.data and not snapshot:
+                raise MarketplaceError('Import the source listing before saving, or clear its URL.')
+            if snapshot:
+                photos, created_photos = stage_photos(snapshot)
+            vehicle = _vehicle_from_form(form)
+            db.session.add(vehicle)
+            db.session.flush()
+            vehicle.ensure_slug()
+            if snapshot:
+                attach_import(vehicle, snapshot, photos, form.marketplace_sync_enabled.data)
+            _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
+            if vehicle.status == 'sold':
+                vehicle.sold_at = vehicle.sold_at or utcnow()
+                delete_local_video_file(vehicle.video_url)
+                vehicle.video_url = None
+            db.session.commit()
+        except (MarketplaceError, IntegrityError) as exc:
+            db.session.rollback()
+            discard_photos(created_photos)
+            flash(str(exc) if isinstance(exc, MarketplaceError)
+                  else 'A vehicle with this VIN or stock number already exists.', 'danger')
+        except Exception:
+            db.session.rollback()
+            discard_photos(created_photos)
+            raise
+        else:
+            _handle_vehicle_images(vehicle, request.files.getlist('images'))
+            db.session.refresh(vehicle)
+            _enqueue_highlights_for_vehicle(vehicle)
+            _maybe_publish_vehicle_to_facebook(
+                vehicle, is_new=True, force=bool(form.post_to_facebook.data),
+            )
+            flash('Vehicle added successfully.', 'success')
+            return redirect(url_for('admin.vehicles'))
     return render_template(
         'admin/vehicle_form.html',
         form=form,
@@ -477,6 +541,7 @@ def vehicle_new():
         title='Add Vehicle',
         facebook_status=fb_status,
         marketplace_draft=None,
+        marketplace_preview=_marketplace_preview(snapshot),
     )
 
 
@@ -491,9 +556,13 @@ def vehicle_edit(id):
     )
     form = VehicleForm(obj=vehicle)
     fb_status = configuration_status()
+    if request.method == 'GET' and vehicle.marketplace_sync:
+        form.marketplace_sync_enabled.data = vehicle.marketplace_sync.enabled
     if form.validate_on_submit():
         was_sold = vehicle.status == 'sold'
         _apply_vehicle_form(vehicle, form)
+        if vehicle.marketplace_sync:
+            vehicle.marketplace_sync.enabled = form.marketplace_sync_enabled.data
         vehicle.ensure_slug()
         _apply_video_to_vehicle(vehicle, form, request.files.get('video_file'))
         if vehicle.status == 'sold' and not was_sold:

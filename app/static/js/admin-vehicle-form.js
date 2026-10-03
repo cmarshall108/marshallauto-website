@@ -11,6 +11,87 @@
 
     const catalogUrl = form.dataset.catalogUrl;
     const vinDecodeUrl = form.dataset.vinDecodeUrl;
+    const marketplacePanel = document.getElementById('marketplace-import');
+    if (marketplacePanel) {
+        const importButton = document.getElementById('marketplace-import-btn');
+        const clearButton = document.getElementById('marketplace-clear-btn');
+        const urlInput = document.getElementById('marketplace_url');
+        const tokenInput = document.getElementById('marketplace_token');
+        const importStatus = document.getElementById('marketplace-import-status');
+        const photoPreview = document.getElementById('marketplace-preview-photos');
+        let importing = false;
+
+        function clearPreview() {
+            tokenInput.value = '';
+            photoPreview.replaceChildren();
+            importStatus.textContent = '';
+        }
+
+        urlInput.addEventListener('input', clearPreview);
+        clearButton.addEventListener('click', () => {
+            urlInput.value = '';
+            clearPreview();
+        });
+        form.addEventListener('submit', (event) => {
+            if (importing) event.preventDefault();
+        });
+        importButton.addEventListener('click', async () => {
+            if (!urlInput.value.trim() || !urlInput.reportValidity()) return;
+            if (!document.getElementById('marketplace_permission').checked) {
+                importStatus.textContent = 'Confirm permission to import the listing and photos.';
+                return;
+            }
+            if (['year', 'make', 'model', 'price', 'mileage', 'description'].some((name) => form.elements[name].value)
+                && !window.confirm('Replace matching form fields with source listing values?')) return;
+            clearPreview();
+            importing = true;
+            importButton.disabled = true;
+            clearButton.disabled = true;
+            urlInput.readOnly = true;
+            importStatus.textContent = 'Loading listing...';
+            const data = new FormData();
+            data.set('url', urlInput.value.trim());
+            data.set('permission', '1');
+            data.set('csrf_token', form.elements.csrf_token.value);
+            try {
+                const response = await fetch(marketplacePanel.dataset.previewUrl, {
+                    method: 'POST', body: data, credentials: 'same-origin',
+                });
+                if (!response.headers.get('content-type')?.includes('application/json')) {
+                    throw new Error('Import failed. Your session may have expired; reload and try again.');
+                }
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Listing import failed.');
+                for (const [name, value] of Object.entries(result.snapshot.fields)) {
+                    const field = form.elements.namedItem(name);
+                    if (field) field.value = value;
+                }
+                tokenInput.value = result.token;
+                urlInput.value = result.snapshot.url;
+                for (const [index, photo] of result.snapshot.photos.entries()) {
+                    const image = document.createElement('img');
+                    image.src = photo.preview_url;
+                    image.alt = `Listing photo ${index + 1}`;
+                    image.width = 112;
+                    image.height = 84;
+                    image.style.cssText = 'width:112px;height:84px;object-fit:cover;flex-shrink:0;';
+                    image.loading = 'lazy';
+                    photoPreview.append(image);
+                }
+                const missing = ['year', 'make', 'model', 'price', 'mileage'].filter(
+                    (name) => result.snapshot.fields[name] === undefined);
+                importStatus.textContent = `${result.snapshot.photos.length} photos ready to import on save.`
+                    + (missing.length ? ` Missing listing details: ${missing.join(', ')}.` : '');
+            } catch (error) {
+                importStatus.textContent = error.message;
+            } finally {
+                importing = false;
+                importButton.disabled = false;
+                clearButton.disabled = false;
+                urlInput.readOnly = false;
+            }
+        });
+    }
     let catalog = null;
     let activeMenu = null;
     let activeIndex = -1;

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for due vehicle listing refreshes every 15 minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/15:00
+Persistent=true
+RandomizedDelaySec=60
+Unit=marshallauto-marketplace-sync.service
+
+[Install]
+WantedBy=timers.target

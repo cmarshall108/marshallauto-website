@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh due Marshall Auto Craigslist and Facebook imports
+After=network-online.target marshallauto.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/marshallauto-website
+Environment=FLASK_ENV=production
+ExecStart=/usr/bin/bash /opt/marshallauto-website/deploy/sync_marketplace.sh
+TimeoutStartSec=30min

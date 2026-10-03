@@ -12,6 +12,46 @@
       data-catalog-url="{{ url_for('admin.vehicle_catalog_api') }}"
       data-vin-decode-url="{{ url_for('admin.vin_decode_api') }}">
     {{ form.hidden_tag() }}
+    {% if not vehicle %}
+    <section class="border-bottom pb-3 mb-3" id="marketplace-import"
+             data-preview-url="{{ url_for('admin.vehicle_marketplace_preview') }}">
+        <label class="form-label fw-semibold" for="marketplace_url"><i class="bi bi-link-45deg me-1"></i>Craigslist or Facebook listing</label>
+        <div class="d-flex flex-wrap gap-2">
+            {{ form.marketplace_url(class="form-control flex-grow-1 w-auto", id="marketplace_url", type="url", placeholder="https://www.craigslist.org/view/d/...", style="min-width:0;flex-basis:260px;") }}
+            <button type="button" class="btn btn-outline-primary" id="marketplace-import-btn"><i class="bi bi-download me-1"></i>Import listing</button>
+            <button type="button" class="btn btn-outline-secondary" id="marketplace-clear-btn" title="Clear listing connection" aria-label="Clear listing connection"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="form-check mt-2">
+            {{ form.marketplace_permission(class="form-check-input", id="marketplace_permission") }}
+            <label class="form-check-label" for="marketplace_permission">{{ form.marketplace_permission.label.text }}</label>
+        </div>
+        <div id="marketplace-import-status" class="small mt-2" role="status" aria-live="polite">{% if marketplace_preview %}{{ marketplace_preview.photos|length }} photos ready to import on save.{% endif %}</div>
+        <div id="marketplace-preview-photos" class="d-flex gap-2 overflow-auto mt-2">
+            {% if marketplace_preview %}{% for photo in marketplace_preview.photos %}
+            <img src="{{ photo.preview_url }}" alt="Listing photo {{ loop.index }}" width="112" height="84" style="width:112px;height:84px;object-fit:cover;flex-shrink:0;" loading="lazy">
+            {% endfor %}{% endif %}
+        </div>
+        <div class="form-check mt-2">
+            {{ form.marketplace_sync_enabled(class="form-check-input", id="marketplace_sync_enabled") }}
+            <label class="form-check-label" for="marketplace_sync_enabled">{{ form.marketplace_sync_enabled.label.text }}</label>
+        </div>
+    </section>
+    {% elif vehicle.marketplace_sync %}
+    {% set source = vehicle.marketplace_sync %}
+    <section class="border-bottom pb-3 mb-3">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <a href="{{ source.source_url }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg me-1"></i>Source {{ 'Craigslist' if source.snapshot.get('provider') == 'craigslist' else 'Facebook Marketplace' }} listing</a>
+            <span class="badge {{ 'text-bg-success' if source.enabled else 'text-bg-secondary' }}">{{ 'Sync enabled' if source.enabled else 'Sync paused' }}</span>
+        </div>
+        <div class="form-check">
+            {{ form.marketplace_sync_enabled(class="form-check-input", id="marketplace_sync_enabled") }}
+            <label class="form-check-label" for="marketplace_sync_enabled">{{ form.marketplace_sync_enabled.label.text }}</label>
+        </div>
+        <div class="small text-muted mt-2">Last successful import: {{ source.last_success_at.strftime('%m/%d/%Y %I:%M %p') if source.last_success_at else 'Never' }} UTC</div>
+        {% if source.enabled %}<div class="small text-muted">Next check due: {{ source.next_check_at.strftime('%m/%d/%Y %I:%M %p') }} UTC</div>{% endif %}
+        {% if source.last_error %}<div class="alert alert-warning small mt-2 mb-0">{{ source.last_error }}</div>{% endif %}
+    </section>
+    {% endif %}
     <div class="alert alert-light border small mb-3">
         <i class="bi bi-lightning-charge text-primary me-1"></i>
         Paste a <strong>VIN</strong> and click <strong>Decode VIN</strong> (or tab out of a complete VIN) to prefill year, make, model, trim, drivetrain, fuel, engine, MPG (EPA), and default safety features from NHTSA.
@@ -64,6 +104,7 @@
         <div class="col-md-4">
             <label class="form-label" for="price">Price *</label>
             {{ form.price(class="form-control", id="price", step="0.01") }}
+            {% if form.price.errors %}<div class="text-danger small">{{ form.price.errors[0] }}</div>{% endif %}
         </div>
         <div class="col-md-4">
             <label class="form-label" for="sale_price">Sale Price (optional)</label>
@@ -72,6 +113,7 @@
         <div class="col-md-4">
             <label class="form-label" for="mileage">Mileage *</label>
             {{ form.mileage(class="form-control", id="mileage") }}
+            {% if form.mileage.errors %}<div class="text-danger small">{{ form.mileage.errors[0] }}</div>{% endif %}
         </div>
         <div class="col-md-4">
             <label class="form-label" for="market_value">Retail Clean-Title Value (JD Power / NADAguides)</label>

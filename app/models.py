@@ -254,6 +254,22 @@ class Vehicle(db.Model):
         return parse_video_url(self.video_url) if self.video_url else None
 
 
+class MarketplaceSync(db.Model):
+    __tablename__ = 'marketplace_syncs'
+
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), primary_key=True)
+    source_url = db.Column(db.String(256), nullable=False)
+    enabled = db.Column(db.Boolean, default=True, nullable=False)
+    snapshot = db.Column(db.JSON, nullable=False)
+    photo_files = db.Column(db.JSON, nullable=False, default=list)
+    next_check_at = db.Column(db.DateTime, nullable=False, index=True)
+    last_checked_at = db.Column(db.DateTime, nullable=True)
+    last_success_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.String(500), nullable=True)
+    vehicle = db.relationship('Vehicle', backref=db.backref(
+        'marketplace_sync', uselist=False, cascade='all, delete-orphan'))
+
+
 class VehicleImage(db.Model):
     __tablename__ = 'vehicle_images'
 

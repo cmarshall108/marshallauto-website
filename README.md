@@ -18,6 +18,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 - **Admin Panel** (`/admin`)
   - Secure login with Flask-Login
   - Add/edit/delete vehicles with image uploads
+  - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
   - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle
   - Cascading typeahead suggestions for make/model/trim, colors, and features
   - “LOW MILES!” badge on inventory cards under 75,000 miles
@@ -107,7 +108,7 @@ Analytics and Facebook posting credentials can also be set in **Admin → Settin
 
 ## Facebook Page posts & Marketplace drafts
 
-**Important:** Meta does **not** provide a public API for ordinary third-party apps to automatically create **Facebook Marketplace** vehicle listings. Marketplace listing creation is limited to Meta partnership programs. This site does **not** scrape or browser-automate Marketplace (fragile and against Meta’s terms).
+**Important:** Meta does **not** provide a public API for ordinary third-party apps to automatically create **Facebook Marketplace** vehicle listings. Marketplace listing creation is limited to Meta partnership programs. Outbound Page posting and Marketplace drafts are separate from the optional public-listing importer below.
 
 What *is* supported:
 
@@ -133,6 +134,33 @@ What *is* supported:
 Post status (`facebook_post_id`, last error/time) is stored on each vehicle
 Analytics IDs can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`), which override env defaults.
 
+
+## Import From Craigslist or Facebook Marketplace
+
+On **Add Vehicle**, paste a Craigslist vehicle URL or a full `https://www.facebook.com/marketplace/item/123456789/` URL, confirm permission, and select **Import listing**. Review the populated details and photo previews, fill missing fields, and save. The initial import downloads the listing photos into the existing local image storage, including responsive variants. No account passwords, cookies, paid providers, or Page tokens are used.
+
+**Craigslist:** Both current `https://www.craigslist.org/view/d/.../<id>` links and regional vehicle URLs such as `https://raleigh.craigslist.org/cto/d/.../7974467394.html` are supported. Only HTTPS Craigslist listing redirects are followed; account, management, search, and external redirects are rejected. The importer reads the listing's JSON-LD, description, vehicle attributes, and ordered gallery. It imports exposed year/make/model, USD price, mileage, title status, transmission, fuel, body style, paint color, drive, VIN, and cylinder information. Other attributes are preserved in the source snapshot and features. Missing information is never inferred from photos or advertising claims. Descriptions retain their line breaks and title-history disclosures. Photos must come from `images.craigslist.org`, and mismatched gallery data aborts the import without removing saved photos.
+
+The supplied [2018 Buick Regal Sportback listing](https://www.craigslist.org/view/d/sanford-2018-buick-regal-sportback/nE3yePJrnEKxic4P388Xg7) was live-tested on October 3, 2026: $7,999, 67,000 miles, rebuilt title, and all 16 photos downloaded successfully. A subsequent real-source refresh reused unchanged photos and rescheduled the task. Listing contents and availability may change after this test.
+
+This is **best-effort public-page parsing**, not an official listing API. Only details actually exposed by the source can be imported. Login walls, removed listings, changed page formats, missing photo collections, non-USD prices, and more than 40 photos are rejected. Facebook share links are not followed. Do not assume missing information (especially mileage, trim, or title history) is known; review all vehicle fields before publishing. Full details and photos cannot be guaranteed for every listing. The tested Facebook listing required login and could not be imported.
+
+Import only content you have rights to reuse and for which automated access is authorized. Meta's [Automated Data Collection Terms](https://www.facebook.com/legal/automated_data_collection_terms) require permission; ownership of the photos alone does not grant that permission. This importer does not bypass Facebook access controls.
+
+Craigslist's [Terms of Use](https://www.craigslist.org/about/terms.of.use) also restrict automated collection without a separate license. Public accessibility is not itself permission. The importer does not bypass logins, challenges, or blocks, and does not retrieve seller contact details or account-management links.
+
+**Refresh behavior:** Saving an imported vehicle creates a persistent task, enabled by default and due every six hours. The worker applies source fields that changed since its last successful snapshot, reconciles imported photos, and retains staff-uploaded photos. Missing source fields do not clear local values. A changed source value takes precedence over a staff edit to that same field; unchanged source values leave staff edits intact. Photo IDs identify unchanged images, so renewed CDN signatures do not cause duplicate downloads. A Facebook sold/pending state updates local status; unavailable listings never imply sold or trigger deletion. Failures retain saved data and retry after six hours. Pause/resume syncing on **Edit Vehicle**, where the last successful import, next due time, and errors are shown. Refreshes do not automatically repost to the Facebook Page.
+
+Apply the schema migration and arrange for the worker to run:
+
+```bash
+venv/bin/python -m flask --app run:app db upgrade
+venv/bin/python -m flask --app run:app listing-sync
+```
+
+The command checks up to 10 due vehicles per run (`--limit` accepts 1-100), with database claims preventing duplicate processing by concurrent workers. `marketplace-sync` remains a compatible alias. Both providers use the existing `MarketplaceSync` table, so Craigslist support adds no extra schema migration. For Ubuntu, the existing `deploy/install.sh` installer installs and enables `marshallauto-marketplace-sync.timer`, which now handles both Craigslist and Facebook records. On an existing deployment, rerun that installer as the server administrator after updating and migrating. The timer invokes the command every 15 minutes; each vehicle retains its six-hour schedule. Inspect failures with `journalctl -u marshallauto-marketplace-sync.service`. This macOS workspace does not install or start systemd services.
+
+For another host, schedule the same command every 15 minutes using cron or the host's scheduler, with the project working directory, virtual environment, and production environment. Merely starting the web server does **not** execute refresh tasks. Initial photo import can take up to about two minutes; configure WSGI/reverse-proxy request timeouts of at least 180 seconds for this admin operation.
 
 ## Photo Highlights (Carvana-style bubbles)
 

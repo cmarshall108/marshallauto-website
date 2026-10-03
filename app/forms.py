@@ -30,6 +30,10 @@ class ChangePasswordForm(FlaskForm):
 
 
 class VehicleForm(FlaskForm):
+    marketplace_url = StringField('Craigslist or Facebook listing', validators=[Optional(), Length(max=512)])
+    marketplace_token = HiddenField()
+    marketplace_permission = BooleanField('I have permission to import this listing and its photos')
+    marketplace_sync_enabled = BooleanField('Refresh from source listing every 6 hours', default=True)
     year = IntegerField('Year *', validators=[DataRequired(), NumberRange(1900, 2100)])
     make = StringField('Make *', validators=[DataRequired(), Length(max=64)])
     model = StringField('Model *', validators=[DataRequired(), Length(max=64)])
