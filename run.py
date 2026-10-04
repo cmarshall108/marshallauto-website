@@ -91,9 +91,13 @@ def leads_spam_scan(delete, rescan_all, dry_run):
 @click.option('--limit', type=click.IntRange(1, 100), default=10, show_default=True)
 def marketplace_sync(limit):
     """Refresh due Craigslist/Facebook imports; schedule every 15 minutes."""
+    from app.craigslist_import import upgrade_saved_photos
     from app.marketplace_import import sync_due
     counts = sync_due(limit=limit)
     click.echo(f"checked={counts['checked']} synced={counts['updated']} failed={counts['failed']}")
+    upgrades = upgrade_saved_photos()
+    if upgrades['upgraded'] or upgrades['failed']:
+        click.echo(f"craigslist_photos_upgraded={upgrades['upgraded']} failed={upgrades['failed']}")
     if counts['failed']:
         raise click.ClickException('Some listings could not be refreshed; see their admin sync status.')
 

@@ -302,7 +302,12 @@ def stage_photos(snapshot, existing=()):
                     and previous[photo['id']].get('source_path', source_path) == source_path):
                 staged.append(previous[photo['id']])
                 continue
-            raw = download(photo['url'], photo=True, deadline=deadline)
+            try:
+                raw = download(photo['url'], photo=True, deadline=deadline)
+            except MarketplaceError:
+                if not photo.get('fallback_url'):
+                    raise
+                raw = download(photo['fallback_url'], photo=True, deadline=deadline)
             upload = FileStorage(stream=BytesIO(raw), filename='marketplace.jpg')
             filename, width, height = save_uploaded_image(upload)
             if not filename:
@@ -324,6 +329,16 @@ def apply_photos(vehicle, photos, previous=()):
     old_names = {photo['filename'] for photo in previous}
     new_names = {photo['filename'] for photo in photos}
     images = {image.filename: image for image in vehicle.images}
+    previous_by_id = {photo['id']: photo['filename'] for photo in previous if 'id' in photo}
+    replaced = []
+    for photo in photos:
+        old_name = previous_by_id.get(photo.get('id'))
+        if photo['filename'] not in images and old_name in images and old_name not in new_names:
+            # Same source photo re-downloaded: keep the row so its paid AI highlights carry over.
+            image = images.pop(old_name)
+            image.filename, image.width, image.height = photo['filename'], photo['width'], photo['height']
+            images[photo['filename']] = image
+            replaced.append({'filename': old_name})
     removed = [image for image in vehicle.images
                if image.filename in old_names and image.filename not in new_names]
     for image in removed:
@@ -342,7 +357,7 @@ def apply_photos(vehicle, photos, previous=()):
         image.order_index = order
     if vehicle.images and not any(image.is_primary for image in vehicle.images):
         min(vehicle.images, key=lambda image: image.order_index).is_primary = True
-    return [{'filename': image.filename} for image in removed]
+    return [{'filename': image.filename} for image in removed] + replaced
 
 
 def attach_import(vehicle, snapshot, photos, enabled=True):

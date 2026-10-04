@@ -2,11 +2,17 @@
 import json
 import re
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
+from werkzeug.datastructures import FileStorage
 
 from app.marketplace_import import MarketplaceError
+
+# Largest size images.craigslist.org serves; listing pages only reference 600x450.
+FULL_SIZE = '1200x900'
+_PHOTO_PATH = re.compile(r'/([A-Za-z0-9_]+)_(\d+x\d+[a-z]?)\.(?:jpg|jpeg|png|webp)')
 
 
 def craigslist_url(value):
@@ -32,10 +38,14 @@ def _image_key(url):
     parts = urlsplit(url)
     if parts.hostname != 'images.craigslist.org':
         raise MarketplaceError('The Craigslist listing contains an unsupported photo host.')
-    match = re.fullmatch(r'/([A-Za-z0-9_]+)_(\d+x\d+[a-z]?)\.(?:jpg|jpeg|png|webp)', parts.path)
+    match = _PHOTO_PATH.fullmatch(parts.path)
     if not match:
         raise MarketplaceError('The Craigslist listing contains an unsupported photo format.')
     return match.group(1)
+
+
+def full_size_url(key):
+    return f'https://images.craigslist.org/{key}_{FULL_SIZE}.jpg'
 
 
 def parse_craigslist(html, url):
@@ -140,9 +150,63 @@ def parse_craigslist(html, url):
         identity = _image_key(image_url)
         if identity not in seen:
             seen.add(identity)
-            photos.append({'id': identity, 'url': originals.get(identity, image_url)})
+            photos.append({'id': identity, 'url': full_size_url(identity),
+                           'fallback_url': originals.get(identity, image_url)})
     if originals and set(originals) != seen:
         raise MarketplaceError('The Craigslist photo collection is incomplete; saved photos were retained.')
     return {'url': canonical, 'title': title, 'fields': fields, 'photos': photos,
             'provider': 'craigslist', 'source_id': post_id.group(1) if post_id else canonical.rsplit('/', 1)[1],
             'attributes': attributes}
+
+
+def upgrade_saved_photos(limit=200):
+    """Swap previously imported low-resolution Craigslist photos for full-size versions in place."""
+    from app import db
+    from app.admin import _delete_vehicle_image_file
+    from app.marketplace_import import download
+    from app.models import MarketplaceSync, VehicleImage
+    from app.utils import save_uploaded_image
+
+    stats = {'upgraded': 0, 'failed': 0}
+    budget = limit
+    for source in MarketplaceSync.query.filter(MarketplaceSync.source_url.contains('craigslist.org/')).all():
+        images = {image.filename: image for image in source.vehicle.images}
+        photos = [dict(photo) for photo in source.photo_files]
+        replaced, created = [], []
+        for photo in photos:
+            match = _PHOTO_PATH.fullmatch(photo.get('source_path') or '')
+            image = images.get(photo.get('filename'))
+            if (budget <= 0 or not match or match.group(2) == FULL_SIZE or image is None
+                    or photo.get('upgrade_attempts', 0) >= 3):
+                continue
+            budget -= 1
+            url = full_size_url(match.group(1))
+            try:
+                raw = download(url, photo=True)
+                filename, width, height = save_uploaded_image(
+                    FileStorage(stream=BytesIO(raw), filename='craigslist.jpg'))
+            except MarketplaceError:
+                filename = None
+            if not filename:
+                photo['upgrade_attempts'] = photo.get('upgrade_attempts', 0) + 1
+                stats['failed'] += 1
+                continue
+            replaced.append(photo['filename'])
+            created.append(filename)
+            photo.pop('upgrade_attempts', None)
+            photo.update(filename=filename, width=width, height=height, source_path=urlsplit(url).path)
+            image.filename, image.width, image.height = filename, width, height
+        if photos == source.photo_files:
+            continue
+        source.photo_files = photos
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            for name in created:
+                _delete_vehicle_image_file(VehicleImage(filename=name))
+            raise
+        for name in replaced:
+            _delete_vehicle_image_file(VehicleImage(filename=name))
+        stats['upgraded'] += len(created)
+    return stats

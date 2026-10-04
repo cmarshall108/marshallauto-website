@@ -8,7 +8,7 @@ from unittest.mock import patch
 from PIL import Image
 
 from app import create_app, db
-from app.models import MarketplaceSync, User, Vehicle, VehicleImage, utcnow
+from app.models import MarketplaceSync, PhotoHighlightJob, User, Vehicle, VehicleImage, utcnow
 from config import TestingConfig
 from app.craigslist_import import craigslist_url, parse_craigslist
 
@@ -49,6 +49,8 @@ class CraigslistParsingTests(unittest.TestCase):
         self.assertEqual(result['fields']['model'], 'Regal Sportback II')
         self.assertEqual(result['fields']['description'], 'Rebuilt title.\nNew seats.')
         self.assertEqual([image['id'] for image in result['photos']], ['front', 'rear'])
+        self.assertEqual(result['photos'][0]['url'], 'https://images.craigslist.org/front_1200x900.jpg')
+        self.assertEqual(result['photos'][0]['fallback_url'], 'https://images.craigslist.org/front_600x450.jpg')
         self.assertEqual(result['source_id'], '7974467394')
         self.assertNotIn('status', result['fields'])
 
@@ -394,6 +396,65 @@ class MarketplaceSyncTests(unittest.TestCase):
             self.assertEqual(len(self.vehicle.images), 2)
             self.assertEqual([photo['id'] for photo in self.source.photo_files], ['rear', 'interior'])
             self.assertIsNone(self.source.last_error)
+
+    def test_craigslist_full_size_falls_back_and_existing_photos_upgrade(self):
+        from pathlib import Path
+        from app.craigslist_import import upgrade_saved_photos
+
+        small, large = BytesIO(), BytesIO()
+        Image.new('RGB', (600, 450), 'red').save(small, format='JPEG')
+        Image.new('RGB', (1200, 900), 'red').save(large, format='JPEG')
+        snapshot = parse_craigslist(craigslist_html(image_names=('front',)), CRAIGSLIST_URL)
+        with TemporaryDirectory() as folder:
+            self.app.config['UPLOAD_FOLDER'] = folder
+            with patch('app.marketplace_import.download',
+                       side_effect=[MarketplaceError('Missing'), small.getvalue()]) as download:
+                photos, created = stage_photos(snapshot)
+            self.assertEqual(download.call_args.args[0], 'https://images.craigslist.org/front_600x450.jpg')
+            self.assertEqual(photos[0]['source_path'], '/front_1200x900.jpg')
+
+            self.source.source_url = CRAIGSLIST_URL
+            self.source.photo_files = [dict(photo, source_path=f'/{photo["id"]}_600x450.jpg')
+                                       for photo in self.photos]
+            for image in self.vehicle.images:
+                image.highlight_status = 'ready'
+            db.session.commit()
+            self.app.config.update(PHOTO_HIGHLIGHTS_ENABLED=True, PHOTO_HIGHLIGHTS_AUTO_ENQUEUE=True)
+            (Path(folder) / 'vehicles' / 'photo1.jpg').write_bytes(small.getvalue())
+            with patch('app.marketplace_import.download', return_value=large.getvalue()) as download:
+                self.assertEqual(upgrade_saved_photos(), {'upgraded': 2, 'failed': 0})
+                self.assertEqual(download.call_args_list[0].args[0], 'https://images.craigslist.org/photo1_1200x900.jpg')
+            self.assertEqual({image.width for image in self.vehicle.images}, {1200})
+            self.assertEqual({image.highlight_status for image in self.vehicle.images}, {'ready'})
+            self.assertEqual(PhotoHighlightJob.query.count(), 0)
+            self.assertEqual({photo['filename'] for photo in self.source.photo_files},
+                             {image.filename for image in self.vehicle.images})
+            self.assertFalse((Path(folder) / 'vehicles' / 'photo1.jpg').exists())
+            with patch('app.marketplace_import.download') as download:
+                self.assertEqual(upgrade_saved_photos(), {'upgraded': 0, 'failed': 0})
+                download.assert_not_called()
+
+    def test_craigslist_sync_redownload_keeps_ai_highlights(self):
+        self.source.source_url = CRAIGSLIST_URL
+        self.source.snapshot = parse_craigslist(craigslist_html(), CRAIGSLIST_URL)
+        self.source.photo_files = [dict(photo, id=identity, source_path=f'/{identity}_600x450.jpg')
+                                   for photo, identity in zip(self.photos, ('front', 'rear'))]
+        for image in self.vehicle.images:
+            image.highlight_status = 'ready'
+        db.session.commit()
+        image_ids = sorted(image.id for image in self.vehicle.images)
+        self.app.config.update(PHOTO_HIGHLIGHTS_ENABLED=True, PHOTO_HIGHLIGHTS_AUTO_ENQUEUE=True)
+        image = BytesIO()
+        Image.new('RGB', (1200, 900), 'blue').save(image, format='JPEG')
+        with TemporaryDirectory() as folder:
+            self.app.config['UPLOAD_FOLDER'] = folder
+            with patch('app.marketplace_import.download',
+                       side_effect=[craigslist_html().encode(), image.getvalue(), image.getvalue()]):
+                self.assertEqual(sync_due()['updated'], 1)
+        self.assertEqual(sorted(image.id for image in self.vehicle.images), image_ids)
+        self.assertEqual({image.width for image in self.vehicle.images}, {1200})
+        self.assertEqual({image.highlight_status for image in self.vehicle.images}, {'ready'})
+        self.assertEqual(PhotoHighlightJob.query.count(), 0)
 
     def test_craigslist_removed_listing_retains_existing_inventory(self):
         self.source.source_url = CRAIGSLIST_URL
