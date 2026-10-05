@@ -931,12 +931,10 @@ def structured_data_vehicle(vehicle):
     else:
         item_condition = condition_map.get(vehicle.condition, 'https://schema.org/UsedCondition')
 
-    next_year = utcnow().year + 1
     offer = {
         "@type": "Offer",
         "priceCurrency": "USD",
         "price": str(vehicle.display_price),
-        "priceValidUntil": f"{next_year}-12-31",
         "itemCondition": item_condition,
         "availability": "https://schema.org/InStock" if vehicle.status == 'available' else "https://schema.org/OutOfStock",
         "url": f"{current_app.config['SITE_URL']}/inventory/{vehicle.slug}",

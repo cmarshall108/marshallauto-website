@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 
-{% set canonical_override = landing_canonical %}
-
 {% block meta_title %}{{ meta_title }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
 {% block robots %}{{ robots_content or 'index, follow' }}{% endblock %}
@@ -228,6 +226,19 @@
         </div>
     </div>
 </section>
+
+{% if inventory_links %}
+<section class="section-padding border-top">
+    <div class="container">
+        <h2 class="h4 fw-bold mb-3">Browse More Inventory</h2>
+        <ul class="list-unstyled d-flex flex-wrap gap-3 mb-0">
+            {% for link in inventory_links %}
+            <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</section>
+{% endif %}
 
 {% if landing_faqs %}
 <section class="section-padding bg-light-brand">

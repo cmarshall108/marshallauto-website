@@ -138,10 +138,22 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         make, model, body_style, title_status,
         min_price, max_price, max_mileage, search, sort=sort,
     )
+    if page < 1:
+        abort(404)
     pagination = query.paginate(page=page, per_page=12, error_out=False)
+    if page > 1 and page > pagination.pages:
+        abort(404)
 
     makes = _available_makes()
     body_styles = _available_body_styles()
+
+    link_city = (request.view_args or {}).get('city') or current_app.config['BUSINESS_CITY'].lower().replace(' ', '-')
+    link_state = (request.view_args or {}).get('state') or current_app.config['BUSINESS_STATE'].lower()
+    area = _service_area_map().get(f'{link_city}-{link_state}')
+    inventory_links = _inventory_landing_links(
+        *area, makes, body_styles,
+        _vehicle_list_query().filter_by(title_status='rebuilt').first() is not None,
+    ) if area else []
 
     links = {}
     if pagination.has_prev:
@@ -182,19 +194,22 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
             ("Used Cars for Sale", url_for('main.inventory', _external=True))
         ])
 
-    # Filtered inventory without a dedicated landing canonicalizes to /inventory
-    has_filters = any([make, model, body_style, title_status, min_price, max_price, max_mileage, search])
-    canonical_override = landing_canonical
-    if not landing_canonical and has_filters and request.endpoint == 'main.inventory':
-        canonical_override = url_for('main.inventory', _external=True)
+    has_filters = any(value is not None and value != '' for value in (
+        make, model, body_style, title_status, min_price, max_price, max_mileage, search,
+    ))
+    arbitrary_filters = has_filters and request.endpoint == 'main.inventory'
+    alternate_sort = sort != 'newest'
+    canonical_override = landing_canonical or url_for('main.inventory', _external=True)
+    if page > 1 and not arbitrary_filters and not alternate_sort:
+        canonical_override = f'{canonical_override}?page={page}'
 
-    robots_content = 'index, follow'
-    if page and page > 1:
-        if has_filters and request.endpoint == 'main.inventory' and not landing_canonical:
-            robots_content = 'noindex, follow'
+    robots_content = (
+        'noindex, follow' if arbitrary_filters or alternate_sort or not pagination.total
+        else 'index, follow'
+    )
 
     list_name = landing_h1 or f"Used Vehicles at {biz}"
-    list_url = landing_canonical or url_for('main.inventory', _external=True)
+    list_url = canonical_override
     structured_item_list = structured_data_item_list(
         pagination.items, name=list_name, list_url=list_url,
     ) if pagination.items else None
@@ -241,6 +256,7 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         page_type='inventory',
         analytics_inventory=analytics_inventory,
         landing_faqs=landing_faqs or [],
+        inventory_links=inventory_links,
     )
 
 
@@ -535,6 +551,36 @@ BODY_STYLE_PLURAL_SLUG = {
 }
 
 
+def _inventory_landing_links(city, state, makes, body_styles, has_rebuilt):
+    city_slug = city.lower().replace(' ', '-')
+    state_slug = state.lower()
+    links = []
+    primary_cities = {
+        current_app.config['BUSINESS_CITY'].lower(),
+        'raleigh', 'durham', 'chapel hill', 'cary', 'fayetteville',
+    }
+    categories = []
+    if city.lower() in primary_cities:
+        categories.extend((make, make.lower().replace(' ', '-')) for make in makes[:8]
+                          if make.lower().replace(' ', '-') not in BODY_STYLE_SLUG_MAP
+                          and make.lower() != 'cars')
+    categories.extend((style, BODY_STYLE_PLURAL_SLUG[style]) for style in body_styles
+                      if style in BODY_STYLE_PLURAL_SLUG)
+    for label, slug in categories:
+        links.append({
+            'label': f'Used {label}',
+            'url': url_for('main.inventory_by_make_or_body_city', slug=slug,
+                           city=city_slug, state=state_slug, _external=True),
+        })
+    if has_rebuilt:
+        links.append({
+            'label': 'Rebuilt Title Vehicles',
+            'url': url_for('main.inventory_rebuilt_by_city', city=city_slug,
+                           state=state_slug, _external=True),
+        })
+    return links
+
+
 @main.route('/inventory/used-<slug>-for-sale-in-<city>-<state>')
 def inventory_by_make_or_body_city(slug, city, state):
     """Local SEO landing: used [make] OR used [body style] in a city.
@@ -542,6 +588,8 @@ def inventory_by_make_or_body_city(slug, city, state):
     Body-style slugs (suvs, trucks, ...) take precedence over make names so the
     shared URL pattern does not collide.
     """
+    if slug.lower() == 'cars':
+        return inventory_by_city(city, state)
     area_slug = f"{city.lower()}-{state.lower()}"
     area = _service_area_map().get(area_slug)
     page = request.args.get('page', 1, type=int)
@@ -691,6 +739,13 @@ def inventory_rebuilt_by_city(city, state):
 def service_area():
     """Service area hub page for local SEO."""
     areas = current_app.config.get('SERVICE_AREAS', [])
+    makes = _available_makes()
+    body_styles = _available_body_styles()
+    has_rebuilt = _vehicle_list_query().filter_by(title_status='rebuilt').first() is not None
+    area_inventory_links = {
+        city: _inventory_landing_links(city, state, makes, body_styles, has_rebuilt)
+        for city, state in areas
+    }
     breadcrumbs = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
         ("Service Area", url_for('main.service_area', _external=True))
@@ -706,6 +761,7 @@ def service_area():
     return render_template(
         'service_area.html',
         areas=areas,
+        area_inventory_links=area_inventory_links,
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
@@ -1269,26 +1325,17 @@ def sitemap():
         .order_by(Vehicle.updated_at.desc())
         .all()
     )
-    latest_vehicle_mod = None
-    if vehicles:
-        latest_vehicle_mod = max(
-            (v.updated_at for v in vehicles if v.updated_at),
-            default=None,
-        )
-    inventory_lastmod = (
-        latest_vehicle_mod.strftime('%Y-%m-%d') if latest_vehicle_mod else _utcnow().strftime('%Y-%m-%d')
-    )
-    today = _utcnow().strftime('%Y-%m-%d')
     pages = [
-        {'loc': url_for('main.index', _external=True), 'priority': '1.00', 'changefreq': 'daily', 'lastmod': inventory_lastmod},
-        {'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'changefreq': 'daily', 'lastmod': inventory_lastmod},
-        {'loc': url_for('main.about', _external=True), 'priority': '0.70', 'changefreq': 'monthly', 'lastmod': today},
-        {'loc': url_for('main.financing', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
-        {'loc': url_for('main.sell_your_car', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
-        {'loc': url_for('main.contact', _external=True), 'priority': '0.80', 'changefreq': 'monthly', 'lastmod': today},
-        {'loc': url_for('main.service_area', _external=True), 'priority': '0.80', 'changefreq': 'weekly', 'lastmod': today},
-        {'loc': url_for('main.blog_list', _external=True), 'priority': '0.60', 'changefreq': 'weekly', 'lastmod': today},
+        {'loc': url_for('main.index', _external=True), 'priority': '1.00', 'changefreq': 'daily'},
+        {'loc': url_for('main.about', _external=True), 'priority': '0.70', 'changefreq': 'monthly'},
+        {'loc': url_for('main.financing', _external=True), 'priority': '0.80', 'changefreq': 'monthly'},
+        {'loc': url_for('main.sell_your_car', _external=True), 'priority': '0.80', 'changefreq': 'monthly'},
+        {'loc': url_for('main.contact', _external=True), 'priority': '0.80', 'changefreq': 'monthly'},
+        {'loc': url_for('main.service_area', _external=True), 'priority': '0.80', 'changefreq': 'weekly'},
+        {'loc': url_for('main.blog_list', _external=True), 'priority': '0.60', 'changefreq': 'weekly'},
     ]
+    if vehicles:
+        pages.append({'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'changefreq': 'daily'})
 
     for post in BlogPost.query.filter_by(is_published=True).all():
         pages.append({
@@ -1300,58 +1347,22 @@ def sitemap():
 
     top_makes = _available_makes()[:8]
     body_styles = _available_body_styles()
-    body_style_slug_map = {
-        'SUV': 'suvs', 'Truck': 'trucks', 'Sedan': 'sedans', 'Coupe': 'coupes',
-        'Van': 'vans', 'Hatchback': 'hatchbacks', 'Wagon': 'wagons', 'Convertible': 'convertibles',
-    }
-    primary_cities = {
-        c.lower() for c in (
-            current_app.config.get('BUSINESS_CITY', ''),
-            'Raleigh', 'Durham', 'Chapel Hill', 'Cary', 'Fayetteville',
-        )
-    }
+    has_rebuilt = any(vehicle.title_status == 'rebuilt' for vehicle in vehicles)
 
-    for city, state in current_app.config.get('SERVICE_AREAS', []):
+    for city, state in current_app.config.get('SERVICE_AREAS', []) if vehicles else []:
         city_slug = city.lower().replace(' ', '-')
         state_slug = state.lower()
         pages.append({
             'loc': url_for('main.inventory_by_city', city=city_slug, state=state_slug, _external=True),
             'priority': '0.75',
             'changefreq': 'daily',
-            'lastmod': inventory_lastmod,
         })
-        pages.append({
-            'loc': url_for('main.inventory_rebuilt_by_city', city=city_slug, state=state_slug, _external=True),
-            'priority': '0.70',
-            'changefreq': 'daily',
-            'lastmod': inventory_lastmod,
-        })
-        for style in body_styles:
-            style_slug = body_style_slug_map.get(style)
-            if not style_slug:
-                continue
+        for link in _inventory_landing_links(city, state, top_makes, body_styles, has_rebuilt):
             pages.append({
-                'loc': url_for(
-                    'main.inventory_by_make_or_body_city',
-                    slug=style_slug,
-                    city=city_slug, state=state_slug, _external=True,
-                ),
+                'loc': link['url'],
                 'priority': '0.65',
                 'changefreq': 'weekly',
-                'lastmod': inventory_lastmod,
             })
-        if city.lower() in primary_cities or city_slug in {c.replace(' ', '-') for c in primary_cities}:
-            for make in top_makes:
-                pages.append({
-                    'loc': url_for(
-                        'main.inventory_by_make_or_body_city',
-                        slug=make.lower().replace(' ', '-'),
-                        city=city_slug, state=state_slug, _external=True,
-                    ),
-                    'priority': '0.60',
-                    'changefreq': 'weekly',
-                    'lastmod': inventory_lastmod,
-                })
 
     for vehicle in vehicles:
         images = vehicle.ordered_images()[:5]
@@ -1359,7 +1370,7 @@ def sitemap():
             'loc': url_for('main.vehicle_detail', slug=vehicle.slug, _external=True),
             'priority': '0.70',
             'changefreq': 'weekly',
-            'lastmod': vehicle.updated_at.strftime('%Y-%m-%d') if vehicle.updated_at else inventory_lastmod,
+            'lastmod': vehicle.updated_at.strftime('%Y-%m-%d') if vehicle.updated_at else None,
             'images': [{'loc': img.absolute_url, 'caption': vehicle.title} for img in images]
         })
     response = make_response(render_template('sitemap.xml', pages=pages))

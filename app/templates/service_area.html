@@ -32,6 +32,13 @@
                                 <h5 class="card-title fw-bold">{{ city }}, {{ state }}</h5>
                                 <p class="card-text text-muted small">Used cars, trucks, and SUVs for sale in {{ city }}.</p>
                                 <a href="{{ url_for('main.inventory_by_city', city=city.lower().replace(' ', '-'), state=state.lower()) }}" class="btn btn-sm btn-primary">Browse Inventory</a>
+                                {% if area_inventory_links.get(city) %}
+                                <ul class="list-unstyled small mt-3 mb-0">
+                                    {% for link in area_inventory_links[city] %}
+                                    <li class="mb-1"><a href="{{ link.url }}">{{ link.label }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
