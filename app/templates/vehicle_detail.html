@@ -540,4 +540,29 @@
         {% endif %}
     </div>
 </section>
+{% if vehicle.is_available %}
+<aside id="vehicle-visit-prompt" class="vehicle-visit-prompt" hidden aria-labelledby="visit-prompt-title" aria-live="polite">
+    <button type="button" class="visit-prompt-close" data-visit-dismiss aria-label="Dismiss visit invitation" title="Dismiss visit invitation">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+    <div class="visit-prompt-intro">
+        <img src="{{ vehicle.primary_image_url() }}" alt="" width="72" height="54" loading="lazy">
+        <div>
+            <h2 id="visit-prompt-title">Want a closer look?</h2>
+            <p>Come see this {{ vehicle.make }} {{ vehicle.model }} at Marshall Auto.</p>
+        </div>
+    </div>
+    <p class="visit-prompt-address"><i class="bi bi-geo-alt" aria-hidden="true"></i> <span>360 Wilson Rd<br>Sanford, NC 27332</span></p>
+    <div class="visit-prompt-actions">
+        <a class="btn btn-primary" id="visit-prompt-directions" href="https://www.google.com/maps/dir/?api=1&amp;destination=360%20Wilson%20Rd%2C%20Sanford%20NC%2027332" target="_blank" rel="noopener noreferrer"><i class="bi bi-sign-turn-right me-1" aria-hidden="true"></i>Get directions</a>
+        <button type="button" class="btn btn-link" data-visit-dismiss>Not now</button>
+    </div>
+</aside>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if vehicle.is_available %}
+<script src="{{ asset_url('js/vehicle-visit.js') }}" defer></script>
+{% endif %}
 {% endblock %}
