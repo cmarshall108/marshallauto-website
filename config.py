@@ -122,7 +122,7 @@ class Config:
         'Wednesday': '10:00 AM - 6:30 PM',
         'Thursday': '10:00 AM - 6:30 PM',
         'Friday': '10:00 AM - 6:30 PM',
-        'Saturday': 'Closed',
+        'Saturday': '10:00 AM - 6:30 PM',
         'Sunday': 'Closed'
     }
 
