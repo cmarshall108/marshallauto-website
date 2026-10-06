@@ -184,6 +184,7 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
     PREFERRED_URL_SCHEME = 'https'
+    SITE_URL = 'https://marshallautosanford.com'
 
     @classmethod
     def init_app(cls, app):
@@ -214,6 +215,7 @@ class TestingConfig(Config):
     ADMIN_USERNAME = 'admin'
     ADMIN_PASSWORD = 'test-admin-password'
     SERVER_NAME = 'localhost'
+    SITE_URL = 'http://localhost'
 
 
 config_by_name = {

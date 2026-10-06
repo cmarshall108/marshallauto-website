@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 from flask import (
     Blueprint, current_app, flash, jsonify, make_response, redirect,
-    render_template, request, send_from_directory, url_for, abort
+    render_template, request, send_from_directory, url_for as flask_url_for, abort
 )
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -28,6 +28,15 @@ main = Blueprint('main', __name__)
 
 def _utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def url_for(endpoint, **values):
+    """Use the configured site origin for absolute URLs, not the proxy host."""
+    external = values.pop('_external', False)
+    url = flask_url_for(endpoint, **values)
+    if external:
+        return f"{current_app.config['SITE_URL'].rstrip('/')}{url}"
+    return url
 
 
 def _canonical_url():

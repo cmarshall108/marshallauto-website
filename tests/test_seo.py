@@ -77,6 +77,34 @@ class SeoTests(unittest.TestCase):
             for entry in ET.fromstring(response.data).findall('sm:url', namespace)
         }
 
+    def test_external_seo_urls_use_site_origin_behind_proxy(self):
+        site_url = 'https://marshallautosanford.com'
+        self.app.config['SITE_URL'] = site_url
+        self.app.config['SERVER_NAME'] = '127.0.0.1:8080'
+        proxy_headers = {
+            'X-Forwarded-Host': '127.0.0.1:8080',
+            'X-Forwarded-Proto': 'http',
+        }
+
+        sitemap = self.client.get('/sitemap.xml', headers=proxy_headers)
+        namespace = {'sm': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+        locations = [
+            entry.find('sm:loc', namespace).text
+            for entry in ET.fromstring(sitemap.data).findall('sm:url', namespace)
+        ]
+        self.assertTrue(locations)
+        self.assertTrue(all(url.startswith(f'{site_url}/') for url in locations))
+        self.assertFalse(any('127.0.0.1' in url for url in locations))
+
+        page = self.client.get('/inventory', headers=proxy_headers)
+        html = BeautifulSoup(page.data, 'html.parser')
+        self.assertEqual(
+            html.select_one('link[rel="canonical"]')['href'],
+            f'{site_url}/inventory',
+        )
+        robots = self.client.get('/robots.txt', headers=proxy_headers)
+        self.assertIn(f'Sitemap: {site_url}/sitemap.xml', robots.get_data(as_text=True))
+
     def test_sitemap_dates_are_only_real_content_timestamps(self):
         vehicle = Vehicle.query.filter_by(slug='test-car-0').one()
         vehicle.updated_at = datetime(2026, 9, 1)
