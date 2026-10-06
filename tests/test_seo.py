@@ -13,6 +13,7 @@ from config import TestingConfig
 class SeoTests(unittest.TestCase):
     def setUp(self):
         self.app = create_app(TestingConfig)
+        self.app.config['SITE_URL'] = 'http://localhost'
         self.ctx = self.app.app_context()
         self.ctx.push()
         db.create_all()
@@ -81,11 +82,13 @@ class SeoTests(unittest.TestCase):
         vehicle.updated_at = datetime(2026, 9, 1)
         db.session.commit()
         pages = self.sitemap_pages()
-        self.assertEqual(pages['http://localhost/inventory/test-car-0'].text, '2026-09-01')
-        for path in ('/', '/inventory', '/about', '/contact', '/service-area', '/blog'):
+        self.assertEqual(pages['http://localhost/inventory/test-car-0'].text, '2026-09-01T00:00:00Z')
+        latest_update = max(vehicle.updated_at for vehicle in Vehicle.query.all())
+        self.assertEqual(pages['http://localhost/inventory'].text, latest_update.isoformat() + 'Z')
+        for path in ('/', '/about', '/contact', '/service-area', '/blog'):
             self.assertIsNone(pages[f'http://localhost{path}'])
 
-    def test_sitemap_only_lists_stocked_landings_and_available_vehicles(self):
+    def test_sitemap_lists_stocked_landings_and_retains_sold_vehicles(self):
         pages = self.sitemap_pages()
         self.assertFalse(any('rebuilt-title-cars' in url for url in pages))
         self.assertTrue(any('used-toyota-for-sale' in url for url in pages))
@@ -97,7 +100,7 @@ class SeoTests(unittest.TestCase):
         vehicle.status = 'sold'
         db.session.commit()
         pages = self.sitemap_pages()
-        self.assertNotIn('http://localhost/inventory/test-car-0', pages)
+        self.assertIn('http://localhost/inventory/test-car-0', pages)
         self.assertFalse(any('rebuilt-title-cars' in url for url in pages))
         Vehicle.query.delete()
         db.session.commit()

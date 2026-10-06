@@ -17,6 +17,7 @@
         {% else %}
         <h1 class="fw-bold mb-2">Used Cars, Trucks &amp; SUVs for Sale in {{ business_city }}, {{ business_state }}</h1>
         {% endif %}
+        <p class="small mb-0"><a href="{{ url_for('main.vehicle_archive') }}">Previous vehicle listings and VIN archive</a></p>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>

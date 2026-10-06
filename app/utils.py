@@ -936,7 +936,11 @@ def structured_data_vehicle(vehicle):
         "priceCurrency": "USD",
         "price": str(vehicle.display_price),
         "itemCondition": item_condition,
-        "availability": "https://schema.org/InStock" if vehicle.status == 'available' else "https://schema.org/OutOfStock",
+        "availability": (
+            "https://schema.org/InStock" if vehicle.status == 'available'
+            else "https://schema.org/SoldOut" if vehicle.status == 'sold'
+            else "https://schema.org/OutOfStock"
+        ),
         "url": f"{current_app.config['SITE_URL']}/inventory/{vehicle.slug}",
         "seller": {
             "@type": "AutoDealer",
@@ -948,9 +952,10 @@ def structured_data_vehicle(vehicle):
     data = {
         "@context": "https://schema.org",
         "@type": "Car",
+        "@id": f"{current_app.config['SITE_URL'].rstrip('/')}/inventory/{vehicle.slug}#vehicle",
         "name": vehicle.title,
         "image": images[:8],
-        "description": vehicle.seo_description or vehicle.description or f"{vehicle.title} for sale at {current_app.config['BUSINESS_NAME']}",
+        "description": vehicle.description or vehicle.seo_description or f"{vehicle.title} {'for sale' if vehicle.status == 'available' else 'archived listing'} at {current_app.config['BUSINESS_NAME']}",
         "sku": vehicle.stock_number or str(vehicle.id),
         "brand": {
             "@type": "Brand",

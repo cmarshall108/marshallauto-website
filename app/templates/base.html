@@ -74,6 +74,9 @@
     {% if structured_vehicle %}
     <script type="application/ld+json">{{ structured_vehicle | tojson | safe }}</script>
     {% endif %}
+    {% if structured_page %}
+    <script type="application/ld+json">{{ structured_page | tojson | safe }}</script>
+    {% endif %}
     {% if structured_local %}
     <script type="application/ld+json">{{ structured_local | tojson | safe }}</script>
     {% endif %}

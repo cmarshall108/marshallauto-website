@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from flask import (
     Blueprint, current_app, flash, jsonify, make_response, redirect,
@@ -31,8 +32,15 @@ def _utcnow():
 
 def _canonical_url():
     """Build a canonical URL without query tracking params."""
-    args = request.view_args or {}
-    return url_for(request.endpoint, **args, _external=True)
+    args = dict(request.view_args or {})
+    page = request.args.get('page', 1, type=int)
+    if page and page > 1 and request.endpoint in {
+        'main.inventory', 'main.vehicle_archive', 'main.blog_list',
+        'main.inventory_by_city', 'main.inventory_by_make_or_body_city',
+        'main.inventory_rebuilt_by_city',
+    }:
+        args['page'] = page
+    return current_app.config['SITE_URL'].rstrip('/') + url_for(request.endpoint, **args)
 
 
 def _service_area_map():
@@ -134,6 +142,8 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
                       landing_breadcrumb=None, landing_canonical=None,
                       landing_faqs=None):
     """Shared inventory rendering helper."""
+    if landing_canonical:
+        landing_canonical = current_app.config['SITE_URL'].rstrip('/') + urlsplit(landing_canonical).path
     query = _build_inventory_query(
         make, model, body_style, title_status,
         min_price, max_price, max_mileage, search, sort=sort,
@@ -199,7 +209,7 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
     ))
     arbitrary_filters = has_filters and request.endpoint == 'main.inventory'
     alternate_sort = sort != 'newest'
-    canonical_override = landing_canonical or url_for('main.inventory', _external=True)
+    canonical_override = landing_canonical or current_app.config['SITE_URL'].rstrip('/') + url_for('main.inventory')
     if page > 1 and not arbitrary_filters and not alternate_sort:
         canonical_override = f'{canonical_override}?page={page}'
 
@@ -791,7 +801,6 @@ def vehicle_detail(slug):
     robots = 'index, follow'
     if vehicle.status != 'available':
         flash('This vehicle is no longer available.', 'info')
-        robots = 'noindex, follow'
 
     related = (
         _vehicle_list_query()
@@ -814,7 +823,12 @@ def vehicle_detail(slug):
     ])
 
     location_phrase = f" in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}"
-    meta_title = vehicle.seo_title or f"{vehicle.title} for Sale{location_phrase} | {current_app.config['BUSINESS_NAME']}"
+    listing_status = 'for Sale' if vehicle.status == 'available' else ('Sold' if vehicle.status == 'sold' else 'Unavailable')
+    vin_phrase = f" | VIN {vehicle.vin}" if vehicle.vin else ''
+    meta_title = (
+        vehicle.seo_title if vehicle.seo_title and vehicle.status == 'available'
+        else f"{vehicle.title} {listing_status}{location_phrase} | {current_app.config['BUSINESS_NAME']}"
+    ) + vin_phrase
 
     title_phrase = (
         f"{vehicle.title_status.replace('_', ' ').title()} title" if vehicle.title_status
@@ -824,6 +838,14 @@ def vehicle_detail(slug):
         f"Shop this {vehicle.title} with {vehicle.mileage:,} miles at {current_app.config['BUSINESS_NAME']}. "
         f"{vehicle.condition.title()} condition, {title_phrase}, financing available."
     )
+    if vehicle.status != 'available':
+        meta_description = (
+            f"This {vehicle.title} is {listing_status.lower()} at {current_app.config['BUSINESS_NAME']} "
+            f"in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. "
+            "View its listing details and browse similar used cars, trucks, and SUVs currently for sale."
+        )
+    if vehicle.vin:
+        meta_description = f"VIN {vehicle.vin}. {meta_description}"
     meta_keywords = vehicle.meta_keywords or ', '.join(filter(None, [
         str(vehicle.year), vehicle.make, vehicle.model, vehicle.trim,
         vehicle.body_style, vehicle.exterior_color, current_app.config['BUSINESS_CITY'],
@@ -853,6 +875,7 @@ def vehicle_detail(slug):
         related=related,
         form=form,
         structured_vehicle=structured_vehicle,
+        structured_local=structured_data_local_business(),
         breadcrumbs=breadcrumbs,
         meta_title=meta_title,
         meta_description=meta_description,
@@ -864,6 +887,33 @@ def vehicle_detail(slug):
         format_mileage=format_mileage,
         page_type='vehicle_detail',
         analytics_vehicle=analytics_vehicle,
+        structured_page={
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            '@id': _canonical_url() + '#webpage',
+            'url': _canonical_url(),
+            'name': meta_title,
+            'datePublished': vehicle.created_at.isoformat() + 'Z',
+            'dateModified': (vehicle.updated_at or vehicle.created_at).isoformat() + 'Z',
+            'mainEntity': {'@id': structured_vehicle['url'] + '#vehicle'},
+        },
+    )
+
+
+@main.route('/inventory/history')
+def vehicle_archive():
+    page = max(request.args.get('page', 1, type=int) or 1, 1)
+    pagination = (
+        Vehicle.query.filter(Vehicle.status != 'available')
+        .order_by(Vehicle.updated_at.desc(), Vehicle.id.desc())
+        .paginate(page=page, per_page=24, error_out=False)
+    )
+    return render_template(
+        'vehicle_archive.html',
+        pagination=pagination,
+        meta_title=f"Sold Vehicle & VIN Archive in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} | {current_app.config['BUSINESS_NAME']}",
+        meta_description=f"Browse previous vehicle listings and VIN details from our {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} dealership. Find similar used cars, trucks, and SUVs in our current inventory.",
+        page_type='vehicle_archive',
     )
 
 
@@ -1321,10 +1371,18 @@ def sitemap():
     vehicles = (
         Vehicle.query
         .options(selectinload(Vehicle.images))
-        .filter_by(status='available')
         .order_by(Vehicle.updated_at.desc())
         .all()
     )
+    latest_vehicle_mod = None
+    if vehicles:
+        latest_vehicle_mod = max(
+            (v.updated_at for v in vehicles if v.updated_at),
+            default=None,
+        )
+    inventory_lastmod = latest_vehicle_mod.isoformat() + 'Z' if latest_vehicle_mod else None
+    available_vehicles = [vehicle for vehicle in vehicles if vehicle.status == 'available']
+    archived_vehicles = [vehicle for vehicle in vehicles if vehicle.status != 'available']
     pages = [
         {'loc': url_for('main.index', _external=True), 'priority': '1.00', 'changefreq': 'daily'},
         {'loc': url_for('main.about', _external=True), 'priority': '0.70', 'changefreq': 'monthly'},
@@ -1334,34 +1392,38 @@ def sitemap():
         {'loc': url_for('main.service_area', _external=True), 'priority': '0.80', 'changefreq': 'weekly'},
         {'loc': url_for('main.blog_list', _external=True), 'priority': '0.60', 'changefreq': 'weekly'},
     ]
-    if vehicles:
-        pages.append({'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'changefreq': 'daily'})
+    if available_vehicles:
+        pages.append({'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'changefreq': 'daily', 'lastmod': inventory_lastmod})
+    if archived_vehicles:
+        pages.append({'loc': url_for('main.vehicle_archive', _external=True), 'priority': '0.50', 'changefreq': 'weekly', 'lastmod': inventory_lastmod})
 
     for post in BlogPost.query.filter_by(is_published=True).all():
         pages.append({
             'loc': url_for('main.blog_post_detail', slug=post.slug, _external=True),
             'priority': '0.55',
             'changefreq': 'monthly',
-            'lastmod': (post.updated_at or post.created_at).strftime('%Y-%m-%d'),
+            'lastmod': (post.updated_at or post.created_at).isoformat() + 'Z',
         })
 
     top_makes = _available_makes()[:8]
     body_styles = _available_body_styles()
-    has_rebuilt = any(vehicle.title_status == 'rebuilt' for vehicle in vehicles)
+    has_rebuilt = any(vehicle.title_status == 'rebuilt' for vehicle in available_vehicles)
 
-    for city, state in current_app.config.get('SERVICE_AREAS', []) if vehicles else []:
+    for city, state in current_app.config.get('SERVICE_AREAS', []) if available_vehicles else []:
         city_slug = city.lower().replace(' ', '-')
         state_slug = state.lower()
         pages.append({
             'loc': url_for('main.inventory_by_city', city=city_slug, state=state_slug, _external=True),
             'priority': '0.75',
             'changefreq': 'daily',
+            'lastmod': inventory_lastmod,
         })
         for link in _inventory_landing_links(city, state, top_makes, body_styles, has_rebuilt):
             pages.append({
                 'loc': link['url'],
                 'priority': '0.65',
                 'changefreq': 'weekly',
+                'lastmod': inventory_lastmod,
             })
 
     for vehicle in vehicles:
@@ -1370,9 +1432,12 @@ def sitemap():
             'loc': url_for('main.vehicle_detail', slug=vehicle.slug, _external=True),
             'priority': '0.70',
             'changefreq': 'weekly',
-            'lastmod': vehicle.updated_at.strftime('%Y-%m-%d') if vehicle.updated_at else None,
+            'lastmod': (vehicle.updated_at or vehicle.created_at).isoformat() + 'Z',
             'images': [{'loc': img.absolute_url, 'caption': vehicle.title} for img in images]
         })
+    for page in pages:
+        parsed = urlsplit(page['loc'])
+        page['loc'] = current_app.config['SITE_URL'].rstrip('/') + parsed.path
     response = make_response(render_template('sitemap.xml', pages=pages))
     response.headers['Content-Type'] = 'application/xml'
     response.headers['Cache-Control'] = 'public, max-age=3600'
@@ -1381,7 +1446,7 @@ def sitemap():
 
 @main.route('/robots.txt')
 def robots():
-    sitemap_url = url_for('main.sitemap', _external=True)
+    sitemap_url = current_app.config['SITE_URL'].rstrip('/') + url_for('main.sitemap')
     content = f"""User-agent: *
 Disallow: /admin/
 Disallow: /admin/*

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block og_title %}{{ meta_title }}{% endblock %}
+{% block og_description %}{{ meta_description }}{% endblock %}
+{% block content %}
+<section class="section-padding">
+    <div class="container">
+        <h1 class="h2 fw-bold">Previous Vehicle Listings in {{ business_city }}, {{ business_state }}</h1>
+        <p>These vehicles are no longer available. <a href="{{ url_for('main.inventory') }}">Shop current cars, trucks, and SUVs for sale</a> at {{ business_name }}.</p>
+        <div class="list-group list-group-flush my-4">
+            {% for vehicle in pagination.items %}
+            <a class="list-group-item list-group-item-action py-3" href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}">
+                <h2 class="h5 mb-1">{{ vehicle.title }} <span class="badge bg-secondary">{{ 'Sold' if vehicle.status == 'sold' else 'Unavailable' }}</span></h2>
+                {% if vehicle.vin %}<p class="text-break mb-1">VIN {{ vehicle.vin }}</p>{% endif %}
+                <span class="text-muted">{{ vehicle.mileage | format_mileage }}{% if vehicle.body_style %} &middot; {{ vehicle.body_style }}{% endif %}</span>
+            </a>
+            {% else %}
+            <p>No previous listings are available.</p>
+            {% endfor %}
+        </div>
+        <nav aria-label="Archive pagination" class="d-flex justify-content-between">
+            {% if pagination.has_prev %}<a href="{{ url_for('main.vehicle_archive', page=pagination.prev_num) }}">Previous</a>{% endif %}
+            {% if pagination.has_next %}<a href="{{ url_for('main.vehicle_archive', page=pagination.next_num) }}">Next</a>{% endif %}
+        </nav>
+    </div>
+</section>
+{% endblock %}

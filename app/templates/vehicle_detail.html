@@ -78,7 +78,7 @@
                     <div class="gallery-stage" id="gallery-stage">
                         <img id="main-gallery-image"
                              src="{{ vehicle.primary_image_url() }}"
-                             alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} {{ vehicle.exterior_color or '' }} for sale in {{ business_city }}, {{ business_state }} at {{ business_name }}"
+                             alt="{{ vehicle.title }} {{ vehicle.exterior_color or '' }} {{ 'for sale' if vehicle.status == 'available' else 'previous listing' }} in {{ business_city }}, {{ business_state }} at {{ business_name }}"
                              width="{{ primary.width if primary and primary.width else 800 }}"
                              height="{{ primary.height if primary and primary.height else 600 }}"
                              fetchpriority="high"
@@ -241,7 +241,15 @@
                         </div>
                         <span class="text-muted small">Stock #{{ vehicle.stock_number or vehicle.id }}</span>
                     </div>
-                    <h1 class="h2 fw-bold mb-1">{{ vehicle.title }} for Sale</h1>
+                    <h1 class="h2 fw-bold mb-1">{{ vehicle.title }} {{ 'for Sale' if vehicle.status == 'available' else ('Sold' if vehicle.status == 'sold' else 'Unavailable') }}</h1>
+                    <p class="text-muted mb-2">{{ business_city }}, {{ business_state }}{% if vehicle.vin %} &middot; <span class="text-break">VIN {{ vehicle.vin }}</span>{% endif %}</p>
+                    {% if vehicle.updated_at %}<p class="small text-muted">Listing updated <time datetime="{{ vehicle.updated_at.isoformat() }}Z">{{ vehicle.updated_at.strftime('%B %d, %Y') }}</time></p>{% endif %}
+                    {% if vehicle.status != 'available' %}
+                    <div class="alert alert-secondary">
+                        This vehicle is no longer available.
+                        <a href="{{ url_for('main.inventory') }}" class="alert-link">Browse current used cars for sale in {{ business_city }}, {{ business_state }}</a> or contact us about similar vehicles.
+                    </div>
+                    {% endif %}
                     {% set savings = vehicle.savings_info() %}
                     {% if vehicle.market_value is not none %}
                     <div class="border rounded p-3 mb-3 bg-light">
@@ -249,7 +257,7 @@
                         <div class="h4 fw-bold mb-0">{{ vehicle.market_value | format_price }}</div>
                     </div>
                     {% endif %}
-                    <p class="vehicle-price mb-2">{{ vehicle.display_price | format_price }}</p>
+                    <p class="vehicle-price mb-2">{% if vehicle.status != 'available' %}<span class="small text-muted">Last listed price: </span>{% endif %}{{ vehicle.display_price | format_price }}</p>
                     {% if savings %}
                     <div class="savings-banner mb-3">
                         <div class="savings-banner-icon"><i class="bi bi-piggy-bank-fill" aria-hidden="true"></i></div>
@@ -289,7 +297,7 @@
 
                     <div class="d-grid gap-2 mb-3 d-none d-lg-grid">
                         <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-telephone-fill me-2"></i>Call About This Car
+                            <i class="bi bi-telephone-fill me-2"></i>{{ 'Call About This Car' if vehicle.status == 'available' else 'Ask About Similar Vehicles' }}
                         </a>
                         <button class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#contactModal">
                             <i class="bi bi-envelope-fill me-2"></i>Request More Info
@@ -299,8 +307,8 @@
                         <button class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#contactModal">
                             <i class="bi bi-envelope-fill me-2"></i>Request More Info
                         </button>
-                        <a href="sms:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}?&body=I'm interested in {{ vehicle.title }} (Stock #{{ vehicle.stock_number or vehicle.id }})" class="btn btn-secondary btn-lg">
-                            <i class="bi bi-chat-dots-fill me-2"></i>Text About This Car
+                        <a href="sms:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}?&body=I'm interested in {{ vehicle.title if vehicle.status == 'available' else 'vehicles similar to ' ~ vehicle.title }} (Stock #{{ vehicle.stock_number or vehicle.id }})" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-chat-dots-fill me-2"></i>{{ 'Text About This Car' if vehicle.status == 'available' else 'Text About Similar Vehicles' }}
                         </a>
                     </div>
 
@@ -334,7 +342,7 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label" for="vd-message">Message</label>
-                                        <textarea id="vd-message" name="message" class="form-control" rows="3" maxlength="5000">I'm interested in {{ vehicle.title }}.</textarea>
+                                        <textarea id="vd-message" name="message" class="form-control" rows="3" maxlength="5000">I'm interested in {{ vehicle.title if vehicle.status == 'available' else 'vehicles similar to ' ~ vehicle.title }}.</textarea>
                                     </div>
                                     <div class="d-none" aria-hidden="true">
                                         <label for="vd-honeypot">Website</label>

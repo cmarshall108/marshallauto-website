@@ -238,6 +238,45 @@ UTM parameters (`utm_*`, `gclid`, `fbclid`) are stored in `sessionStorage` and a
 
 ## SEO Checklist
 
+### Inventory and VIN indexing
+
+Every retained vehicle listing, including sold and pending vehicles, has an
+indexable detail page and appears in `/sitemap.xml`. VINs are server-rendered in
+the listing text, title, description, and Car structured data when a VIN is on
+file. `/inventory/history` provides paginated links to previous listings and
+their VINs. Current inventory and `/feeds/vehicles.xml` remain available-only.
+Sold pages clearly identify the vehicle as sold and link buyers to current stock.
+Keep sold records rather than deleting them to preserve their URLs and VIN content.
+
+Freshness is based on actual listing creation/update timestamps, not daily date
+rewrites. Vehicle pages expose `datePublished` and `dateModified` in WebPage
+structured data and show the listing update date. The sitemap uses precise UTC
+update timestamps and does not invent modification dates for static pages.
+Listing status/price/content changes update the vehicle timestamp through the
+existing database model. Sitemap responses may be cached for up to one hour.
+
+### Search engine rollout
+
+1. Deploy the changes and confirm `SITE_URL` is the canonical HTTPS public domain.
+2. Verify the domain in Google Search Console and Bing Webmaster Tools. The admin
+  settings support Google's verification tag; DNS verification also works for
+  either service.
+3. Submit `https://marshallautosanford.com/sitemap.xml` in both services, replacing
+  the domain if your configured public domain differs.
+4. Use Google's URL Inspection on the Sanford inventory page, a current vehicle,
+  and a sold vehicle with a VIN. Request indexing for these representative URLs.
+5. Validate rendered vehicle structured data and review indexing/crawl reports.
+  Check search impressions and clicks for VIN queries and Sanford-area searches.
+6. Keep the Google Business Profile address, phone, hours, inventory website link,
+  photos, and genuine reviews accurate. Add useful, original Sanford-area buying
+  guides and detailed vehicle descriptions rather than duplicating city pages.
+
+These changes make pages discoverable and eligible for indexing; they cannot
+force Google or Bing to index every VIN or guarantee rankings, rich results, or
+traffic. VINs missing from records and listings that have been deleted cannot be
+exposed by these changes. Archived VIN pages are dealership listing records, not
+vehicle-history reports. Do not mark sold cars as available to attract searches.
+
 - [ ] Set `SITE_URL` to your real domain
 - [ ] Add Google Tag Manager and/or GA4 + Facebook Pixel IDs (env or Admin → Settings)
 - [ ] Update business address and hours in `config.py`
