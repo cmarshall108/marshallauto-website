@@ -92,6 +92,11 @@ if ! git reset --hard "$REMOTE" --quiet; then
   exit 1
 fi
 
+# System packages are not installed by pip. Keep the site available if apt fails.
+if ! bash "$ROOT/deploy/ensure_ffmpeg.sh"; then
+  log "WARNING: ffmpeg unavailable; video uploads will be rejected. See installation errors above."
+fi
+
 if ! "$PYTHON" -m pip install --quiet -r requirements.txt; then
   log "FAILED: pip install"
   rollback

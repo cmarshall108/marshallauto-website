@@ -101,6 +101,23 @@ vehicle edit page; refresh to check it. The previous video stays available until
 replacement succeeds. Removing/replacing a video, selling, or deleting the vehicle
 prevents older jobs from publishing.
 
+The Ubuntu one-time installer and automatic deploy script both check/install
+`ffmpeg` and verify it runs. If apt installation fails, deployment continues with
+an explicit warning in `/var/log/marshallauto-deploy.log`; video uploads remain
+disabled, but the rest of the website stays online. To repair an existing server:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends ffmpeg
+ffmpeg -version
+sudo systemctl restart marshallauto
+```
+
+Then reopen the saved vehicle and upload the video again. A 422 reporting missing
+ffmpeg means that video was rejected before staging; existing vehicle details/media
+are unaffected. On non-Ubuntu hosts, install ffmpeg with the host's package manager
+and ensure both web and worker processes can find it on their PATH.
+
 The per-media-request limit defaults to 90 MiB, below the 100 MB ceiling on common
 Cloudflare plans. The form reserves 64 KiB for multipart overhead. Larger individual
 videos need compression before upload or a YouTube/Vimeo URL; splitting photo requests
