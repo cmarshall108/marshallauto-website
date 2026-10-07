@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask, Request, current_app, request
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -50,11 +50,22 @@ password_hasher = type('PasswordHasher', (), {
 bcrypt = password_hasher
 
 
+class MediaUploadRequest(Request):
+    @property
+    def max_content_length(self):
+        limit = super().max_content_length
+        if self.endpoint == 'admin.vehicle_media_upload':
+            media_limit = current_app.config['MEDIA_UPLOAD_MAX_CONTENT_LENGTH']
+            return min(limit, media_limit) if limit is not None else media_limit
+        return limit
+
+
 def create_app(config_class=None):
     if config_class is None:
         config_class = get_config()
 
     app = Flask(__name__, static_folder='static', template_folder='templates')
+    app.request_class = MediaUploadRequest
     app.config.from_object(config_class)
 
     if hasattr(config_class, 'init_app'):
@@ -71,6 +82,7 @@ def create_app(config_class=None):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+
     csrf.init_app(app)
 
     login_manager.login_view = 'admin.login'
@@ -165,12 +177,14 @@ def create_app(config_class=None):
 
     @app.errorhandler(RequestEntityTooLarge)
     def request_entity_too_large(e):
-        from flask import flash, redirect, request, url_for
-        limit_mb = int(app.config.get('MAX_CONTENT_LENGTH', 0) / (1024 * 1024))
+        from flask import flash, jsonify, redirect, request, url_for
+        limit_mb = int((request.max_content_length or 0) / (1024 * 1024))
         message = (
             f'Upload too large. Maximum total size is {limit_mb}MB per request. '
-            'Try fewer photos at a time, or compress the images first.'
+            'Try fewer photos at a time, compress the file, or use a video URL.'
         )
+        if request.accept_mimetypes.best == 'application/json':
+            return jsonify(success=False, message=message), 413
         # Prefer a flash + redirect back to the admin form when possible
         if request.path.startswith('/admin'):
             flash(message, 'danger')

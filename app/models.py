@@ -416,6 +416,25 @@ class PhotoHighlightJob(db.Model):
     vehicle = db.relationship('Vehicle', backref=db.backref('highlight_jobs', lazy='dynamic'))
 
 
+class VideoUploadJob(db.Model):
+    """Durable video compression work, processed outside HTTP requests."""
+    __tablename__ = 'video_upload_jobs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True, index=True)
+    input_filename = db.Column(db.String(128), nullable=False)
+    previous_url = db.Column(db.String(500), nullable=True)
+    status = db.Column(db.String(20), default='queued', nullable=False, index=True)
+    attempts = db.Column(db.Integer, default=0, nullable=False)
+    claim_token = db.Column(db.String(32), nullable=True)
+    lease_expires_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    vehicle = db.relationship('Vehicle', backref=db.backref('video_jobs', lazy='dynamic'))
+
+
 class ServiceRecord(db.Model):
     __tablename__ = 'service_records'
 
@@ -771,4 +790,3 @@ class BlogPost(db.Model):
 
     def __repr__(self):
         return f'<BlogPost {self.title}>'
-

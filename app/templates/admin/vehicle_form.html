@@ -10,6 +10,8 @@
 
 <form method="POST" enctype="multipart/form-data" class="card border-0 shadow p-4" id="vehicle-form"
       data-catalog-url="{{ url_for('admin.vehicle_catalog_api') }}"
+      data-media-file-limit="{{ [config.MAX_CONTENT_LENGTH, config.MEDIA_UPLOAD_MAX_CONTENT_LENGTH]|min - 65536 }}"
+      data-is-new="{{ '0' if vehicle else '1' }}"
       data-vin-decode-url="{{ url_for('admin.vin_decode_api') }}">
     {{ form.hidden_tag() }}
     {% if not vehicle %}
@@ -185,9 +187,18 @@
             <label class="form-label" for="video_file">Or Upload a Video File</label>
             {{ form.video_file(class="form-control", id="video_file", accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v") }}
             <div class="form-text">
-                Uploaded video is automatically compressed heavily on the server (this VPS has very limited disk space),
+                Uploaded video is queued for background compression (this VPS has very limited disk space),
                 so expect reduced quality/resolution. The video is also deleted automatically once this vehicle's status is set to <strong>Sold</strong>.
+                The current video stays available until processing succeeds. Maximum file size:
+                {{ (([config.MAX_CONTENT_LENGTH, config.MEDIA_UPLOAD_MAX_CONTENT_LENGTH]|min - 65536) / 1048576)|round(1) }} MB.
             </div>
+            {% if video_job and video_job.status in ['queued', 'running'] %}
+            <div class="alert alert-info small mt-2">Video {{ 'waiting for background compression' if video_job.status == 'queued' else 'being compressed' }}. Refresh this page to check progress.</div>
+            {% elif video_job and video_job.status == 'failed' %}
+            <div class="alert alert-danger small mt-2">{{ video_job.last_error }}</div>
+            {% elif video_job and video_job.status == 'completed' %}
+            <div class="text-success small mt-2">Video processing completed.</div>
+            {% endif %}
             {% if vehicle and vehicle.video_url and vehicle.video_url.startswith('/static/uploads/vehicles/videos/') %}
             <div class="form-check mt-2">
                 {{ form.remove_video(class="form-check-input", id="remove_video") }}
@@ -381,6 +392,7 @@
     </div>
 
     <div class="mt-4">
+        <div id="vehicle-upload-status" class="mb-2" role="status" aria-live="polite"></div>
         <button type="submit" class="btn btn-primary btn-lg">Save Vehicle</button>
         <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
     </div>
@@ -427,6 +439,7 @@
 
 {% block extra_js %}
 <script src="{{ asset_url('js/admin-vehicle-form.js') }}"></script>
+<script src="{{ asset_url('js/admin-media-upload.js') }}"></script>
 <script>
 (function () {
   var btn = document.getElementById('copy-marketplace-draft-btn');

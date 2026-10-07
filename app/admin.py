@@ -22,7 +22,8 @@ from app.forms import (
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
-    SiteSetting, TestDrive, User, Vehicle, VehicleImage, VehicleImageHighlight, utcnow,
+    SiteSetting, TestDrive, User, Vehicle, VehicleImage, VehicleImageHighlight,
+    VideoUploadJob, utcnow,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -40,7 +41,10 @@ from app.marketplace_import import (
 from app.utils import (
     client_ip, delete_license_image, delete_local_video_file, is_safe_redirect,
     rate_limit_exceeded, save_license_image_data_url, save_uploaded_image,
-    save_uploaded_license_image, save_uploaded_pdf, save_uploaded_video,
+    save_uploaded_license_image, save_uploaded_pdf,
+)
+from app.video_jobs import (
+    VideoUploadError, cancel_video_jobs, discard_staged_video, stage_video_upload,
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
 from app.vin_decode import decode_vin, normalize_vin
@@ -529,11 +533,20 @@ def vehicle_new():
             _handle_vehicle_images(vehicle, request.files.getlist('images'))
             db.session.refresh(vehicle)
             _enqueue_highlights_for_vehicle(vehicle)
-            _maybe_publish_vehicle_to_facebook(
-                vehicle, is_new=True, force=bool(form.post_to_facebook.data),
-            )
+            if not _deferred_vehicle_media():
+                _maybe_publish_vehicle_to_facebook(
+                    vehicle, is_new=True, force=bool(form.post_to_facebook.data),
+                )
             flash('Vehicle added successfully.', 'success')
-            return redirect(url_for('admin.vehicles'))
+            return _vehicle_save_response(vehicle)
+    if _deferred_vehicle_media():
+        from flask import get_flashed_messages
+        messages = get_flashed_messages()
+        return jsonify(
+            success=False,
+            message=' '.join(messages) or 'Please correct the vehicle form before uploading.',
+            errors=form.errors,
+        ), 400
     return render_template(
         'admin/vehicle_form.html',
         form=form,
@@ -578,13 +591,19 @@ def vehicle_edit(id):
         db.session.commit()
         db.session.refresh(vehicle)
         _enqueue_highlights_for_vehicle(vehicle)
-        _maybe_publish_vehicle_to_facebook(
-            vehicle,
-            is_new=False,
-            force=bool(form.post_to_facebook.data),
-        )
+        if not _deferred_vehicle_media():
+            _maybe_publish_vehicle_to_facebook(
+                vehicle,
+                is_new=False,
+                force=bool(form.post_to_facebook.data),
+            )
         flash('Vehicle updated successfully.', 'success')
-        return redirect(url_for('admin.vehicles'))
+        return _vehicle_save_response(vehicle)
+    if _deferred_vehicle_media():
+        return jsonify(
+            success=False, message='Please correct the vehicle form before uploading.',
+            errors=form.errors,
+        ), 400
     draft = build_marketplace_draft(vehicle) if vehicle else None
     return render_template(
         'admin/vehicle_form.html',
@@ -593,7 +612,65 @@ def vehicle_edit(id):
         title='Edit Vehicle',
         facebook_status=fb_status,
         marketplace_draft=draft,
+        video_job=VideoUploadJob.query.filter_by(vehicle_id=id).order_by(VideoUploadJob.id.desc()).first(),
     )
+
+
+def _deferred_vehicle_media():
+    return request.method == 'POST' and request.headers.get('X-Vehicle-Media-Upload') == 'deferred'
+
+
+def _vehicle_save_response(vehicle):
+    if _deferred_vehicle_media():
+        return jsonify(
+            success=True, vehicle_id=vehicle.id,
+            upload_url=url_for('admin.vehicle_media_upload', id=vehicle.id),
+            finish_url=url_for('admin.vehicle_media_finish', id=vehicle.id),
+            edit_url=url_for('admin.vehicle_edit', id=vehicle.id),
+            redirect_url=url_for('admin.vehicles'),
+        )
+    return redirect(url_for('admin.vehicles'))
+
+
+@admin_bp.post('/vehicles/<int:id>/media')
+@login_required
+def vehicle_media_upload(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    photos = [file for file in request.files.getlist('images') if file.filename]
+    video = request.files.get('video_file')
+    if len(photos) + bool(video and video.filename) != 1:
+        return jsonify(success=False, message='Upload exactly one photo or video per request.'), 400
+    if photos:
+        ids, failures = _handle_vehicle_images(vehicle, photos, notify=False)
+        if failures:
+            return jsonify(success=False, message=f'Could not save {failures[0]}. Try a JPEG image.'), 422
+        return jsonify(success=True, image_id=ids[0])
+    job = None
+    try:
+        job = stage_video_upload(vehicle, video)
+        db.session.commit()
+    except VideoUploadError as exc:
+        db.session.rollback()
+        current_app.logger.warning('Video upload rejected for vehicle %s: %s', id, exc)
+        return jsonify(success=False, message=str(exc)), 422
+    except Exception:
+        db.session.rollback()
+        if job is not None:
+            discard_staged_video(job)
+        raise
+    flash('Video uploaded and queued for background compression. Check its status on the vehicle edit page.', 'info')
+    return jsonify(success=True, video_job_id=job.id, status='queued'), 202
+
+
+@admin_bp.post('/vehicles/<int:id>/media/finish')
+@login_required
+def vehicle_media_finish(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    _maybe_publish_vehicle_to_facebook(
+        vehicle, is_new=request.form.get('is_new') == '1',
+        force=request.form.get('post_to_facebook') == '1',
+    )
+    return jsonify(success=True, redirect_url=url_for('admin.vehicles'))
 
 
 @admin_bp.route('/vehicles/<int:id>/facebook/post', methods=['POST'])
@@ -649,6 +726,7 @@ def vehicle_delete(id):
         if report.filename:
             _delete_carfax_file(report.filename)
     delete_local_video_file(vehicle.video_url)
+    cancel_video_jobs(vehicle)
     db.session.delete(vehicle)
     db.session.commit()
     flash('Vehicle deleted.', 'success')
@@ -1533,33 +1611,32 @@ def _apply_vehicle_form(vehicle, form):
 def _apply_video_to_vehicle(vehicle, form, video_file):
     """Apply video upload/URL/removal from the vehicle form (one video per vehicle).
 
-    File upload takes precedence over the pasted URL. Any previously self-hosted
-    (compressed) file is deleted from disk before being replaced, since VPS storage
-    is very limited.
+    File upload takes precedence over the pasted URL. The background worker keeps
+    the current video until compression succeeds, then removes the old local file.
     """
     if form.remove_video.data:
+        cancel_video_jobs(vehicle)
         delete_local_video_file(vehicle.video_url)
         vehicle.video_url = None
         return
     if video_file and getattr(video_file, 'filename', None):
-        filename = save_uploaded_video(video_file)
-        if filename:
-            delete_local_video_file(vehicle.video_url)
-            vehicle.video_url = f'/static/uploads/vehicles/videos/{filename}'
+        try:
+            stage_video_upload(vehicle, video_file)
+        except VideoUploadError as exc:
+            current_app.logger.warning('Video upload rejected for vehicle %s: %s', vehicle.id, exc)
+            flash(str(exc) + ' The existing video, if any, was kept.', 'warning')
         else:
-            flash(
-                'Video upload could not be processed (unsupported file or the server could not '
-                'compress it). The existing video, if any, was kept.',
-                'warning',
-            )
+            flash('Video uploaded and queued for background compression. Check the edit page for its status.', 'info')
         return
     new_url = (form.video_url.data or '').strip() or None
+    if new_url != vehicle.video_url or vehicle.status == 'sold':
+        cancel_video_jobs(vehicle)
     if new_url != vehicle.video_url:
         delete_local_video_file(vehicle.video_url)
         vehicle.video_url = new_url
 
 
-def _handle_vehicle_images(vehicle, files):
+def _handle_vehicle_images(vehicle, files, *, notify=True):
     existing = list(vehicle.images or [])
     order_offset = len(existing)
     new_image_ids = []
@@ -1587,7 +1664,7 @@ def _handle_vehicle_images(vehicle, files):
         if img.id:
             new_image_ids.append(img.id)
     db.session.commit()
-    if failed_names:
+    if failed_names and notify:
         flash(
             f"Could not save {len(failed_names)} photo(s): {', '.join(failed_names)}. "
             'These photos were not added to the listing. Try uploading them again as JPEG images.',
@@ -1603,6 +1680,7 @@ def _handle_vehicle_images(vehicle, files):
                 current_app.logger.warning(
                     'Failed to enqueue highlight job for image %s: %s', image_id, exc
                 )
+    return new_image_ids, failed_names
 
 
 def _enqueue_highlights_for_vehicle(vehicle, force=False):

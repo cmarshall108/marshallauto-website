@@ -50,10 +50,13 @@ def run_loop(poll_seconds: float = 2.0, lease_seconds: int = 300, once: bool = F
 
     with app.app_context():
         from app.highlight_jobs import queue_stats, run_worker_once
+        from app.video_jobs import run_video_worker_once
 
         while not _shutdown:
             try:
-                worked = run_worker_once(lease_seconds=lease_seconds)
+                worked = run_video_worker_once()
+                if not worked:
+                    worked = run_worker_once(lease_seconds=lease_seconds)
             except Exception:
                 logger.exception('Worker loop error')
                 worked = False

@@ -74,6 +74,34 @@ gunicorn -w 4 -b 0.0.0.0:8000 "run:create_app()"
 
 Set `DATABASE_URL` to a production PostgreSQL database for better performance and reliability.
 
+### Bulk vehicle photos and videos
+
+With JavaScript enabled, Save Vehicle saves the details first, then uploads each photo
+in order in a separate request and finally uploads the video. The form shows progress
+and stops on errors; already-saved media is kept. If a request is interrupted, use the
+link to the saved vehicle and check its media before retrying to avoid duplicates.
+Without JavaScript, the ordinary multipart form still works, subject to the total
+request size limit.
+
+Video compression runs as a durable database job in the existing
+`python -m app.highlight_worker` process, not inside the web request. The Ubuntu launcher
+starts this worker by default (`START_HIGHLIGHT_WORKER=1`); other deployments must run
+it separately, even if photo highlights are disabled. Install ffmpeg and run
+`flask db upgrade` before deployment. Queued/running/failed video status appears on the
+vehicle edit page; refresh to check it. The previous video stays available until the
+replacement succeeds. Removing/replacing a video, selling, or deleting the vehicle
+prevents older jobs from publishing.
+
+The per-media-request limit defaults to 90 MiB, below the 100 MB ceiling on common
+Cloudflare plans. The form reserves 64 KiB for multipart overhead. Larger individual
+videos need compression before upload or a YouTube/Vimeo URL; splitting photo requests
+does not bypass a proxy's single-file limit. Keep any reverse-proxy body limit at least
+as large as this setting, and only increase it if the hosting/proxy plan supports it.
+
+A Cloudflare 520 alone does not identify the cause. Check the origin log
+(`/var/log/marshallauto.log` on the Ubuntu deployment) and system journal at the failure
+time for worker exits, out-of-memory kills, disk exhaustion, and connection resets.
+
 ## Environment Variables
 
 | Variable | Description |
@@ -82,6 +110,8 @@ Set `DATABASE_URL` to a production PostgreSQL database for better performance an
 | `DATABASE_URL` | Database connection string (defaults to SQLite) |
 | `ADMIN_USERNAME` | Admin login username |
 | `ADMIN_PASSWORD` | Admin login password |
+| `MAX_CONTENT_LENGTH` | Total multipart request limit in bytes (default 256 MiB) |
+| `MEDIA_UPLOAD_MAX_CONTENT_LENGTH` | Individual media request limit in bytes (default 90 MiB; capped by `MAX_CONTENT_LENGTH`) |
 | `SITE_URL` | Public site URL used for sitemaps and structured data |
 | `BUSINESS_NAME` | Business name |
 | `BUSINESS_PHONE` | Business phone number |

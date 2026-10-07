@@ -537,11 +537,30 @@ def save_uploaded_video(file_obj, subfolder='vehicles/videos'):
 
     file_obj.save(raw_path)
     try:
+        if compress_video_file(raw_path, final_path):
+            return final_name
+        return None
+    finally:
+        if os.path.exists(raw_path):
+            try:
+                os.remove(raw_path)
+            except OSError as exc:
+                current_app.logger.warning('Failed to delete raw video %s: %s', raw_path, exc)
+
+
+def compress_video_file(raw_path, final_path):
+    """Compress a staged video; never publish incomplete output."""
+    ffmpeg = _ffmpeg_path()
+    if not ffmpeg:
+        current_app.logger.error('Video compression unavailable: ffmpeg not found.')
+        return False
+    succeeded = False
+    try:
         result = subprocess.run(
             [
-                ffmpeg, '-y', '-i', raw_path,
+                ffmpeg, '-y', '-threads', '1', '-i', raw_path,
                 '-vf', f"scale='min({VIDEO_MAX_WIDTH},iw)':-2",
-                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(VIDEO_CRF),
+                '-c:v', 'libx264', '-threads', '1', '-preset', 'veryfast', '-crf', str(VIDEO_CRF),
                 '-c:a', 'aac', '-b:a', VIDEO_AUDIO_BITRATE, '-ac', '1',
                 '-movflags', '+faststart',
                 final_path,
@@ -553,17 +572,18 @@ def save_uploaded_video(file_obj, subfolder='vehicles/videos'):
             current_app.logger.error(
                 'Video compression failed: %s', result.stderr.decode('utf-8', 'ignore')[-800:]
             )
-            return None
-        return final_name
+            return False
+        succeeded = True
+        return True
     except (subprocess.SubprocessError, OSError) as exc:
         current_app.logger.error('Video compression failed: %s', exc)
-        return None
+        return False
     finally:
-        if os.path.exists(raw_path):
+        if not succeeded and os.path.exists(final_path):
             try:
-                os.remove(raw_path)
-            except OSError:
-                pass
+                os.remove(final_path)
+            except OSError as exc:
+                current_app.logger.warning('Failed to delete incomplete video %s: %s', final_path, exc)
 
 
 def delete_local_video_file(video_url):
