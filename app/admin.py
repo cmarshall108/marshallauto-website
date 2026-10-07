@@ -680,11 +680,27 @@ def vehicle_images_reorder(id):
 def vehicle_image_delete(id):
     image = db.session.get(VehicleImage, id) or abort(404)
     vehicle_id = image.vehicle_id
-    _delete_vehicle_image_file(image)
-    db.session.delete(image)
+    _delete_vehicle_image(image)
     db.session.commit()
     flash('Image deleted.', 'success')
     return redirect(url_for('admin.vehicle_edit', id=vehicle_id))
+
+
+@admin_bp.route('/vehicles/<int:id>/images/delete-all', methods=['POST'])
+@login_required
+def vehicle_images_delete_all(id):
+    vehicle = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(id=id)
+        .first_or_404()
+    )
+    images = list(vehicle.images)
+    for image in images:
+        _delete_vehicle_image(image)
+    db.session.commit()
+    flash(f'Deleted all {len(images)} vehicle photo(s). You can upload new photos now.', 'success')
+    return redirect(url_for('admin.vehicle_edit', id=id))
 
 
 @admin_bp.route('/vehicles/<int:id>/highlights/analyze', methods=['POST'])
@@ -1624,6 +1640,11 @@ def _delete_vehicle_image_file(image):
                     os.remove(variant)
     except OSError:
         pass
+
+
+def _delete_vehicle_image(image):
+    _delete_vehicle_image_file(image)
+    db.session.delete(image)
 
 
 def _delete_carfax_file(filename):

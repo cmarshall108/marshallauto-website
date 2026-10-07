@@ -2,6 +2,7 @@ import os
 import unittest
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pillow_heif
 from PIL import Image
@@ -74,9 +75,10 @@ class HeicConversionTests(unittest.TestCase):
         vehicle.ensure_slug()
         db.session.commit()
         client = self.app.test_client()
-        response = client.post('/admin/login', data={
-            'username': user.username, 'password': 'test-password-only',
-        })
+        with patch('app.admin.rate_limit_exceeded', return_value=False):
+            response = client.post('/admin/login', data={
+                'username': user.username, 'password': 'test-password-only',
+            })
         self.assertEqual(response.status_code, 302)
         jpeg = BytesIO()
         Image.new('RGB', (800, 600), 'blue').save(jpeg, format='JPEG')
@@ -98,6 +100,42 @@ class HeicConversionTests(unittest.TestCase):
         for photo in vehicle.images:
             self.assertIn(photo.url.encode(), response.data)
             self.assertTrue(os.path.isfile(os.path.join(self.folder, photo.filename)))
+
+    def test_delete_all_vehicle_photos_removes_files_and_rows(self):
+        vehicle = Vehicle(year=2012, make='Dodge', model='Challenger', price=8999, mileage=63400)
+        other_vehicle = Vehicle(year=2015, make='Honda', model='Civic', price=12000, mileage=50000)
+        user = User(username='photo-delete-admin')
+        user.set_password('test-password-only')
+        db.session.add_all([vehicle, other_vehicle, user])
+        db.session.flush()
+        images = [
+            VehicleImage(vehicle_id=vehicle.id, filename='first.jpg', is_primary=True),
+            VehicleImage(vehicle_id=vehicle.id, filename='second.jpg'),
+            VehicleImage(vehicle_id=other_vehicle.id, filename='other.jpg'),
+        ]
+        db.session.add_all(images)
+        db.session.commit()
+
+        for filename in ('first.jpg', 'first_thumbnail.jpg', 'second.jpg', 'other.jpg'):
+            with open(os.path.join(self.folder, filename), 'wb') as photo_file:
+                photo_file.write(b'photo')
+
+        client = self.app.test_client()
+        response = client.post('/admin/login', data={
+            'username': user.username, 'password': 'test-password-only',
+        })
+        self.assertEqual(response.status_code, 302)
+
+        response = client.post(f'/admin/vehicles/{vehicle.id}/images/delete-all')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], f'/admin/vehicles/{vehicle.id}/edit')
+        self.assertEqual(VehicleImage.query.filter_by(vehicle_id=vehicle.id).count(), 0)
+        self.assertEqual(VehicleImage.query.filter_by(vehicle_id=other_vehicle.id).count(), 1)
+        self.assertFalse(os.path.exists(os.path.join(self.folder, 'first.jpg')))
+        self.assertFalse(os.path.exists(os.path.join(self.folder, 'first_thumbnail.jpg')))
+        self.assertFalse(os.path.exists(os.path.join(self.folder, 'second.jpg')))
+        self.assertTrue(os.path.isfile(os.path.join(self.folder, 'other.jpg')))
 
     def test_failed_upload_is_reported_instead_of_silently_skipped(self):
         from flask import get_flashed_messages
