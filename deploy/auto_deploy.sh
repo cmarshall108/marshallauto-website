@@ -94,11 +94,30 @@ fi
 
 # System packages are not installed by pip. Keep the site available if apt fails.
 if ! bash "$ROOT/deploy/ensure_ffmpeg.sh"; then
-  log "WARNING: ffmpeg unavailable; video uploads will be rejected. See installation errors above."
+  log "WARNING: system ffmpeg unavailable; trying the pip-installed bundled FFmpeg below."
 fi
 
 if ! "$PYTHON" -m pip install --quiet -r requirements.txt; then
   log "FAILED: pip install"
+  rollback
+  exit 1
+fi
+
+if ! "$PYTHON" - <<'PY'
+import subprocess
+from app.utils import _ffmpeg_path
+
+executable = _ffmpeg_path()
+if not executable:
+    raise SystemExit('No system or bundled FFmpeg available for video uploads.')
+result = subprocess.run([executable, '-version'], capture_output=True, text=True, timeout=15)
+if result.returncode:
+    raise SystemExit(f'FFmpeg verification failed: {result.stderr[-1000:]}')
+print(f'Video compressor verified: {executable}')
+print(result.stdout.splitlines()[0])
+PY
+then
+  log "FAILED: video compressor verification"
   rollback
   exit 1
 fi

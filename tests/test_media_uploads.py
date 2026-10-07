@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, inspect
 from app import create_app, db
 from app.models import User, Vehicle, VideoUploadJob, utcnow
 from app.video_jobs import cancel_video_jobs, run_video_worker_once
-from app.utils import compress_video_file
+from app.utils import _ffmpeg_path, compress_video_file
 from config import TestingConfig
 
 
@@ -283,6 +283,23 @@ class MediaUploadTests(unittest.TestCase):
         ], check=True, capture_output=True, timeout=30)
         self.assertTrue(compress_video_file(raw, output))
         self.assertGreater(os.path.getsize(output), 0)
+
+    def test_real_bundled_ffmpeg_upload_and_compression_without_system_ffmpeg(self):
+        raw = os.path.join(self.tmp.name, 'bundled.mov')
+        with patch('app.utils.shutil.which', return_value=None):
+            executable = _ffmpeg_path()
+            self.assertTrue(executable)
+            subprocess.run([
+                executable, '-y', '-f', 'lavfi', '-i',
+                'color=c=blue:s=64x48:r=5', '-t', '0.4', '-c:v', 'libx264', raw,
+            ], check=True, capture_output=True, timeout=30)
+            with open(raw, 'rb') as source:
+                response = self.upload({'video_file': (BytesIO(source.read()), 'video.mov')})
+            self.assertEqual(response.status_code, 202)
+            self.assertTrue(run_video_worker_once())
+        db.session.refresh(self.vehicle)
+        self.assertTrue(self.vehicle.video_url.endswith('.mp4'))
+        self.assertEqual(VideoUploadJob.query.first().status, 'completed')
 
     def test_deferred_create_saves_details_and_posts_only_after_uploads(self):
         with patch('app.admin._maybe_publish_vehicle_to_facebook') as publish:

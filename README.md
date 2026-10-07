@@ -102,9 +102,16 @@ replacement succeeds. Removing/replacing a video, selling, or deleting the vehic
 prevents older jobs from publishing.
 
 The Ubuntu one-time installer and automatic deploy script both check/install
-`ffmpeg` and verify it runs. If apt installation fails, deployment continues with
-an explicit warning in `/var/log/marshallauto-deploy.log`; video uploads remain
-disabled, but the rest of the website stays online. To repair an existing server:
+system `ffmpeg`. The Python requirements also include `imageio-ffmpeg`, which bundles
+an executable on supported platforms. Web and worker processes prefer system FFmpeg
+and fall back to the bundled executable when it is absent; no manual SSH installation
+is needed on supported deployments. This is still native FFmpeg, not a pure-Python codec.
+
+If apt installation fails, automatic deployment logs a warning and installs the Python
+requirements instead. It verifies the resolved compressor with `-version` before
+restarting; if neither option works, deployment rolls back and logs the failure.
+See `/var/log/marshallauto-deploy.log` for the selected executable and any errors.
+For an unsupported platform, or to repair an existing system installation manually:
 
 ```bash
 sudo apt-get update

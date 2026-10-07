@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import re
 import secrets
 import shutil
@@ -571,7 +572,15 @@ VIDEO_AUDIO_BITRATE = '64k'
 
 
 def _ffmpeg_path():
-    return shutil.which('ffmpeg')
+    system_ffmpeg = shutil.which('ffmpeg')
+    if system_ffmpeg:
+        return system_ffmpeg
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+        return get_ffmpeg_exe()
+    except (ImportError, RuntimeError) as exc:
+        logging.getLogger(__name__).error('No system or bundled FFmpeg available: %s', exc)
+        return None
 
 
 def save_uploaded_video(file_obj, subfolder='vehicles/videos'):

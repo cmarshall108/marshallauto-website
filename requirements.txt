@@ -7,6 +7,7 @@ WTForms==3.1.2
 Werkzeug==3.0.3
 Pillow==12.3.0
 pillow-heif==1.8.0
+imageio-ffmpeg==0.6.0
 python-dotenv==1.0.1
 email-validator==2.2.0
 blinker==1.8.2

@@ -18,7 +18,7 @@ command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
 
 if ! bash "$ROOT/deploy/ensure_ffmpeg.sh"; then
-  echo "WARNING: continuing site installation without video uploads; install ffmpeg to enable them." >&2
+  echo "WARNING: system ffmpeg unavailable; the imageio-ffmpeg Python dependency supplies a fallback on supported platforms." >&2
 fi
 
 chmod +x "$ROOT/start_ubuntu_prod.sh" "$ROOT/deploy/auto_deploy.sh" "$ROOT/deploy/healthcheck.sh"

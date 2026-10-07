@@ -4,7 +4,27 @@ from unittest import mock
 
 from flask import Flask
 
-from app.utils import is_safe_redirect, notify_new_lead
+from app.utils import _ffmpeg_path, is_safe_redirect, notify_new_lead
+
+
+class FfmpegResolutionTests(unittest.TestCase):
+    def test_prefers_system_executable(self):
+        with mock.patch('app.utils.shutil.which', return_value='/usr/bin/ffmpeg'), \
+                mock.patch('imageio_ffmpeg.get_ffmpeg_exe') as bundled:
+            self.assertEqual(_ffmpeg_path(), '/usr/bin/ffmpeg')
+        bundled.assert_not_called()
+
+    def test_uses_bundled_executable_without_system_installation(self):
+        with mock.patch('app.utils.shutil.which', return_value=None), \
+                mock.patch('imageio_ffmpeg.get_ffmpeg_exe', return_value='/wheel/ffmpeg'):
+            self.assertEqual(_ffmpeg_path(), '/wheel/ffmpeg')
+
+    def test_missing_bundle_is_logged(self):
+        with mock.patch('app.utils.shutil.which', return_value=None), \
+                mock.patch('imageio_ffmpeg.get_ffmpeg_exe', side_effect=RuntimeError('unsupported host')), \
+                self.assertLogs('app.utils', level='ERROR') as logs:
+            self.assertIsNone(_ffmpeg_path())
+        self.assertIn('unsupported host', logs.output[0])
 
 
 class SafeRedirectTests(unittest.TestCase):
