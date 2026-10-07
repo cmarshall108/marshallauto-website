@@ -54,6 +54,13 @@ function setup(options = {}) {
                 headers: { get: () => 'text/html' },
             };
         }
+        if (options.jsonFailAt === calls.length) {
+            return {
+                ok: false, status: 520,
+                headers: { get: name => name === 'cf-ray' ? 'test-ray' : 'application/json' },
+                json: async () => ({ error: 'Web server is returning an unknown error' }),
+            };
+        }
         if (options.validationError && calls.length === 1) {
             return {
                 ok: false, status: 400, headers: { get: () => 'application/json' },
@@ -127,6 +134,23 @@ test('validation errors restore controls without uploading files', async () => {
     assert.equal(view.calls.length, 1);
     assert.match(view.status.textContent, /year: Invalid year/);
     assert.equal(view.controls[0].disabled, false);
+});
+
+test('JSON 520 errors show status, server error, filename and ray instead of generic upload failure', async () => {
+    const view = setup({
+        photos: [
+            { name: 'one.heic', size: 10 },
+            { name: 'two.heic', size: 10 },
+            { name: 'three.heic', size: 10 },
+        ],
+        jsonFailAt: 4,
+    });
+    await view.submit();
+    assert.match(view.status.textContent, /three.heic: HTTP 520/);
+    assert.match(view.status.textContent, /Web server is returning an unknown error/);
+    assert.match(view.status.textContent, /Cloudflare Ray: test-ray/);
+    assert.match(view.status.textContent, /2 photo\(s\) were saved/);
+    assert.equal(view.calls.length, 4);
 });
 
 test('existing submit guards and no-media submits retain normal behavior', async () => {

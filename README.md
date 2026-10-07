@@ -83,6 +83,15 @@ link to the saved vehicle and check its media before retrying to avoid duplicate
 Without JavaScript, the ordinary multipart form still works, subject to the total
 request size limit.
 
+HEIC/HEIF photos are decoded one at a time in a short-lived subprocess, with one
+decoder thread, a 45-second timeout, and a 512 MiB virtual-memory ceiling on Linux.
+Full-size photo buffers are resized before EXIF/color transformations and released
+after saving. Decoder failures are logged and return an explicit upload error
+instead of crashing the web process. If a photo exceeds the conversion budget,
+export it as JPEG and retry. This mitigates HEIC decoder/resource failures; a 520
+still requires origin logs to identify its actual cause. Upload errors show the
+filename, HTTP status, and a Cloudflare Ray ID when present.
+
 Video compression runs as a durable database job in the existing
 `python -m app.highlight_worker` process, not inside the web request. The Ubuntu launcher
 starts this worker by default (`START_HIGHLIGHT_WORKER=1`); other deployments must run
@@ -112,6 +121,8 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `ADMIN_PASSWORD` | Admin login password |
 | `MAX_CONTENT_LENGTH` | Total multipart request limit in bytes (default 256 MiB) |
 | `MEDIA_UPLOAD_MAX_CONTENT_LENGTH` | Individual media request limit in bytes (default 90 MiB; capped by `MAX_CONTENT_LENGTH`) |
+| `HEIC_CONVERSION_TIMEOUT` | HEIC subprocess timeout in seconds (default 45) |
+| `HEIC_CONVERSION_MEMORY_MB` | Linux HEIC subprocess virtual-memory ceiling in MiB (default 512; tune for available RAM) |
 | `SITE_URL` | Public site URL used for sitemaps and structured data |
 | `BUSINESS_NAME` | Business name |
 | `BUSINESS_PHONE` | Business phone number |

@@ -17,16 +17,20 @@
             method: 'POST', body: data, credentials: 'same-origin',
             headers: { Accept: 'application/json', ...headers },
         });
+        const ray = response.headers.get('cf-ray');
+        const rayDetail = ray ? ` Cloudflare Ray: ${ray}.` : '';
         if (!response.headers.get('content-type')?.includes('application/json')) {
             throw new Error(
-                `Upload request returned HTTP ${response.status}. Your session may have expired or the server rejected the request.`
+                `Upload request returned HTTP ${response.status}. Your session may have expired or the server rejected the request.${rayDetail}`
             );
         }
         const result = await response.json();
         if (!response.ok || !result.success) {
             const errors = Object.entries(result.errors || {})
                 .map(([name, messages]) => `${name}: ${messages.join(' ')}`).join(' ');
-            throw new Error(`${result.message || 'Upload failed.'} ${errors}`.trim());
+            const detail = typeof result.message === 'string' ? result.message
+                : typeof result.error === 'string' ? result.error : 'The server did not confirm the upload.';
+            throw new Error(`HTTP ${response.status}: ${detail} ${errors}${rayDetail}`.trim());
         }
         return result;
     }
@@ -60,11 +64,13 @@
         uploading = true;
         let saved = null;
         let completed = 0;
+        let currentFile = '';
         status.className = 'alert alert-info';
         status.textContent = 'Saving vehicle details...';
         try {
             saved = await send(form.action, data, { 'X-Vehicle-Media-Upload': 'deferred' });
             for (const [index, photo] of photos.entries()) {
+                currentFile = photo.name;
                 status.textContent = `Uploading photo ${index + 1} of ${photos.length}: ${photo.name}`;
                 const media = new FormData();
                 media.set('csrf_token', csrf);
@@ -73,6 +79,7 @@
                 completed++;
             }
             if (video) {
+                currentFile = video.name;
                 status.textContent = 'Uploading video. Compression will run in the background after upload.';
                 const media = new FormData();
                 media.set('csrf_token', csrf);
@@ -80,6 +87,7 @@
                 await send(saved.upload_url, media);
             }
             status.textContent = 'Uploads saved. Finishing vehicle save...';
+            currentFile = '';
             const finish = new FormData();
             finish.set('csrf_token', csrf);
             finish.set('is_new', form.dataset.isNew);
@@ -89,7 +97,7 @@
             window.location.assign(saved.redirect_url);
         } catch (error) {
             status.className = 'alert alert-danger';
-            status.textContent = `${error.message} `;
+            status.textContent = `${currentFile ? `${currentFile}: ` : ''}${error.message} `;
             if (saved) {
                 status.append(`Vehicle details and ${completed} photo(s) were saved. `
                     + 'Check the listing before retrying; the last request may also have reached the server. ');

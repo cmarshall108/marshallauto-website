@@ -1,4 +1,7 @@
 import os
+import json
+import subprocess
+import sys
 import unittest
 from io import BytesIO
 from tempfile import TemporaryDirectory
@@ -10,7 +13,7 @@ from werkzeug.datastructures import FileStorage
 
 from app import create_app, db
 from app.models import User, Vehicle, VehicleImage
-from app.utils import convert_heic_vehicle_images, save_uploaded_image
+from app.utils import _normalize_image, convert_heic_vehicle_images, save_uploaded_image
 from config import TestingConfig
 
 
@@ -24,7 +27,11 @@ class HeicConversionTests(unittest.TestCase):
     def setUp(self):
         self.tmp = TemporaryDirectory()
         self.app = create_app(TestingConfig)
-        self.app.config.update(UPLOAD_FOLDER=self.tmp.name, PHOTO_HIGHLIGHTS_ENABLED=False)
+        self.app.config.update(
+            UPLOAD_FOLDER=self.tmp.name,
+            PRIVATE_UPLOAD_FOLDER=os.path.join(self.tmp.name, 'private'),
+            PHOTO_HIGHLIGHTS_ENABLED=False,
+        )
         self.ctx = self.app.app_context()
         self.ctx.push()
         db.create_all()
@@ -47,6 +54,116 @@ class HeicConversionTests(unittest.TestCase):
         with Image.open(os.path.join(self.folder, filename)) as img:
             self.assertEqual(img.format, 'JPEG')
         self.assertTrue(os.path.exists(os.path.join(self.folder, filename.replace('.jpg', '_card.jpg'))))
+
+    def test_heic_native_crash_does_not_crash_request_or_leave_staged_files(self):
+        with patch('app.utils.subprocess.run') as run:
+            run.return_value.returncode = -11
+            run.return_value.stderr = 'decoder crash'
+            self.assertEqual(save_uploaded_image(FileStorage(
+                stream=BytesIO(b'heic data'), filename='third.heic',
+            )), (None, None, None))
+        self.assertEqual(os.listdir(os.path.join(
+            self.app.config['PRIVATE_UPLOAD_FOLDER'], 'image_conversion',
+        )), [])
+        upload = FileStorage(stream=BytesIO(heic_bytes()), filename='next.heic')
+        self.assertTrue(save_uploaded_image(upload)[0].endswith('.jpg'))
+
+    def test_heic_timeout_is_bounded_and_cleans_input(self):
+        with patch('app.utils.subprocess.run', side_effect=subprocess.TimeoutExpired('decoder', 45)) as run:
+            self.assertEqual(save_uploaded_image(FileStorage(
+                stream=BytesIO(b'heic data'), filename='slow.heic',
+            )), (None, None, None))
+        self.assertEqual(run.call_args.kwargs['timeout'], 45)
+        self.assertEqual(os.listdir(os.path.join(
+            self.app.config['PRIVATE_UPLOAD_FOLDER'], 'image_conversion',
+        )), [])
+
+    def test_twenty_real_heic_uploads_all_succeed_through_media_endpoint(self):
+        vehicle = Vehicle(year=2020, make='Honda', model='Civic', price=15000, mileage=40000)
+        user = User(username='heic-batch-admin')
+        user.set_password('test-password-only')
+        db.session.add_all([vehicle, user])
+        db.session.commit()
+        client = self.app.test_client()
+        with patch('app.admin.rate_limit_exceeded', return_value=False):
+            client.post('/admin/login', data={
+                'username': user.username, 'password': 'test-password-only',
+            })
+        content = heic_bytes()
+        for index in range(20):
+            response = client.post(f'/admin/vehicles/{vehicle.id}/media', data={
+                'images': (BytesIO(content), f'IMG_{index}.HEIC'),
+            }, headers={'Accept': 'application/json'})
+            self.assertEqual(response.status_code, 200, response.data)
+        db.session.refresh(vehicle)
+        self.assertEqual(len(vehicle.images), 20)
+        self.assertEqual([image.order_index for image in vehicle.images], list(range(20)))
+        for image in vehicle.images:
+            self.assertTrue(image.filename.endswith('.jpg'))
+            self.assertEqual((image.width, image.height), (1200, 675))
+
+    def test_large_heic_is_processed_and_normalized(self):
+        upload = FileStorage(stream=BytesIO(heic_bytes((4032, 3024))), filename='large.heic')
+        filename, width, height = save_uploaded_image(upload)
+        self.assertTrue(filename.endswith('.jpg'))
+        self.assertEqual((width, height), (1200, 900))
+
+    def test_resize_precedes_exif_transform_and_preserves_rotated_dimensions(self):
+        from PIL import ImageOps
+        with Image.new('RGB', (4000, 3000), 'blue') as source:
+            source.getexif()[274] = 6
+            original_transpose = ImageOps.exif_transpose
+
+            def transpose(image, *, in_place=False):
+                self.assertEqual(image.size, (1600, 1200))
+                self.assertTrue(in_place)
+                return original_transpose(image, in_place=in_place)
+
+            with patch('app.utils.ImageOps.exif_transpose', side_effect=transpose):
+                result = _normalize_image(source, 1200)
+            self.assertEqual(result.size, (1200, 1600))
+
+    def test_jpeg_exif_rotation_and_png_transparency_are_preserved(self):
+        jpeg = BytesIO()
+        with Image.new('RGB', (1600, 900), 'blue') as image:
+            exif = Image.Exif()
+            exif[274] = 6
+            image.save(jpeg, format='JPEG', exif=exif)
+        jpeg.seek(0)
+        filename, width, height = save_uploaded_image(FileStorage(stream=jpeg, filename='rotated.jpg'))
+        self.assertEqual((width, height), (900, 1600))
+        with Image.open(os.path.join(self.folder, filename)) as saved:
+            self.assertNotIn(274, saved.getexif())
+        png = BytesIO()
+        with Image.new('RGBA', (32, 24), (255, 0, 0, 0)) as image:
+            image.save(png, format='PNG')
+        png.seek(0)
+        filename, width, height = save_uploaded_image(FileStorage(stream=png, filename='transparent.png'))
+        self.assertEqual((width, height), (32, 24))
+        with Image.open(os.path.join(self.folder, filename)) as saved:
+            self.assertEqual(saved.mode, 'RGB')
+            self.assertEqual(saved.getpixel((0, 0)), (255, 255, 255))
+
+    def test_linux_worker_applies_memory_ceiling_before_decoding(self):
+        import resource
+        from app.image_upload_worker import main
+        from pillow_heif import options
+        path = os.path.join(self.tmp.name, 'input.heic')
+        with open(path, 'wb') as source:
+            source.write(b'unused by mock')
+        settings = {'HEIC_CONVERSION_MEMORY_MB': 512}
+
+        def decode(*args, **kwargs):
+            set_limit.assert_called_once_with(resource.RLIMIT_AS, (512 * 1048576, 512 * 1048576))
+            self.assertEqual(options.DECODE_THREADS, 1)
+            return 'image.jpg', 1200, 900
+
+        with patch.object(sys, 'argv', ['worker', path, json.dumps(settings), '1200']), \
+                patch.object(sys, 'platform', 'linux'), \
+                patch('resource.setrlimit') as set_limit, \
+                patch('app.image_upload_worker._save_uploaded_image_in_process', side_effect=decode), \
+                patch('builtins.print'):
+            self.assertEqual(main(), 0)
 
     def test_existing_listing_accepts_replacement_photos(self):
         from app.admin import _handle_vehicle_images

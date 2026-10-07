@@ -1,9 +1,12 @@
 import os
+import json
 import re
 import secrets
 import shutil
 import smtplib
 import subprocess
+import sys
+import tempfile
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
@@ -16,7 +19,7 @@ from sqlalchemy import func
 
 try:
     from pillow_heif import register_heif_opener
-    register_heif_opener()
+    register_heif_opener(decode_threads=1)
 except ImportError:  # pragma: no cover - HEIC uploads will be rejected as unreadable
     pass
 
@@ -91,6 +94,55 @@ def _validate_pdf_magic(file_obj):
 
 
 def save_uploaded_image(file_obj, subfolder='vehicles', width=None, quality=None):
+    """Save a normalized image; isolate native HEIC decoding from the caller."""
+    if file_obj and getattr(file_obj, 'filename', None) and \
+            allowed_file(file_obj.filename, HEIC_EXTENSIONS):
+        return _save_heic_isolated(file_obj, subfolder, width, quality)
+    return _save_uploaded_image_in_process(file_obj, subfolder, width, quality)
+
+
+def _save_heic_isolated(file_obj, subfolder, width, quality):
+    """Keep native HEIC decoding and its allocations out of the web process."""
+    folder = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'image_conversion')
+    os.makedirs(folder, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=folder) as staging:
+        source_path = os.path.join(staging, 'input.heic')
+        file_obj.save(source_path)
+        settings = {
+            'UPLOAD_FOLDER': staging,
+            'ALLOWED_IMAGE_EXTENSIONS': list(current_app.config['ALLOWED_IMAGE_EXTENSIONS']),
+            'IMAGE_WIDTHS': current_app.config.get('IMAGE_WIDTHS', {}),
+            'IMAGE_QUALITY': quality or current_app.config.get('IMAGE_QUALITY', 85),
+            'HEIC_CONVERSION_MEMORY_MB': current_app.config.get('HEIC_CONVERSION_MEMORY_MB', 512),
+        }
+        try:
+            result = subprocess.run(
+                [sys.executable, '-m', 'app.image_upload_worker', source_path,
+                 json.dumps(settings), str(width or settings['IMAGE_WIDTHS'].get('detail', 1200))],
+                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                capture_output=True, text=True,
+                timeout=current_app.config.get('HEIC_CONVERSION_TIMEOUT', 45),
+            )
+            if result.returncode != 0:
+                current_app.logger.error(
+                    'HEIC conversion failed for %s (exit %s): %s',
+                    file_obj.filename, result.returncode, result.stderr[-2000:],
+                )
+                return None, None, None
+            metadata = json.loads(result.stdout)
+            filename = metadata['filename']
+            output_folder = os.path.join(staging, 'converted')
+            destination = os.path.join(current_app.config['UPLOAD_FOLDER'], subfolder)
+            os.makedirs(destination, exist_ok=True)
+            for name in os.listdir(output_folder):
+                os.replace(os.path.join(output_folder, name), os.path.join(destination, name))
+            return filename, metadata['width'], metadata['height']
+        except (subprocess.SubprocessError, OSError, ValueError, KeyError) as exc:
+            current_app.logger.error('HEIC conversion failed for %s: %s', file_obj.filename, exc)
+            return None, None, None
+
+
+def _save_uploaded_image_in_process(file_obj, subfolder='vehicles', width=None, quality=None):
     """Save and resize an uploaded image, returning (filename, width, height) or (None, None, None)."""
     if not file_obj or not getattr(file_obj, 'filename', None):
         return None, None, None
@@ -116,20 +168,21 @@ def save_uploaded_image(file_obj, subfolder='vehicles', width=None, quality=None
     full_path = os.path.join(upload_path, filename)
 
     try:
-        img = _normalize_image(Image.open(file_obj), width)
+        with Image.open(file_obj) as source:
+            img = _normalize_image(source, width)
+            try:
+                save_kwargs = {'optimize': True}
+                if ext in ('jpg', 'jpeg', 'webp'):
+                    save_kwargs['quality'] = quality
+                if ext == 'webp':
+                    save_kwargs['method'] = 6
 
-        save_kwargs = {'optimize': True}
-        if ext in ('jpg', 'jpeg', 'webp'):
-            save_kwargs['quality'] = quality
-        if ext == 'webp':
-            save_kwargs['method'] = 6
-
-        img.save(full_path, **save_kwargs)
-
-        # Generate card/thumbnail variants for responsive listings
-        _save_image_variants(img, upload_path, filename)
-
-        return filename, img.width, img.height
+                img.save(full_path, **save_kwargs)
+                _save_image_variants(img, upload_path, filename)
+                return filename, img.width, img.height
+            finally:
+                if img is not source:
+                    img.close()
     except Exception as e:
         current_app.logger.error('Image save failed: %s', e)
         return None, None, None
@@ -137,7 +190,14 @@ def save_uploaded_image(file_obj, subfolder='vehicles', width=None, quality=None
 
 def _normalize_image(img, width):
     """Apply EXIF rotation, flatten to RGB, and cap the width."""
-    img = ImageOps.exif_transpose(img)
+    # Shrink before rotation/color conversion to avoid full-resolution copies.
+    rotated = img.getexif().get(274) in (5, 6, 7, 8)
+    oriented_width = img.height if rotated else img.width
+    if oriented_width > width:
+        ratio = width / float(oriented_width)
+        target = (max(1, int(img.width * ratio)), max(1, int(img.height * ratio)))
+        img.thumbnail(target, Image.Resampling.LANCZOS)
+    ImageOps.exif_transpose(img, in_place=True)
     if img.mode in ('RGBA', 'P', 'LA'):
         background = Image.new('RGB', img.size, (255, 255, 255))
         if img.mode == 'P':
@@ -183,15 +243,20 @@ def convert_heic_vehicle_images(dry_run=False):
         try:
             with Image.open(os.path.join(upload_path, old_name)) as src:
                 img = _normalize_image(src, width)
-            img.save(os.path.join(upload_path, new_name), format='JPEG', quality=quality, optimize=True)
-            _save_image_variants(img, upload_path, new_name)
+                try:
+                    img.save(os.path.join(upload_path, new_name), format='JPEG', quality=quality, optimize=True)
+                    _save_image_variants(img, upload_path, new_name)
+                    image_width, image_height = img.size
+                finally:
+                    if img is not src:
+                        img.close()
         except Exception as exc:
             current_app.logger.error('HEIC conversion failed for image %s (%s): %s', image.id, old_name, exc)
             stats['failed'] += 1
             continue
 
         image.filename = new_name
-        image.width, image.height = img.width, img.height
+        image.width, image.height = image_width, image_height
         requeue = highlights_on and image.highlight_status in ('pending', 'failed')
         if requeue:
             image.highlight_status = 'pending'
@@ -229,6 +294,8 @@ def _save_image_variants(img, upload_path, filename):
             variant.save(os.path.join(upload_path, variant_name), **kwargs)
         except Exception as e:
             current_app.logger.warning('Variant save failed (%s): %s', label, e)
+        finally:
+            variant.close()
 
 
 def save_uploaded_pdf(file_obj):

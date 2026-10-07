@@ -643,7 +643,11 @@ def vehicle_media_upload(id):
     if photos:
         ids, failures = _handle_vehicle_images(vehicle, photos, notify=False)
         if failures:
-            return jsonify(success=False, message=f'Could not save {failures[0]}. Try a JPEG image.'), 422
+            return jsonify(
+                success=False,
+                message=f'Could not save {failures[0]}. The image could not be decoded or conversion '
+                'exceeded the server resource limit. Convert this photo to JPEG and upload again.',
+            ), 422
         return jsonify(success=True, image_id=ids[0])
     job = None
     try:

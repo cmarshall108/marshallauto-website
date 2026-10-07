@@ -48,6 +48,8 @@ class Config:
         'detail': 1200,
     }
     IMAGE_QUALITY = 85
+    HEIC_CONVERSION_TIMEOUT = int(os.environ.get('HEIC_CONVERSION_TIMEOUT', '45'))
+    HEIC_CONVERSION_MEMORY_MB = int(os.environ.get('HEIC_CONVERSION_MEMORY_MB', '512'))
 
     # Carvana-style photo highlights (worker only; never blocks web requests)
     # Primary engine: Grok vision via xAI (XAI_API_KEY). Fallback: OpenCV.
