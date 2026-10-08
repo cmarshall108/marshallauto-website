@@ -1,5 +1,6 @@
 import importlib
 import os
+import stat
 import unittest
 from decimal import Decimal
 from io import BytesIO
@@ -13,7 +14,9 @@ from sqlalchemy import create_engine, inspect, text
 
 from app import create_app, db
 from app.models import User, Vehicle, VehicleSaleImage
+from app.utils import save_uploaded_license_image
 from config import TestingConfig
+from werkzeug.datastructures import FileStorage
 
 
 def id_photo():
@@ -150,6 +153,50 @@ class VehicleSaleTests(unittest.TestCase):
                 self.save(buyer_id_images=[(id_photo(), 'front.jpg')])
         self.assertEqual(self.photos(), [])
         self.assertEqual(VehicleSaleImage.query.count(), 0)
+
+    def test_private_image_pixel_limit_before_decode(self):
+        upload = id_photo()
+        with patch('app.utils.MAX_PRIVATE_IMAGE_PIXELS', 1000), \
+                patch('PIL.Image.Image.load') as decode:
+            response = self.save(buyer_id_images=[(upload, 'front.jpg')])
+        self.assertEqual(response.status_code, 422)
+        decode.assert_not_called()
+        self.assertEqual(self.photos(), [])
+
+    def test_private_image_dimensions_permissions_and_metadata(self):
+        stream = BytesIO()
+        exif = Image.Exif()
+        exif[270] = 'Sensitive original camera metadata'
+        Image.new('RGB', (800, 2400), 'white').save(stream, 'JPEG', exif=exif)
+        stream.seek(0)
+        self.assertEqual(self.save(buyer_id_images=[(stream, 'portrait.jpg')]).status_code, 302)
+        image = VehicleSaleImage.query.one()
+        path = os.path.join(self.app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses', image.filename)
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(os.stat(os.path.dirname(path)).st_mode), 0o700)
+        with Image.open(path) as saved:
+            self.assertEqual(saved.size, (533, 1600))
+            self.assertEqual(len(saved.getexif()), 0)
+            self.assertEqual(saved.format, 'JPEG')
+
+    def test_private_image_failure_removes_partial_file(self):
+        upload = id_photo()
+        with patch('PIL.Image.Image.save', side_effect=OSError('disk failure')):
+            response = self.save(buyer_id_images=[(upload, 'front.jpg')])
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(self.photos(), [])
+        self.assertEqual(VehicleSaleImage.query.count(), 0)
+
+    def test_shared_private_image_byte_limit_boundary(self):
+        raw = id_photo().getvalue()
+        with patch('app.utils.MAX_PRIVATE_IMAGE_BYTES', len(raw)):
+            self.assertIsNotNone(save_uploaded_license_image(
+                FileStorage(stream=BytesIO(raw), filename='valid.jpg'),
+            ))
+            self.assertIsNone(save_uploaded_license_image(
+                FileStorage(stream=BytesIO(raw + b'x'), filename='too-large.jpg'),
+            ))
+        self.assertEqual(len(self.photos()), 1)
 
     def test_private_photos_auth_ownership_deletion_and_csrf(self):
         self.save(buyer_id_images=[(id_photo(), 'front.jpg'), (id_photo(), 'back.jpg')])

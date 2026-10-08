@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import warnings
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -25,6 +26,8 @@ except ImportError:  # pragma: no cover - HEIC uploads will be rejected as unrea
     pass
 
 HEIC_EXTENSIONS = {'heic', 'heif'}
+MAX_PRIVATE_IMAGE_BYTES = 15 * 1024 * 1024
+MAX_PRIVATE_IMAGE_PIXELS = 20_000_000
 
 # In-process rate limit buckets: key -> deque of timestamps
 _rate_buckets = defaultdict(deque)
@@ -320,31 +323,47 @@ def _save_license_image_bytes(raw_bytes):
     """Shared save path for license images, whatever the source (file or camera capture)."""
     import io
 
-    try:
-        img = Image.open(io.BytesIO(raw_bytes))
-        img.verify()
-        img = Image.open(io.BytesIO(raw_bytes))  # re-open after verify() invalidates the handle
-    except (UnidentifiedImageError, OSError, ValueError):
+    if len(raw_bytes) > MAX_PRIVATE_IMAGE_BYTES:
+        current_app.logger.warning('Rejected private ID image exceeding byte limit')
         return None
-
-    img = ImageOps.exif_transpose(img)
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
-
-    # Cap resolution — this is a document photo, not a gallery image; no need for full camera res.
-    max_width = 1600
-    if img.width > max_width:
-        ratio = max_width / float(img.width)
-        img = img.resize((max_width, max(1, int(img.height * ratio))), Image.Resampling.LANCZOS)
-
-    filename = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}.jpg"
-    upload_path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
-    os.makedirs(upload_path, exist_ok=True)
+    path = None
     try:
-        img.save(os.path.join(upload_path, filename), format='JPEG', quality=85, optimize=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(raw_bytes)) as source:
+                if source.width * source.height > MAX_PRIVATE_IMAGE_PIXELS:
+                    current_app.logger.warning('Rejected private ID image exceeding pixel limit')
+                    return None
+                source.verify()
+            with Image.open(io.BytesIO(raw_bytes)) as source:
+                img = ImageOps.exif_transpose(source)
+                try:
+                    img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                    converted = img.convert('RGB')
+                    try:
+                        filename = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}.jpg"
+                        upload_path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
+                        os.makedirs(upload_path, mode=0o700, exist_ok=True)
+                        destination = os.path.join(upload_path, filename)
+                        fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                        path = destination
+                        with os.fdopen(fd, 'wb') as output:
+                            converted.save(
+                                output, format='JPEG', quality=85, optimize=True,
+                                exif=b'', icc_profile=None,
+                            )
+                    finally:
+                        converted.close()
+                finally:
+                    img.close()
         return filename
-    except Exception as e:
-        current_app.logger.error('License image save failed: %s', e)
+    except (
+        UnidentifiedImageError, OSError, ValueError,
+        Image.DecompressionBombError, Image.DecompressionBombWarning,
+    ):
+        current_app.logger.warning('Private ID image rejected or could not be saved', exc_info=True)
+        if path and os.path.exists(path):
+            os.remove(path)
         return None
 
 
@@ -353,12 +372,10 @@ def save_uploaded_license_image(file_obj):
     if not file_obj or not getattr(file_obj, 'filename', None):
         return None
     if not allowed_file(file_obj.filename, current_app.config['ALLOWED_IMAGE_EXTENSIONS']):
-        return None
-    if not _validate_image_magic(file_obj):
-        current_app.logger.warning('Rejected non-image license upload: %s', file_obj.filename)
+        current_app.logger.warning('Rejected unsupported private ID image extension')
         return None
     file_obj.seek(0)
-    return _save_license_image_bytes(file_obj.read())
+    return _save_license_image_bytes(file_obj.read(MAX_PRIVATE_IMAGE_BYTES + 1))
 
 
 def save_license_image_data_url(data_url):

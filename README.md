@@ -46,8 +46,17 @@ Upload only documents you are authorized to retain and delete them when no longe
 Sale details are admin-only and are not included in public listings, public photo
 galleries, or Facebook posts. ID photos use the existing `PRIVATE_UPLOAD_FOLDER`
 license storage, outside the public static directory, and require an active admin
-session to view. Sale pages and photos are marked `private, no-store`. Individual
-photos can be deleted; deleting a vehicle also removes its sale photos. Relisting
+session to view. Sale pages and photos are marked `private, no-store`.
+New ID files are created with owner-only read/write permissions. Image processing
+rejects images over 20 megapixels before decoding, bounds saved photos to
+1600 pixels on both axes, and strips EXIF metadata (including GPS coordinates).
+Existing file permissions are not changed automatically; restrict access to the
+private upload directory and its backups on the server. Use production mode,
+HTTPS, strong unique admin credentials, and an unprivileged application service
+account. Private files are not encrypted by the application; protect disks and
+backups and maintain an appropriate document-retention policy.
+
+Individual photos can be deleted; deleting a vehicle also removes its sale photos. Relisting
 a vehicle retains its private sale records for later use, without changing the
 public price. Run `flask db upgrade` before deploying this feature.
 
