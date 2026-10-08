@@ -16,7 +16,7 @@ from flask.cli import with_appcontext
 from sqlalchemy import case, or_
 
 from app import db
-from app.models import AdminRecoveryCode, User, utcnow
+from app.models import AdminRecoveryCode, SiteSetting, User, utcnow
 
 
 def _cipher():
@@ -38,7 +38,13 @@ def decrypt_secret(encrypted):
 
 
 def requires_two_factor(user):
-    return current_app.config['ADMIN_TWO_FACTOR_REQUIRED'] or user.totp_enabled
+    # Read the policy from the database so changes reach every worker immediately.
+    required = db.session.query(SiteSetting.value).filter_by(
+        key='admin_two_factor_required',
+    ).scalar()
+    return (
+        current_app.config['ADMIN_TWO_FACTOR_REQUIRED'] or required == 'true'
+    )
 
 
 def session_verified(user):

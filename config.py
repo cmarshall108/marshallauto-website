@@ -75,7 +75,7 @@ class Config:
     # Admin auth
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME') or 'admin'
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'admin'
-    ADMIN_TWO_FACTOR_REQUIRED = True
+    ADMIN_TWO_FACTOR_REQUIRED = False
     TWO_FACTOR_CHALLENGE_SECONDS = 300
 
     # Simple in-process rate limits (per worker)

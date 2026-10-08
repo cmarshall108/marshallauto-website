@@ -16,7 +16,7 @@ from flask_login.utils import encode_cookie
 from sqlalchemy import create_engine, inspect, text
 
 from app import create_app, db
-from app.models import AdminRecoveryCode, User
+from app.models import AdminRecoveryCode, SiteSetting, User
 from app.two_factor import (
     consume_code, decrypt_secret, encrypt_secret, provisioning_uri, replace_recovery_codes,
     totp_counter,
@@ -90,7 +90,7 @@ class TwoFactorTests(unittest.TestCase):
         return match.group(1)
 
     def test_mandatory_enrollment_blocks_every_admin_surface_until_confirmed(self):
-        self.assertTrue(Config.ADMIN_TWO_FACTOR_REQUIRED)
+        self.assertFalse(Config.ADMIN_TWO_FACTOR_REQUIRED)
         response = self.password_login(next_page='/admin/vehicles?status=sold')
         self.assertEqual(response.location, '/admin/login/setup')
         for path in ('/admin/', '/admin/vehicles', '/admin/settings', '/admin/settings/two-factor'):
@@ -284,6 +284,99 @@ class TwoFactorTests(unittest.TestCase):
             db.session.get(User, self.user_id).is_active_user = False
             db.session.commit()
         self.assertEqual(self.client.get('/admin/').status_code, 302)
+
+    def test_default_policy_allows_password_login_even_after_enrollment(self):
+        self.enroll()
+        self.client.get('/admin/logout')
+        self.app.config['ADMIN_TWO_FACTOR_REQUIRED'] = False
+        response = self.password_login()
+        self.assertEqual(response.location, '/admin/dashboard')
+        self.assertEqual(self.client.get('/admin/').status_code, 200)
+        self.assertEqual(self.client.get('/admin/settings').status_code, 200)
+        with self.app.app_context():
+            user = db.session.get(User, self.user_id)
+            self.assertTrue(user.totp_enabled)
+            self.assertIsNotNone(user.totp_secret_encrypted)
+            self.assertEqual(AdminRecoveryCode.query.count(), 10)
+        self.assertEqual(self.client.get('/admin/settings/two-factor').location, '/admin/settings')
+
+    def test_settings_switch_requires_setup_and_can_be_disabled(self):
+        self.app.config['ADMIN_TWO_FACTOR_REQUIRED'] = False
+        self.assertEqual(self.password_login().location, '/admin/dashboard')
+        self.app.config['WTF_CSRF_ENABLED'] = True
+        page = self.client.get('/admin/settings')
+        self.assertIn('Require two-factor authentication for every admin', page.text)
+        blocked = self.client.post('/admin/settings', data={
+            'site_title': 'Marshall Auto', 'admin_two_factor_required': 'y',
+        }, headers={'Accept': 'application/json'})
+        self.assertEqual(blocked.status_code, 400)
+        with self.app.app_context():
+            self.assertIsNone(SiteSetting.query.filter_by(key='admin_two_factor_required').first())
+        response = self.client.post('/admin/settings', data={
+            'csrf_token': self.csrf_token(page),
+            'site_title': 'Marshall Auto', 'admin_two_factor_required': 'y',
+        })
+        self.assertEqual(response.location, '/admin/login')
+        page = self.client.get('/admin/login')
+        response = self.client.post('/admin/login', data={
+            'csrf_token': self.csrf_token(page),
+            'username': 'two-factor-admin', 'password': 'test-password-only',
+        })
+        self.assertEqual(response.location, '/admin/login/setup')
+        page = self.client.get('/admin/login/setup')
+        response = self.client.post('/admin/login/setup', data={
+            'csrf_token': self.csrf_token(page),
+            'code': pyotp.TOTP(self.secret()).now(),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('I Saved My Codes', response.text)
+        self.assertEqual(self.client.get('/admin/').status_code, 200)
+
+    def test_settings_switch_can_be_disabled_and_existing_enrollment_reused(self):
+        self.app.config['ADMIN_TWO_FACTOR_REQUIRED'] = False
+        self.assertEqual(self.password_login().location, '/admin/dashboard')
+        response = self.client.post('/admin/settings', data={
+            'site_title': 'Marshall Auto', 'admin_two_factor_required': 'y',
+        })
+        self.assertEqual(response.location, '/admin/login')
+        self.assertEqual(self.client.get('/admin/').status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(SiteSetting.query.filter_by(
+                key='admin_two_factor_required',
+            ).one().value, 'true')
+        _, codes, _ = self.enroll()
+        response = self.client.post('/admin/settings', data={'site_title': 'Marshall Auto'})
+        self.assertEqual(response.location, '/admin/settings')
+        self.client.get('/admin/logout')
+        self.assertEqual(self.password_login().location, '/admin/dashboard')
+        response = self.client.post('/admin/settings', data={
+            'site_title': 'Marshall Auto', 'admin_two_factor_required': 'y',
+        })
+        self.assertEqual(response.location, '/admin/login')
+        self.assertEqual(self.factor_login(codes[0]).location, '/admin/dashboard')
+
+    def test_policy_changes_bypass_cached_settings_and_block_pending_enrollment(self):
+        self.app.config['ADMIN_TWO_FACTOR_REQUIRED'] = False
+        self.password_login()
+        with self.app.app_context():
+            # Simulate a stale settings cache in another worker.
+            SiteSetting.load_all()
+            db.session.add(SiteSetting(key='admin_two_factor_required', value='true'))
+            db.session.commit()
+        self.assertEqual(self.client.get('/admin/').status_code, 302)
+        self.client.get('/admin/logout')
+        self.assertEqual(self.password_login().location, '/admin/login/setup')
+        self.client.get('/admin/login/setup')
+        secret = self.secret()
+        with self.app.app_context():
+            SiteSetting.query.filter_by(key='admin_two_factor_required').update({'value': 'false'})
+            db.session.commit()
+        self.assertEqual(self.client.get('/admin/login/setup/qr').status_code, 403)
+        response = self.client.post('/admin/login/setup', data={'code': pyotp.TOTP(secret).now()})
+        self.assertEqual(response.location, '/admin/login')
+        with self.app.app_context():
+            self.assertFalse(db.session.get(User, self.user_id).totp_enabled)
+        self.assertEqual(self.password_login().location, '/admin/dashboard')
 
     def test_csrf_token_survives_password_to_enabled_two_factor_challenge(self):
         _, codes, _ = self.enroll()

@@ -174,7 +174,7 @@ def _finish_two_factor_login(user):
 @admin_bp.route('/login/verify', methods=['GET', 'POST'])
 def two_factor_verify():
     user = pending_user()
-    if not user:
+    if not user or not requires_two_factor(user):
         return _two_factor_expired()
     if not user.totp_enabled:
         return redirect(url_for('admin.two_factor_setup'))
@@ -199,7 +199,7 @@ def two_factor_verify():
 @admin_bp.route('/login/setup', methods=['GET', 'POST'])
 def two_factor_setup():
     user = pending_user()
-    if not user:
+    if not user or not requires_two_factor(user):
         return _two_factor_expired()
     if user.totp_enabled:
         return redirect(url_for('admin.two_factor_verify'))
@@ -236,7 +236,7 @@ def two_factor_setup():
 @admin_bp.get('/login/setup/qr')
 def two_factor_qr():
     user = pending_user()
-    if not user or user.totp_enabled or not user.totp_secret_encrypted:
+    if not user or not requires_two_factor(user) or user.totp_enabled or not user.totp_secret_encrypted:
         abort(403)
     try:
         uri = provisioning_uri(user)
@@ -250,6 +250,9 @@ def two_factor_qr():
 @admin_bp.route('/settings/two-factor', methods=['GET', 'POST'])
 @admin_required
 def two_factor_recovery():
+    if not requires_two_factor(current_user):
+        flash('Enable two-factor authentication in Settings before managing recovery codes.', 'warning')
+        return redirect(url_for('admin.settings'))
     form = TwoFactorRecoveryForm()
     if not current_user.totp_enabled:
         flash('Sign in again to complete required authenticator setup.', 'warning')
@@ -1582,7 +1585,9 @@ def lead_delete(id):
 @login_required
 def settings():
     form = SiteSettingForm()
+    was_required = requires_two_factor(current_user)
     if form.validate_on_submit():
+        SiteSetting.set('admin_two_factor_required', 'true' if form.admin_two_factor_required.data else 'false')
         SiteSetting.set('site_title', form.site_title.data)
         SiteSetting.set('site_tagline', form.site_tagline.data)
         SiteSetting.set('meta_description', form.meta_description.data)
@@ -1626,10 +1631,18 @@ def settings():
         SiteSetting.invalidate_cache()
         SiteSetting.load_all()
         flash('Settings saved.', 'success')
+        if not was_required and form.admin_two_factor_required.data:
+            logout_user()
+            session.clear()
+            session['_remember'] = 'clear'
+            current_app.logger.info('Site-wide admin two-factor authentication enabled.')
+            flash('Two-factor authentication enabled. Sign in again to verify or set up your authenticator.', 'info')
+            return redirect(url_for('admin.login'))
         return redirect(url_for('admin.settings'))
 
     # Only populate from DB on GET so validation errors keep user input
     if request.method == 'GET':
+        form.admin_two_factor_required.data = was_required
         form.site_title.data = SiteSetting.get('site_title')
         form.site_tagline.data = SiteSetting.get('site_tagline')
         form.meta_description.data = SiteSetting.get('meta_description')

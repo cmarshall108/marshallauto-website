@@ -17,7 +17,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 
 - **Admin Panel** (`/admin`)
   - Secure login with Flask-Login
-  - Required authenticator-app two-factor authentication for every admin, with single-use recovery codes
+  - Optional site-wide authenticator-app two-factor authentication, with single-use recovery codes
   - Add/edit/delete vehicles with image uploads
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
@@ -63,15 +63,18 @@ public price. Run `flask db upgrade` before deploying this feature.
 
 ## Admin two-factor authentication
 
-All admin accounts must use an authenticator app. After deployment, existing
-sessions and old "remember me" cookies no longer grant access; each admin enters
-their username/password and is prompted to enroll before the panel is accessible.
+Two-factor authentication is **off by default**, including for accounts that
+previously enrolled. Sign in with your password and use **Settings → Require
+two-factor authentication for every admin → Save Settings** when ready to enable it.
+This switch applies site-wide and requires a fresh sign-in when enabled. Existing
+password-only sessions no longer grant access; each admin enters their password
+and verifies their authenticator or enrolls before the panel is accessible.
 Scan the locally generated QR code with Google Authenticator, Microsoft
 Authenticator, 1Password, or another standard TOTP app (or enter the manual key).
 Confirm with a six-digit code, then save the ten recovery codes shown **only once**
 in a password manager or another secure location. New accounts follow the same flow.
 
-Subsequent logins require the password plus a current authenticator code or an
+While enabled, subsequent logins require the password plus a current authenticator code or an
 unused recovery code. Verification expires five minutes after the password step.
 Phone/server clocks must be accurate; the server accepts at most one adjacent
 30-second interval of clock drift. Codes cannot be reused, including concurrently.
@@ -81,8 +84,10 @@ access is intentionally disabled so it cannot bypass two-factor verification.
 
 **Settings → Replace Recovery Codes** requires the current password and a fresh
 authenticator/recovery code. It invalidates old recovery codes and other sessions.
-Password changes also invalidate other sessions. Two-factor authentication cannot
-be disabled in the admin panel.
+Password changes also invalidate other sessions while two-factor authentication
+is required. Uncheck the site-wide requirement in Settings to return to password-only
+login. Disabling does not delete authenticator secrets or recovery codes; re-enabling
+reuses existing enrollments. Admins without an enrollment are prompted to set up one.
 
 Authenticator secrets are encrypted in the database with a domain-separated key
 derived from `SECRET_KEY`; recovery codes are stored only as hashes. No secrets or

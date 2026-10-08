@@ -9,8 +9,8 @@
 
 <section class="card border-0 shadow p-4 mb-4">
     <h5 class="fw-bold">Admin Two-Factor Authentication</h5>
-    <p>Authenticator verification is required for every admin. {% if current_user.totp_enabled %}Your authenticator is enabled.{% else %}Sign in again to complete authenticator setup.{% endif %}</p>
-    {% if current_user.totp_enabled %}
+    <p>Two-factor authentication is optional. Enable the requirement below when you are ready to require an authenticator code for every admin.</p>
+    {% if form.admin_two_factor_required.data and current_user.totp_enabled %}
     <p class="text-muted small">Keep your recovery codes safe. They cannot be displayed again, but you can replace them after verifying your password and a fresh code.</p>
     <div><a href="{{ url_for('admin.two_factor_recovery') }}" class="btn btn-outline-primary">Replace Recovery Codes</a></div>
     {% endif %}
@@ -19,6 +19,11 @@
 <form method="POST" class="card border-0 shadow p-4">
     {{ form.hidden_tag() }}
     <div class="row g-3">
+        <div class="col-12">
+            {{ form.admin_two_factor_required(class="form-check-input") }}
+            {{ form.admin_two_factor_required.label(class="form-check-label") }}
+            <div class="form-text">Off by default, including for previously enrolled accounts. Enabling requires a fresh sign-in; admins without an authenticator will be prompted to set one up. Disabling keeps existing authenticator keys and recovery codes for later use.</div>
+        </div>
         <div class="col-md-6">
             <label class="form-label">Site Title</label>
             {{ form.site_title(class="form-control") }}

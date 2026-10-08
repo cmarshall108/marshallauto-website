@@ -12,7 +12,7 @@
         {{ form.password(class="form-control", autocomplete="current-password") }}
         {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
     </div>
-    <p class="text-muted small">An authenticator code is required after your password. New admin accounts will be prompted to set up their authenticator app.</p>
+    <p class="text-muted small">If two-factor authentication is enabled in Settings, you will be asked for an authenticator code or prompted to set up your authenticator app.</p>
     <button type="submit" class="btn btn-primary w-100">Continue</button>
 </form>
 <p class="text-center text-muted small mt-3 mb-0"><a href="{{ url_for('main.index') }}">Back to Website</a></p>

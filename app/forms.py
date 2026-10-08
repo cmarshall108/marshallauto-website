@@ -217,6 +217,7 @@ class TestDriveEditForm(FlaskForm):
 
 
 class SiteSettingForm(FlaskForm):
+    admin_two_factor_required = BooleanField('Require two-factor authentication for every admin')
     site_title = StringField('Site Title', validators=[DataRequired(), Length(max=160)])
     site_tagline = StringField('Site Tagline', validators=[Optional(), Length(max=255)])
     meta_description = TextAreaField('Default Meta Description', validators=[Optional(), Length(max=500)])
