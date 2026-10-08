@@ -1,0 +1,69 @@
+{% extends "admin/base.html" %}
+{% block title %}Sale Details - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Sale Details</h2>
+        <div>{{ vehicle.title }}{% if vehicle.stock_number %} &middot; Stock #{{ vehicle.stock_number }}{% endif %}</div>
+        {% if vehicle.sold_at %}<small class="text-muted">Sold {{ vehicle.sold_at.strftime('%m/%d/%Y') }}</small>{% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">Edit Vehicle</a>
+        <a href="{{ url_for('admin.vehicles', status='sold') }}" class="btn btn-outline-secondary">Sold Vehicles</a>
+    </div>
+</div>
+<div class="alert alert-info">
+    <i class="bi bi-lock me-1"></i>Private admin records only. Notes, the actual amount received, and buyer ID photos are never shown in the public listing or sent to Facebook.
+</div>
+<form method="POST" enctype="multipart/form-data" class="card border-0 shadow p-4">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+        <div class="col-md-6">
+            {{ form.sold_price.label(class="form-label") }}
+            {{ form.sold_price(class="form-control", step="0.01", min="0", max="99999999.99") }}
+            <div class="form-text">Final amount paid, not the advertised price. Leave blank if not recorded.</div>
+            {% for error in form.sold_price.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.payment_method.label(class="form-label") }}
+            {{ form.payment_method(class="form-select") }}
+            {% for error in form.payment_method.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            {{ form.sale_notes.label(class="form-label") }}
+            {{ form.sale_notes(class="form-control", rows="6", maxlength="20000", placeholder="For example: negotiated price, cashier's check details, buyer information, or follow-up items.") }}
+            {% for error in form.sale_notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            {{ form.buyer_id_images.label(class="form-label") }}
+            {{ form.buyer_id_images(class="form-control", accept="image/jpeg,image/png,image/webp", multiple=True) }}
+            <div class="form-text">Attach front/back ID photos when needed, such as for a cashier's check. Up to 10 photos per save, 15 MB each; total request limit {{ config.MAX_CONTENT_LENGTH // (1024 * 1024) }} MB. Only upload IDs you are authorized to retain. Photos are stored privately outside the public gallery.</div>
+            {% for error in form.buyer_id_images.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">{{ form.submit(class="btn btn-primary") }}</div>
+    </div>
+</form>
+{% if vehicle.sale_images %}
+<section class="mt-4">
+    <h4>Saved Buyer ID Photos</h4>
+    <div class="row g-3">
+        {% for image in vehicle.sale_images %}
+        <div class="col-md-4 col-sm-6">
+            <div class="card h-100">
+                <a href="{{ url_for('admin.vehicle_sale_image', id=vehicle.id, image_id=image.id) }}" target="_blank" rel="noopener">
+                    <img src="{{ url_for('admin.vehicle_sale_image', id=vehicle.id, image_id=image.id) }}" class="card-img-top" style="height:200px;object-fit:contain;" alt="Buyer ID photo {{ loop.index }}" loading="lazy">
+                </a>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin.vehicle_sale_image_delete', id=vehicle.id, image_id=image.id) }}" onsubmit="return confirm('Permanently delete this buyer ID photo?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete ID Photo {{ loop.index }}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

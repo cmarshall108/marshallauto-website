@@ -118,6 +118,26 @@ class VehicleForm(FlaskForm):
     submit = SubmitField('Save Vehicle')
 
 
+class VehicleSaleForm(FlaskForm):
+    sold_price = DecimalField(
+        'Actual Amount Received ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+    )
+    payment_method = SelectField('Payment Method', choices=[
+        ('', '-- Select --'),
+        ('cash', 'Cash'),
+        ('cashiers_check', "Cashier's Check"),
+        ('certified_check', 'Certified Check'),
+        ('personal_check', 'Personal Check'),
+        ('financing', 'Financing'),
+        ('wire', 'Wire / Bank Transfer'),
+        ('other', 'Other / Mixed Payment'),
+    ], validators=[Optional()])
+    sale_notes = TextAreaField('Sale Notes', validators=[Optional(), Length(max=20000)])
+    buyer_id_images = FileField('Buyer ID Photos', render_kw={'multiple': True})
+    submit = SubmitField('Save Sale Details')
+
+
 class ServiceRecordForm(FlaskForm):
     vehicle_id = SelectField('Vehicle *', coerce=int, validators=[DataRequired()])
     service_date = DateField('Service Date *', validators=[DataRequired()])
@@ -307,4 +327,3 @@ class BlogPostForm(FlaskForm):
     seo_title = StringField('SEO Title', validators=[Optional(), Length(max=160)])
     seo_description = TextAreaField('SEO Description', validators=[Optional(), Length(max=320)])
     submit = SubmitField('Save Post')
-

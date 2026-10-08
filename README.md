@@ -18,6 +18,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 - **Admin Panel** (`/admin`)
   - Secure login with Flask-Login
   - Add/edit/delete vehicles with image uploads
+  - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
   - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle
   - Cascading typeahead suggestions for make/model/trim, colors, and features
@@ -31,6 +32,24 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 CarFax PDFs linked from the admin list and edit pages use `/carfax/<report_id>/download`.
 Authenticated admins can view reports for available or sold vehicles; public visitors
 can only download reports for available vehicles.
+
+### Sold-vehicle sale details
+
+Save a vehicle with **Status: Sold** to open its **Sale Details** page. You can
+also reopen it from **Vehicles → Sold → Sale Details** or the vehicle edit page.
+Record the actual amount received (separate from the public asking/discount price),
+payment method, and freeform notes. Attach multiple buyer ID photos when needed,
+for example for a cashier's check; each save accepts up to 10 photos, 15 MiB each,
+within the configured total request limit. JPEG, PNG, and WebP are recommended.
+Upload only documents you are authorized to retain and delete them when no longer needed.
+
+Sale details are admin-only and are not included in public listings, public photo
+galleries, or Facebook posts. ID photos use the existing `PRIVATE_UPLOAD_FOLDER`
+license storage, outside the public static directory, and require an active admin
+session to view. Sale pages and photos are marked `private, no-store`. Individual
+photos can be deleted; deleting a vehicle also removes its sale photos. Relisting
+a vehicle retains its private sale records for later use, without changing the
+public price. Run `flask db upgrade` before deploying this feature.
 
 ## Quick Start
 

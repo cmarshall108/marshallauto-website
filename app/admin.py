@@ -18,11 +18,11 @@ from app import db
 from app.forms import (
     BlogPostForm, CarfaxReportForm, ChangePasswordForm, LoginForm, ReviewForm,
     ServiceRecordForm, SiteSettingForm, TestDriveEditForm, TestDriveForm,
-    TestDriveReturnForm, VehicleForm,
+    TestDriveReturnForm, VehicleForm, VehicleSaleForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
-    SiteSetting, TestDrive, User, Vehicle, VehicleImage, VehicleImageHighlight,
+    SiteSetting, TestDrive, User, Vehicle, VehicleImage, VehicleImageHighlight, VehicleSaleImage,
     VideoUploadJob, utcnow,
 )
 from app.highlight_jobs import (
@@ -56,6 +56,10 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 def _admin_no_index(response):
     """Keep admin pages out of search results even if a URL is discovered/linked."""
     response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    if request.endpoint in (
+        'admin.vehicle_sale', 'admin.vehicle_sale_image', 'admin.vehicle_sale_image_delete',
+    ):
+        response.headers['Cache-Control'] = 'private, no-store'
     return response
 
 
@@ -621,15 +625,99 @@ def _deferred_vehicle_media():
 
 
 def _vehicle_save_response(vehicle):
+    destination = (
+        url_for('admin.vehicle_sale', id=vehicle.id)
+        if vehicle.status == 'sold' else url_for('admin.vehicles')
+    )
     if _deferred_vehicle_media():
         return jsonify(
             success=True, vehicle_id=vehicle.id,
             upload_url=url_for('admin.vehicle_media_upload', id=vehicle.id),
             finish_url=url_for('admin.vehicle_media_finish', id=vehicle.id),
             edit_url=url_for('admin.vehicle_edit', id=vehicle.id),
-            redirect_url=url_for('admin.vehicles'),
+            redirect_url=destination,
         )
-    return redirect(url_for('admin.vehicles'))
+    return redirect(destination)
+
+
+def _delete_sale_image_file(filename):
+    path = os.path.join(
+        current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses', os.path.basename(filename),
+    )
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        current_app.logger.warning('Sale ID photo already missing: %s', filename)
+    except OSError:
+        current_app.logger.exception('Could not delete sale ID photo: %s', filename)
+        raise
+
+
+@admin_bp.route('/vehicles/<int:id>/sale', methods=['GET', 'POST'])
+@admin_required
+def vehicle_sale(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    if vehicle.status != 'sold':
+        flash('Mark this vehicle as sold before editing sale details.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=id))
+    form = VehicleSaleForm(obj=vehicle)
+    if form.validate_on_submit():
+        uploads = [file for file in request.files.getlist('buyer_id_images') if file.filename]
+        filenames = []
+        try:
+            if len(uploads) > 10:
+                raise ValueError('Upload no more than 10 ID photos at a time.')
+            for upload in uploads:
+                size = len(upload.stream.read(MAX_LICENSE_IMAGE_BYTES + 1))
+                if size > MAX_LICENSE_IMAGE_BYTES:
+                    raise ValueError('Each buyer ID photo must be 15 MB or smaller.')
+                upload.stream.seek(0)
+                filename = save_uploaded_license_image(upload)
+                if not filename:
+                    raise ValueError('Could not save a buyer ID photo. Use a valid JPEG, PNG, or WebP image.')
+                filenames.append(filename)
+            vehicle.sold_price = form.sold_price.data
+            vehicle.payment_method = form.payment_method.data or None
+            vehicle.sale_notes = (form.sale_notes.data or '').strip() or None
+            for filename in filenames:
+                vehicle.sale_images.append(VehicleSaleImage(filename=filename))
+            db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            for filename in filenames:
+                _delete_sale_image_file(filename)
+            current_app.logger.warning('Sale ID upload rejected for vehicle %s: %s', id, exc)
+            form.buyer_id_images.errors.append(str(exc))
+            return render_template('admin/vehicle_sale.html', form=form, vehicle=vehicle), 422
+        except Exception:
+            db.session.rollback()
+            for filename in filenames:
+                _delete_sale_image_file(filename)
+            raise
+        flash('Sale details saved.', 'success')
+        return redirect(url_for('admin.vehicle_sale', id=id))
+    return render_template('admin/vehicle_sale.html', form=form, vehicle=vehicle)
+
+
+@admin_bp.get('/vehicles/<int:id>/sale/images/<int:image_id>')
+@admin_required
+def vehicle_sale_image(id, image_id):
+    image = VehicleSaleImage.query.filter_by(id=image_id, vehicle_id=id).first_or_404()
+    directory = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
+    response = send_from_directory(directory, os.path.basename(image.filename))
+    response.headers['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@admin_bp.post('/vehicles/<int:id>/sale/images/<int:image_id>/delete')
+@admin_required
+def vehicle_sale_image_delete(id, image_id):
+    image = VehicleSaleImage.query.filter_by(id=image_id, vehicle_id=id).first_or_404()
+    _delete_sale_image_file(image.filename)
+    db.session.delete(image)
+    db.session.commit()
+    flash('Buyer ID photo deleted.', 'success')
+    return redirect(url_for('admin.vehicle_sale', id=id))
 
 
 @admin_bp.post('/vehicles/<int:id>/media')
@@ -674,7 +762,11 @@ def vehicle_media_finish(id):
         vehicle, is_new=request.form.get('is_new') == '1',
         force=request.form.get('post_to_facebook') == '1',
     )
-    return jsonify(success=True, redirect_url=url_for('admin.vehicles'))
+    return jsonify(
+        success=True,
+        redirect_url=url_for('admin.vehicle_sale', id=id)
+        if vehicle.status == 'sold' else url_for('admin.vehicles'),
+    )
 
 
 @admin_bp.route('/vehicles/<int:id>/facebook/post', methods=['POST'])
@@ -729,6 +821,8 @@ def vehicle_delete(id):
     for report in list(vehicle.carfax_reports):
         if report.filename:
             _delete_carfax_file(report.filename)
+    for image in list(vehicle.sale_images):
+        _delete_sale_image_file(image.filename)
     delete_local_video_file(vehicle.video_url)
     cancel_video_jobs(vehicle)
     db.session.delete(vehicle)

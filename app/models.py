@@ -59,6 +59,15 @@ class User(UserMixin, db.Model):
         return f'<User {self.username}>'
 
 
+class VehicleSaleImage(db.Model):
+    __tablename__ = 'vehicle_sale_images'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, index=True)
+    filename = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+
 class Vehicle(db.Model):
     __tablename__ = 'vehicles'
 
@@ -83,6 +92,9 @@ class Vehicle(db.Model):
     status = db.Column(db.String(20), default='available', nullable=False, index=True)  # available, sold, pending
     # Set automatically the first time status transitions to 'sold' — powers days-on-lot / sell-through stats
     sold_at = db.Column(db.DateTime, nullable=True, index=True)
+    sold_price = db.Column(db.Numeric(10, 2), nullable=True)
+    payment_method = db.Column(db.String(32), nullable=True)
+    sale_notes = db.Column(db.Text, nullable=True)
 
     # Details
     body_style = db.Column(db.String(64), nullable=True, index=True)
@@ -139,6 +151,13 @@ class Vehicle(db.Model):
         lazy='selectin',
         cascade='all, delete-orphan',
         order_by='CarfaxReport.created_at.desc()',
+    )
+    sale_images = db.relationship(
+        'VehicleSaleImage',
+        backref='vehicle',
+        lazy='select',
+        cascade='all, delete-orphan',
+        order_by='VehicleSaleImage.id.asc()',
     )
 
     @hybrid_property

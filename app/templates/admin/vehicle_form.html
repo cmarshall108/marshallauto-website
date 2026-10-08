@@ -100,7 +100,17 @@
         <div class="col-md-4">
             <label class="form-label" for="status">Status</label>
             {{ form.status(class="form-select", id="status") }}
+            <div class="form-text">Save with status Sold to enter private sale notes, the amount received, and buyer ID photos.</div>
         </div>
+        {% if vehicle and vehicle.status == 'sold' %}
+        <div class="col-12">
+            <div class="alert alert-info mb-0">
+                <strong>Private Sale Details</strong>
+                <p class="mb-2">Record the actual selling amount, payment method, notes, and buyer ID photos separately from this public listing.</p>
+                <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-outline-primary">Edit Sale Details</a>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Pricing -->
         <div class="col-md-4">
