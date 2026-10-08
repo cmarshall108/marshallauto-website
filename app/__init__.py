@@ -168,8 +168,20 @@ def create_app(config_class=None):
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
-        from flask import flash, jsonify, redirect, request, url_for
+        from flask import flash, jsonify, redirect, request, session, url_for
         message = 'Your session expired or the security token was missing. Please try that again.'
+        # The flashed message is deliberately generic, so log the specific reason
+        # (token missing / session token missing / mismatch / expired) to make
+        # these failures diagnosable without exposing token values.
+        app.logger.warning(
+            'CSRF validation failed on %s %s (endpoint=%s): %s '
+            '[session_seed=%s, session_keys=%d, form_token=%s, cookie=%s]',
+            request.method, request.path, request.endpoint, e.description,
+            'present' if session.get('csrf_token') else 'missing',
+            len(session),
+            'present' if request.form.get('csrf_token') else 'missing',
+            'present' if request.cookies.get(app.config['SESSION_COOKIE_NAME']) else 'missing',
+        )
         wants_json = (
             request.headers.get('X-Requested-With') == 'XMLHttpRequest'
             or request.accept_mimetypes.best == 'application/json'

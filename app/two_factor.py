@@ -53,7 +53,10 @@ def session_verified(user):
 
 
 def start_challenge(user, next_page=None):
+    csrf_token = session.get('csrf_token')
     session.clear()
+    if csrf_token:
+        session['csrf_token'] = csrf_token
     session['_remember'] = 'clear'
     session['admin_2fa_pending'] = {
         'user_id': user.id,

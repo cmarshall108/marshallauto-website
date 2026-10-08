@@ -82,6 +82,13 @@ class TwoFactorTests(unittest.TestCase):
         self.assertEqual(self.password_login(client).location, '/admin/login/verify')
         return client.post('/admin/login/verify', data={'code': code})
 
+    @staticmethod
+    def csrf_token(response):
+        match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', response.text)
+        if not match:
+            raise AssertionError('Response did not contain a CSRF token')
+        return match.group(1)
+
     def test_mandatory_enrollment_blocks_every_admin_surface_until_confirmed(self):
         self.assertTrue(Config.ADMIN_TWO_FACTOR_REQUIRED)
         response = self.password_login(next_page='/admin/vehicles?status=sold')
@@ -277,6 +284,32 @@ class TwoFactorTests(unittest.TestCase):
             db.session.get(User, self.user_id).is_active_user = False
             db.session.commit()
         self.assertEqual(self.client.get('/admin/').status_code, 302)
+
+    def test_csrf_token_survives_password_to_enabled_two_factor_challenge(self):
+        _, codes, _ = self.enroll()
+        self.client.get('/admin/logout')
+        self.app.config['WTF_CSRF_ENABLED'] = True
+
+        login_page = self.client.get('/admin/login')
+        login_token = self.csrf_token(login_page)
+        with self.client.session_transaction() as cookie:
+            csrf_seed = cookie['csrf_token']
+
+        response = self.client.post('/admin/login', data={
+            'csrf_token': login_token,
+            'username': 'two-factor-admin',
+            'password': 'test-password-only',
+        })
+        self.assertEqual(response.location, '/admin/login/verify')
+        with self.client.session_transaction() as cookie:
+            self.assertEqual(cookie['csrf_token'], csrf_seed)
+
+        verify_page = self.client.get(response.location)
+        response = self.client.post('/admin/login/verify', data={
+            'csrf_token': self.csrf_token(verify_page),
+            'code': codes[0],
+        })
+        self.assertEqual(response.location, '/admin/dashboard')
 
     def test_secret_corruption_cannot_bypass_2fa_even_with_recovery_code(self):
         _, codes, _ = self.enroll()
