@@ -30,7 +30,7 @@
                     <td>{{ report.owners_reported or 'N/A' }}</td>
                     <td>
                         {% if report.filename %}
-                        <a href="{{ url_for('admin.carfax_report_download', id=report.id) }}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+                        <a href="{{ url_for('main.carfax_download', report_id=report.id) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
                         {% else %}
                         <span class="text-muted">No file</span>
                         {% endif %}

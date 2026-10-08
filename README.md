@@ -28,6 +28,10 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Edit site settings, SEO defaults, and analytics IDs
   - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
 
+CarFax PDFs linked from the admin list and edit pages use `/carfax/<report_id>/download`.
+Authenticated admins can view reports for available or sold vehicles; public visitors
+can only download reports for available vehicles.
+
 ## Quick Start
 
 1. Create a virtual environment and install dependencies:

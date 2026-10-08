@@ -39,7 +39,7 @@
             <label class="form-label">CarFax PDF</label>
             {{ form.report_file(class="form-control", accept=".pdf") }}
             {% if report and report.filename %}
-            <p class="form-text">Current file: <a href="{{ url_for('admin.carfax_report_download', id=report.id) }}" target="_blank" rel="noopener">{{ report.filename }}</a></p>
+            <p class="form-text">Current file: <a href="{{ url_for('main.carfax_download', report_id=report.id) }}" target="_blank" rel="noopener">{{ report.filename }}</a></p>
             {% endif %}
         </div>
     </div>
