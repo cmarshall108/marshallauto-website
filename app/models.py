@@ -1,4 +1,5 @@
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app
@@ -27,9 +28,17 @@ class User(UserMixin, db.Model):
     locked_until = db.Column(db.DateTime, nullable=True)
     last_login_at = db.Column(db.DateTime, nullable=True)
     last_login_ip = db.Column(db.String(64), nullable=True)
+    totp_secret_encrypted = db.Column(db.Text, nullable=True)
+    totp_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    totp_last_counter = db.Column(db.BigInteger, nullable=True)
+    auth_version = db.Column(db.String(32), default=lambda: secrets.token_hex(16), nullable=True)
+    recovery_codes = db.relationship(
+        'AdminRecoveryCode', cascade='all, delete-orphan', backref='user', lazy='select',
+    )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        self.auth_version = secrets.token_hex(16)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -57,6 +66,14 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f'<User {self.username}>'
+
+
+class AdminRecoveryCode(db.Model):
+    __tablename__ = 'admin_recovery_codes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    code_hash = db.Column(db.String(64), nullable=False, unique=True)
 
 
 class VehicleSaleImage(db.Model):

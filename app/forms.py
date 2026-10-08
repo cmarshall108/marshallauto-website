@@ -29,6 +29,16 @@ class ChangePasswordForm(FlaskForm):
     submit = SubmitField('Change Password')
 
 
+class TwoFactorForm(FlaskForm):
+    code = StringField('Authenticator or Recovery Code', validators=[DataRequired(), Length(max=32)])
+    submit = SubmitField('Verify Code')
+
+
+class TwoFactorRecoveryForm(TwoFactorForm):
+    password = PasswordField('Current Password', validators=[DataRequired(), Length(max=128)])
+    submit = SubmitField('Replace Recovery Codes')
+
+
 class VehicleForm(FlaskForm):
     marketplace_url = StringField('Craigslist or Facebook listing', validators=[Optional(), Length(max=512)])
     marketplace_token = HiddenField()

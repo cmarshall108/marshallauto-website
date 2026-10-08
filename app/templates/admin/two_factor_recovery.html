@@ -1,0 +1,21 @@
+{% extends "admin/base.html" %}
+{% block title %}Two-Factor Recovery Codes{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4">Two-Factor Recovery Codes</h2>
+<div class="alert alert-warning">Replacing recovery codes immediately invalidates the previous codes and signs out your other admin sessions. The new codes are shown only once.</div>
+<form method="POST" class="card border-0 shadow p-4">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        {{ form.password.label(class="form-label") }}
+        {{ form.password(class="form-control", autocomplete="current-password") }}
+        {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="mb-3">
+        {{ form.code.label(class="form-label") }}
+        {{ form.code(class="form-control", autocomplete="one-time-code", maxlength="32", spellcheck="false") }}
+        {% for error in form.code.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        <div class="form-text">Wait for a new authenticator code if you just used the current code to sign in.</div>
+    </div>
+    <div>{{ form.submit(class="btn btn-primary") }} <a href="{{ url_for('admin.settings') }}" class="btn btn-outline-secondary">Back</a></div>
+</form>
+{% endblock %}

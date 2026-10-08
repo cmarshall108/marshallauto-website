@@ -1,14 +1,20 @@
 import os
 import base64
 import binascii
+import secrets
+from io import BytesIO
 from datetime import timedelta
 from decimal import InvalidOperation
 from functools import wraps
 
 from flask import (
     Blueprint, Response, abort, current_app, flash, jsonify, redirect, render_template,
-    request, send_from_directory, url_for,
+    request, send_from_directory, session, url_for,
 )
+import pyotp
+import qrcode
+from cryptography.fernet import InvalidToken
+from qrcode.image.svg import SvgPathImage
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -18,7 +24,7 @@ from app import db
 from app.forms import (
     BlogPostForm, CarfaxReportForm, ChangePasswordForm, LoginForm, ReviewForm,
     ServiceRecordForm, SiteSettingForm, TestDriveEditForm, TestDriveForm,
-    TestDriveReturnForm, VehicleForm, VehicleSaleForm,
+    TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm, VehicleForm, VehicleSaleForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
@@ -48,6 +54,11 @@ from app.video_jobs import (
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
 from app.vin_decode import decode_vin, normalize_vin
+from app.two_factor import (
+    consume_code, decrypt_secret, encrypt_secret, mark_session_verified, pending_user,
+    provisioning_uri, record_failure, replace_recovery_codes, requires_two_factor,
+    start_challenge,
+)
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 
@@ -56,10 +67,13 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 def _admin_no_index(response):
     """Keep admin pages out of search results even if a URL is discovered/linked."""
     response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    response.headers['Cache-Control'] = 'private, no-store'
     if request.endpoint in (
-        'admin.vehicle_sale', 'admin.vehicle_sale_image', 'admin.vehicle_sale_image_delete',
+        'admin.two_factor_setup', 'admin.two_factor_qr', 'admin.two_factor_verify',
+        'admin.two_factor_recovery',
     ):
-        response.headers['Cache-Control'] = 'private, no-store'
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        response.headers['X-Frame-Options'] = 'DENY'
     return response
 
 
@@ -84,6 +98,7 @@ def _vehicle_choices():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('admin.dashboard'))
+    session.pop('admin_2fa_pending', None)
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -106,30 +121,171 @@ def login():
             return render_template('admin/login.html', form=form), 429
 
         if user and user.is_active and user.check_password(form.password.data):
+            next_page = request.args.get('next') or request.form.get('next')
+            next_page = next_page if is_safe_redirect(next_page) else None
+            if requires_two_factor(user):
+                if not user.auth_version:
+                    user.auth_version = secrets.token_hex(16)
+                    db.session.commit()
+                start_challenge(user, next_page)
+                if user.totp_enabled:
+                    return redirect(url_for('admin.two_factor_verify'))
+                return redirect(url_for('admin.two_factor_setup'))
+            session.clear()
             user.register_successful_login(client_ip())
             db.session.commit()
             current_app.logger.info('Admin login succeeded: %s from %s', username, client_ip())
             login_user(user, remember=bool(form.remember.data))
-            next_page = request.args.get('next')
             if next_page and is_safe_redirect(next_page):
                 return redirect(next_page)
             return redirect(url_for('admin.dashboard'))
 
         if user:
-            user.register_failed_login(
-                current_app.config.get('LOGIN_LOCKOUT_THRESHOLD', 5),
-                current_app.config.get('LOGIN_LOCKOUT_MINUTES', 15),
-            )
-            db.session.commit()
+            record_failure(user)
         current_app.logger.warning('Failed admin login attempt: %s from %s', username, client_ip())
         flash('Invalid username or password.', 'danger')
     return render_template('admin/login.html', form=form)
+
+
+def _two_factor_expired():
+    session.pop('admin_2fa_pending', None)
+    flash('Sign in with your password again. Verification expired or the account is unavailable.', 'warning')
+    return redirect(url_for('admin.login'))
+
+
+def _two_factor_storage_error():
+    db.session.rollback()
+    current_app.logger.error('Admin 2FA secret could not be decrypted; server-owner recovery required.')
+    flash('Two-factor configuration is unavailable. Contact the server owner; login is blocked.', 'danger')
+    return render_template('admin/two_factor.html', form=None, mode='unavailable'), 503
+
+
+def _finish_two_factor_login(user):
+    next_page = session.get('admin_2fa_pending', {}).get('next')
+    session.clear()
+    user.register_successful_login(client_ip())
+    db.session.commit()
+    login_user(user, remember=False)
+    mark_session_verified(user)
+    current_app.logger.info('Admin two-factor login succeeded for user %s', user.id)
+    return next_page if is_safe_redirect(next_page) else url_for('admin.dashboard')
+
+
+@admin_bp.route('/login/verify', methods=['GET', 'POST'])
+def two_factor_verify():
+    user = pending_user()
+    if not user:
+        return _two_factor_expired()
+    if not user.totp_enabled:
+        return redirect(url_for('admin.two_factor_setup'))
+    form = TwoFactorForm()
+    if form.validate_on_submit():
+        try:
+            accepted = consume_code(user, form.code.data)
+        except InvalidToken:
+            return _two_factor_storage_error()
+        if accepted:
+            db.session.refresh(user)
+            destination = _finish_two_factor_login(user)
+            return redirect(destination)
+        db.session.rollback()
+        record_failure(user)
+        flash('Invalid or already-used code. Try a new authenticator code or an unused recovery code.', 'danger')
+        if user.is_locked:
+            return _two_factor_expired()
+    return render_template('admin/two_factor.html', form=form, mode='verify')
+
+
+@admin_bp.route('/login/setup', methods=['GET', 'POST'])
+def two_factor_setup():
+    user = pending_user()
+    if not user:
+        return _two_factor_expired()
+    if user.totp_enabled:
+        return redirect(url_for('admin.two_factor_verify'))
+    if not user.totp_secret_encrypted:
+        encrypted = encrypt_secret(pyotp.random_base32())
+        User.query.filter_by(id=user.id, totp_secret_encrypted=None, totp_enabled=False).update({
+            User.totp_secret_encrypted: encrypted,
+        }, synchronize_session=False)
+        db.session.commit()
+        db.session.refresh(user)
+        if user.totp_enabled:
+            return redirect(url_for('admin.two_factor_verify'))
+    form = TwoFactorForm()
+    try:
+        secret = decrypt_secret(user.totp_secret_encrypted)
+        if form.validate_on_submit():
+            if consume_code(user, form.code.data, enrollment=True):
+                db.session.refresh(user)
+                codes = replace_recovery_codes(user)
+                destination = _finish_two_factor_login(user)
+                return render_template(
+                    'admin/two_factor_codes.html', codes=codes, destination=destination,
+                )
+            db.session.rollback()
+            record_failure(user)
+            flash('Invalid or already-used authenticator code. Setup is not complete.', 'danger')
+            if user.is_locked:
+                return _two_factor_expired()
+    except InvalidToken:
+        return _two_factor_storage_error()
+    return render_template('admin/two_factor.html', form=form, mode='setup', secret=secret)
+
+
+@admin_bp.get('/login/setup/qr')
+def two_factor_qr():
+    user = pending_user()
+    if not user or user.totp_enabled or not user.totp_secret_encrypted:
+        abort(403)
+    try:
+        uri = provisioning_uri(user)
+    except InvalidToken:
+        return _two_factor_storage_error()
+    output = BytesIO()
+    qrcode.make(uri, image_factory=SvgPathImage).save(output)
+    return Response(output.getvalue(), mimetype='image/svg+xml')
+
+
+@admin_bp.route('/settings/two-factor', methods=['GET', 'POST'])
+@admin_required
+def two_factor_recovery():
+    form = TwoFactorRecoveryForm()
+    if not current_user.totp_enabled:
+        flash('Sign in again to complete required authenticator setup.', 'warning')
+        return redirect(url_for('admin.logout'))
+    if current_user.is_locked:
+        flash('This account is temporarily locked. Try again later.', 'danger')
+        return render_template('admin/two_factor_recovery.html', form=form), 429
+    if form.validate_on_submit():
+        try:
+            accepted = (
+                current_user.check_password(form.password.data)
+                and consume_code(current_user, form.code.data)
+            )
+        except InvalidToken:
+            return _two_factor_storage_error()
+        if accepted:
+            db.session.refresh(current_user._get_current_object())
+            codes = replace_recovery_codes(current_user)
+            db.session.commit()
+            mark_session_verified(current_user)
+            current_app.logger.info('Admin recovery codes replaced for user %s', current_user.id)
+            return render_template(
+                'admin/two_factor_codes.html', codes=codes, destination=url_for('admin.settings'),
+            )
+        db.session.rollback()
+        record_failure(current_user._get_current_object())
+        flash('Incorrect password or invalid/already-used verification code.', 'danger')
+    return render_template('admin/two_factor_recovery.html', form=form)
 
 
 @admin_bp.route('/logout')
 @login_required
 def logout():
     logout_user()
+    session.clear()
+    session['_remember'] = 'clear'
     flash('You have been logged out.', 'info')
     return redirect(url_for('admin.login'))
 
@@ -1548,6 +1704,7 @@ def change_password():
         current_user.failed_login_attempts = 0
         current_user.locked_until = None
         db.session.commit()
+        mark_session_verified(current_user)
         current_app.logger.info('Admin password changed: %s from %s', current_user.username, client_ip())
         flash('Password updated successfully.', 'success')
     else:

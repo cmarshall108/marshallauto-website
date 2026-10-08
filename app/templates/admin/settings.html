@@ -7,6 +7,15 @@
     <h2 class="fw-bold mb-0">Website Settings</h2>
 </div>
 
+<section class="card border-0 shadow p-4 mb-4">
+    <h5 class="fw-bold">Admin Two-Factor Authentication</h5>
+    <p>Authenticator verification is required for every admin. {% if current_user.totp_enabled %}Your authenticator is enabled.{% else %}Sign in again to complete authenticator setup.{% endif %}</p>
+    {% if current_user.totp_enabled %}
+    <p class="text-muted small">Keep your recovery codes safe. They cannot be displayed again, but you can replace them after verifying your password and a fresh code.</p>
+    <div><a href="{{ url_for('admin.two_factor_recovery') }}" class="btn btn-outline-primary">Replace Recovery Codes</a></div>
+    {% endif %}
+</section>
+
 <form method="POST" class="card border-0 shadow p-4">
     {{ form.hidden_tag() }}
     <div class="row g-3">

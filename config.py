@@ -75,6 +75,8 @@ class Config:
     # Admin auth
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME') or 'admin'
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'admin'
+    ADMIN_TWO_FACTOR_REQUIRED = True
+    TWO_FACTOR_CHALLENGE_SECONDS = 300
 
     # Simple in-process rate limits (per worker)
     LOGIN_RATE_LIMIT = 10          # attempts
@@ -220,6 +222,8 @@ class TestingConfig(Config):
     ADMIN_PASSWORD = 'test-admin-password'
     SERVER_NAME = 'localhost'
     SITE_URL = 'http://localhost'
+    # Unrelated feature tests isolate password-only fixtures; 2FA tests enable enforcement.
+    ADMIN_TWO_FACTOR_REQUIRED = False
 
 
 config_by_name = {

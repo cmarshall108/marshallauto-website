@@ -1,0 +1,12 @@
+{% extends "admin/auth_base.html" %}
+{% block title %}Save Recovery Codes{% endblock %}
+{% block content %}
+<h4>Save Your Recovery Codes</h4>
+<div class="alert alert-warning">These codes are shown only once. Save them in a password manager or another safe place before continuing.</div>
+<p>Each code replaces your authenticator code for one login, but you still need your password. Do not share these codes. Any previous recovery codes are now invalid.</p>
+<ul class="list-unstyled border rounded p-3">
+    {% for code in codes %}<li class="py-1"><code>{{ code }}</code></li>{% endfor %}
+</ul>
+<p class="text-muted small">You can replace your recovery codes in Settings after verifying your password and a fresh authenticator or recovery code.</p>
+<a href="{{ destination }}" class="btn btn-primary w-100">I Saved My Codes - Continue</a>
+{% endblock %}

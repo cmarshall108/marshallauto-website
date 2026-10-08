@@ -94,16 +94,20 @@ def create_app(config_class=None):
 
     @login_manager.user_loader
     def load_user(user_id):
+        from app.two_factor import session_verified
         try:
-            return db.session.get(User, int(user_id))
+            user = db.session.get(User, int(user_id))
         except (TypeError, ValueError):
             return None
+        return user if user and user.is_active and session_verified(user) else None
 
     from app.admin import admin_bp
     from app.routes import analytics_collect, inject_globals, main
 
     app.register_blueprint(main)
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    from app.two_factor import register_commands
+    register_commands(app)
 
     # Public analytics beacon (sendBeacon / no form token)
     csrf.exempt(analytics_collect)

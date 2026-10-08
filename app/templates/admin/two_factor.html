@@ -1,0 +1,40 @@
+{% extends "admin/auth_base.html" %}
+{% block title %}Two-Factor Authentication{% endblock %}
+{% block content %}
+{% if mode == 'setup' %}
+<h4>Set Up Two-Factor Authentication</h4>
+<p>Admin access requires an authenticator app, such as Google Authenticator, Microsoft Authenticator, or 1Password.</p>
+<ol>
+    <li>Scan this QR code in your authenticator app.</li>
+    <li>Enter the six-digit code to confirm setup.</li>
+    <li>Save the recovery codes shown next in a safe place.</li>
+</ol>
+<div class="text-center mb-3">
+    <img src="{{ url_for('admin.two_factor_qr') }}" width="240" height="240" class="img-fluid" alt="Authenticator setup QR code">
+</div>
+<details class="mb-3">
+    <summary>Cannot scan? Enter a setup key manually</summary>
+    <p class="mt-2">Account: Marshall Auto Admin. Type: time-based, six digits, 30 seconds.</p>
+    <code class="text-break">{{ secret }}</code>
+</details>
+{% elif mode == 'verify' %}
+<h4>Verify Your Login</h4>
+<p>Enter the current six-digit code from your authenticator app, or one of your unused recovery codes.</p>
+{% else %}
+<h4>Login Unavailable</h4>
+<p>Contact the server owner to recover your two-factor configuration. Password-only access is not permitted.</p>
+{% endif %}
+{% if form %}
+<p class="text-muted small">Complete verification within five minutes of entering your password. Make sure your phone's date and time are set automatically. Each code can only be used once.</p>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        <label for="code" class="form-label">{{ 'Authenticator Code' if mode == 'setup' else form.code.label.text }}</label>
+        {{ form.code(class="form-control", autocomplete="one-time-code", maxlength="32", spellcheck="false", autofocus=True) }}
+        {% for error in form.code.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary w-100") }}
+</form>
+{% endif %}
+<p class="text-center small mt-3 mb-0"><a href="{{ url_for('admin.login') }}">Start again with your password</a></p>
+{% endblock %}

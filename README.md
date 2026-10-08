@@ -17,6 +17,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 
 - **Admin Panel** (`/admin`)
   - Secure login with Flask-Login
+  - Required authenticator-app two-factor authentication for every admin, with single-use recovery codes
   - Add/edit/delete vehicles with image uploads
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
@@ -59,6 +60,54 @@ backups and maintain an appropriate document-retention policy.
 Individual photos can be deleted; deleting a vehicle also removes its sale photos. Relisting
 a vehicle retains its private sale records for later use, without changing the
 public price. Run `flask db upgrade` before deploying this feature.
+
+## Admin two-factor authentication
+
+All admin accounts must use an authenticator app. After deployment, existing
+sessions and old "remember me" cookies no longer grant access; each admin enters
+their username/password and is prompted to enroll before the panel is accessible.
+Scan the locally generated QR code with Google Authenticator, Microsoft
+Authenticator, 1Password, or another standard TOTP app (or enter the manual key).
+Confirm with a six-digit code, then save the ten recovery codes shown **only once**
+in a password manager or another secure location. New accounts follow the same flow.
+
+Subsequent logins require the password plus a current authenticator code or an
+unused recovery code. Verification expires five minutes after the password step.
+Phone/server clocks must be accurate; the server accepts at most one adjacent
+30-second interval of clock drift. Codes cannot be reused, including concurrently.
+Failed password/code attempts count toward the persisted account lockout.
+Admin sessions require a new full login after 12 hours; persistent "remember me"
+access is intentionally disabled so it cannot bypass two-factor verification.
+
+**Settings → Replace Recovery Codes** requires the current password and a fresh
+authenticator/recovery code. It invalidates old recovery codes and other sessions.
+Password changes also invalidate other sessions. Two-factor authentication cannot
+be disabled in the admin panel.
+
+Authenticator secrets are encrypted in the database with a domain-separated key
+derived from `SECRET_KEY`; recovery codes are stored only as hashes. No secrets or
+recovery codes are stored in the signed browser session, logged, or sent to an
+external QR service. Admin responses are marked `private, no-store`.
+Keep `SECRET_KEY` stable, strong, and private, separate from database backups.
+Changing it invalidates sessions and makes existing authenticator secrets
+unreadable; login fails closed until the account is reset and enrolled again.
+
+If an admin loses both their authenticator and all recovery codes, a trusted
+server owner can reset that account from the server after verifying their identity:
+
+```bash
+flask --app run reset-admin-2fa ADMIN_USERNAME
+```
+
+The command asks for confirmation, invalidates sessions/recovery codes, and
+requires a password plus fresh enrollment at the next login. There is no public
+reset endpoint. Reset does not change the account password; change it separately
+if compromised.
+
+Deploy the updated Python requirements and run `flask db upgrade` before restarting
+web processes. No new environment variable is required. Use HTTPS and production
+mode. The test configuration disables required enrollment for unrelated feature
+fixtures; dedicated two-factor tests explicitly enable the production requirement.
 
 ## Quick Start
 
