@@ -133,6 +133,22 @@
     </div>
 </section>
 
+{% if coming_soon %}
+<section class="section-padding">
+    <div class="container">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <h2 class="section-title mb-2">Coming Soon</h2>
+                <p class="section-subtitle mb-0">A first look at vehicles we're getting ready. Ask us for updates.</p>
+            </div>
+            <a href="{{ url_for('main.coming_soon') }}" class="btn btn-outline-primary">See What's Coming</a>
+        </div>
+        {% set vehicles = coming_soon %}
+        {% include "_coming_soon_cards.html" %}
+    </div>
+</section>
+{% endif %}
+
 <!-- Reviews -->
 {% if approved_reviews %}
 <section class="section-padding">

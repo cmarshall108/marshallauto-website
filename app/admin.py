@@ -299,7 +299,9 @@ def logout():
 def dashboard():
     stats = {
         'total_vehicles': Vehicle.query.count(),
-        'available_vehicles': Vehicle.query.filter_by(status='available').count(),
+        'available_vehicles': Vehicle.query.filter_by(
+            status='available', is_coming_soon=False,
+        ).count(),
         'sold_vehicles': Vehicle.query.filter_by(status='sold').count(),
         'pending_leads': Lead.query.filter_by(is_read=False, is_spam=False).count(),
         'total_leads': Lead.query.filter(Lead.is_spam.is_(False)).count(),
@@ -519,7 +521,9 @@ def vehicles():
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
     query = Vehicle.query.options(selectinload(Vehicle.images))
-    if status:
+    if status == 'coming_soon':
+        query = query.filter_by(status='available', is_coming_soon=True)
+    elif status:
         query = query.filter_by(status=status)
     pagination = query.order_by(Vehicle.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False)
@@ -528,7 +532,7 @@ def vehicles():
 
 CSV_IMPORT_FIELDS = [
     'year', 'make', 'model', 'trim', 'vin', 'stock_number', 'price', 'sale_price',
-    'mileage', 'condition', 'title_status', 'status', 'body_style', 'exterior_color',
+    'mileage', 'condition', 'title_status', 'status', 'is_coming_soon', 'body_style', 'exterior_color',
     'interior_color', 'engine', 'transmission', 'drivetrain', 'fuel_type',
     'mpg_city', 'mpg_highway', 'description', 'features',
 ]
@@ -575,6 +579,10 @@ def vehicle_import():
                     condition=(row.get('condition') or 'used').lower() or 'used',
                     title_status=(row.get('title_status') or 'clean').lower() or 'clean',
                     status=(row.get('status') or 'available').lower() or 'available',
+                    is_coming_soon=(
+                        (row.get('is_coming_soon') or '').lower() in {'1', 'true', 'yes', 'on'}
+                        and (row.get('status') or 'available').lower() == 'available'
+                    ),
                     body_style=row.get('body_style')[:64] or None if row.get('body_style') else None,
                     exterior_color=row.get('exterior_color')[:64] or None if row.get('exterior_color') else None,
                     interior_color=row.get('interior_color')[:64] or None if row.get('interior_color') else None,
@@ -938,6 +946,9 @@ def vehicle_facebook_post(id):
         .filter_by(id=id)
         .first_or_404()
     )
+    if vehicle.is_coming_soon:
+        flash('Coming Soon vehicles are not posted to Facebook until they are ready for sale.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=id))
     result = post_vehicle_to_page(vehicle, force=True)
     apply_publish_result(vehicle, result)
     db.session.commit()
@@ -960,6 +971,8 @@ def vehicle_marketplace_draft(id):
         .filter_by(id=id)
         .first_or_404()
     )
+    if vehicle.is_coming_soon:
+        return jsonify(error='Clear the Coming Soon flag before preparing a Marketplace listing.'), 409
     return jsonify(build_marketplace_draft(vehicle))
 
 
@@ -1732,6 +1745,10 @@ def change_password():
 def _maybe_publish_vehicle_to_facebook(vehicle, *, is_new: bool, force: bool = False):
     """Post to Facebook Page when checkbox forced or auto-post settings match."""
     try:
+        if vehicle.is_coming_soon:
+            if force:
+                flash('Coming Soon vehicles are not posted to Facebook until they are ready for sale.', 'info')
+            return
         if force:
             result = post_vehicle_to_page(vehicle, force=True)
             apply_publish_result(vehicle, result)
@@ -1829,6 +1846,7 @@ def _vehicle_from_form(form):
         condition=form.condition.data,
         title_status=form.title_status.data,
         status=form.status.data,
+        is_coming_soon=bool(form.is_coming_soon.data and form.status.data == 'available'),
         body_style=form.body_style.data.strip() if form.body_style.data else None,
         exterior_color=form.exterior_color.data.strip() if form.exterior_color.data else None,
         interior_color=form.interior_color.data.strip() if form.interior_color.data else None,
@@ -1860,6 +1878,7 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.condition = form.condition.data
     vehicle.title_status = form.title_status.data
     vehicle.status = form.status.data
+    vehicle.is_coming_soon = bool(form.is_coming_soon.data and form.status.data == 'available')
     vehicle.body_style = form.body_style.data.strip() if form.body_style.data else None
     vehicle.exterior_color = form.exterior_color.data.strip() if form.exterior_color.data else None
     vehicle.interior_color = form.interior_color.data.strip() if form.interior_color.data else None

@@ -16,6 +16,7 @@
     <a href="{{ url_for('admin.vehicles', status='available') }}" class="btn btn-sm {% if status == 'available' %}btn-success{% else %}btn-outline-secondary{% endif %}">Available</a>
     <a href="{{ url_for('admin.vehicles', status='pending') }}" class="btn btn-sm {% if status == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}">Pending</a>
     <a href="{{ url_for('admin.vehicles', status='sold') }}" class="btn btn-sm {% if status == 'sold' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Sold</a>
+    <a href="{{ url_for('admin.vehicles', status='coming_soon') }}" class="btn btn-sm {% if status == 'coming_soon' %}btn-info{% else %}btn-outline-secondary{% endif %}">Coming Soon</a>
 </div>
 
 <div class="table-card p-4">
@@ -45,11 +46,14 @@
                     </td>
                     <td>{{ vehicle.display_price | format_price }}</td>
                     <td>{{ vehicle.mileage | format_mileage }}</td>
-                    <td><span class="badge badge-status bg-{{ 'success' if vehicle.status == 'available' else 'warning' if vehicle.status == 'pending' else 'secondary' }}">{{ vehicle.status | title }}</span></td>
+                    <td>
+                        <span class="badge badge-status bg-{{ 'success' if vehicle.status == 'available' else 'warning' if vehicle.status == 'pending' else 'secondary' }}">{{ vehicle.status | title }}</span>
+                        {% if vehicle.is_coming_soon %}<span class="badge text-bg-info">Coming Soon</span>{% endif %}
+                    </td>
                     <td>{{ vehicle.stock_number or 'N/A' }}</td>
                     <td>{{ vehicle.created_at.strftime('%m/%d/%Y') }}</td>
                     <td>
-                        <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" target="_blank" class="btn btn-sm btn-outline-secondary mb-1"><i class="bi bi-eye"></i></a>
+                        <a href="{{ url_for('main.coming_soon') if vehicle.is_coming_soon else url_for('main.vehicle_detail', slug=vehicle.slug) }}" target="_blank" class="btn btn-sm btn-outline-secondary mb-1"><i class="bi bi-eye"></i></a>
                         <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-sm btn-primary mb-1"><i class="bi bi-pencil"></i></a>
                         {% if vehicle.status == 'sold' %}
                         <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-sm btn-outline-primary mb-1">Sale Details</a>

@@ -8,6 +8,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Responsive, modern design with Bootstrap 5
   - Home page with featured inventory and search
   - Inventory listing with filters (make, body style, price, mileage, search)
+  - Coming Soon showcase for teaser vehicles, with contact links for availability updates
   - Vehicle detail pages with image gallery, specs, features, service history, and CarFax
   - Carvana-style photo highlight bubbles (features + condition notes) powered by a local OpenCV worker
   - Financing, sell-your-car, about, and contact pages
@@ -19,6 +20,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Secure login with Flask-Login
   - Optional site-wide authenticator-app two-factor authentication, with single-use recovery codes
   - Add/edit/delete vehicles with image uploads
+  - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
   - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle

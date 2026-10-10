@@ -181,6 +181,26 @@ a:hover {
     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
 }
 
+.coming-soon-card {
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--border-radius);
+    background: #fff;
+    box-shadow: var(--box-shadow);
+}
+
+.coming-soon-card img {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+}
+
+.coming-soon-card .coming-soon-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+}
+
 /* Favorite / compare controls */
 .favorite-btn {
     color: #333;

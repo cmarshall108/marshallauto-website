@@ -78,6 +78,7 @@ class VehicleForm(FlaskForm):
         ('pending', 'Pending'),
         ('sold', 'Sold'),
     ])
+    is_coming_soon = BooleanField('Show in Coming Soon section')
 
     body_style = StringField('Body Style', validators=[Optional(), Length(max=64)])
     exterior_color = StringField('Exterior Color', validators=[Optional(), Length(max=64)])

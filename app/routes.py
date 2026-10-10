@@ -64,7 +64,7 @@ def _service_area_map():
 def _available_makes():
     return [
         m[0] for m in db.session.query(Vehicle.make)
-        .filter_by(status='available')
+        .filter_by(status='available', is_coming_soon=False)
         .distinct()
         .order_by(Vehicle.make)
         .all()
@@ -74,7 +74,7 @@ def _available_makes():
 def _available_body_styles():
     return [
         b[0] for b in db.session.query(Vehicle.body_style)
-        .filter_by(status='available')
+        .filter_by(status='available', is_coming_soon=False)
         .distinct()
         .order_by(Vehicle.body_style)
         .all()
@@ -87,7 +87,17 @@ def _vehicle_list_query():
     return (
         Vehicle.query
         .options(selectinload(Vehicle.images))
-        .filter_by(status='available')
+        .filter_by(status='available', is_coming_soon=False)
+    )
+
+
+def _coming_soon_query():
+    """Public teaser vehicles; these are not yet part of sale inventory."""
+    return (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(status='available', is_coming_soon=True)
+        .order_by(Vehicle.created_at.desc())
     )
 
 
@@ -411,7 +421,7 @@ def index():
     makes = _available_makes()
     models = [
         m[0] for m in db.session.query(Vehicle.model)
-        .filter_by(status='available')
+        .filter_by(status='available', is_coming_soon=False)
         .distinct()
         .order_by(Vehicle.model)
         .all()
@@ -473,6 +483,28 @@ def index():
         page_type='home',
         areas=areas,
         home_faqs=home_faqs,
+        coming_soon=_coming_soon_query().limit(3).all(),
+    )
+
+
+@main.route('/coming-soon')
+def coming_soon():
+    vehicles = _coming_soon_query().all()
+    breadcrumbs = structured_data_breadcrumb([
+        ("Home", current_app.config['SITE_URL']),
+        ("Coming Soon", url_for('main.coming_soon', _external=True)),
+    ])
+    return render_template(
+        'coming_soon.html',
+        vehicles=vehicles,
+        breadcrumbs=breadcrumbs,
+        meta_title=f"Coming Soon Vehicles | {current_app.config['BUSINESS_NAME']}",
+        meta_description=(
+            f"Get an early look at vehicles coming soon to {current_app.config['BUSINESS_NAME']} "
+            f"in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. "
+            "Contact us to be among the first to know when they are ready."
+        ),
+        page_type='coming_soon',
     )
 
 
@@ -807,6 +839,8 @@ def vehicle_detail(slug):
         .filter_by(slug=slug)
         .first_or_404()
     )
+    if vehicle.is_coming_soon and vehicle.status == 'available':
+        abort(404)
     robots = 'index, follow'
     if vehicle.status != 'available':
         flash('This vehicle is no longer available.', 'info')
@@ -936,7 +970,7 @@ def api_vehicles_summary():
     vehicles = (
         Vehicle.query
         .options(selectinload(Vehicle.images))
-        .filter(Vehicle.slug.in_(slugs))
+        .filter(Vehicle.slug.in_(slugs), Vehicle.is_coming_soon.is_(False))
         .all()
     )
     by_slug = {v.slug: v for v in vehicles}
@@ -1075,6 +1109,18 @@ def _create_lead_from_form(form, source='contact'):
 @main.route('/contact', methods=['GET', 'POST'])
 def contact():
     form = ContactForm()
+    if request.method == 'GET':
+        vehicle_id = request.args.get('vehicle_id', type=int)
+        if vehicle_id:
+            vehicle = Vehicle.query.filter_by(
+                id=vehicle_id, status='available', is_coming_soon=True,
+            ).first()
+            if vehicle:
+                form.vehicle_id.data = str(vehicle.id)
+                form.message.data = (
+                    f"I'm interested in the upcoming {vehicle.title}. "
+                    "Please let me know when it's available."
+                )
     if form.validate_on_submit():
         if rate_limit_exceeded(
             f"contact:{client_ip()}",
@@ -1351,7 +1397,10 @@ def carfax_download(report_id):
     vehicle = db.session.get(Vehicle, report.vehicle_id)
     if not vehicle:
         abort(404)
-    if vehicle.status != 'available' and not getattr(current_user, 'is_authenticated', False):
+    if (
+        (vehicle.status != 'available' or vehicle.is_coming_soon)
+        and not getattr(current_user, 'is_authenticated', False)
+    ):
         abort(404)
     # Basic path traversal guard
     filename = os.path.basename(report.filename)
@@ -1365,7 +1414,7 @@ def vehicle_feed():
     vehicles = (
         Vehicle.query
         .options(selectinload(Vehicle.images))
-        .filter_by(status='available')
+        .filter_by(status='available', is_coming_soon=False)
         .order_by(Vehicle.created_at.desc())
         .all()
     )
@@ -1390,8 +1439,18 @@ def sitemap():
             default=None,
         )
     inventory_lastmod = latest_vehicle_mod.isoformat() + 'Z' if latest_vehicle_mod else None
-    available_vehicles = [vehicle for vehicle in vehicles if vehicle.status == 'available']
-    archived_vehicles = [vehicle for vehicle in vehicles if vehicle.status != 'available']
+    coming_soon_vehicles = [
+        vehicle for vehicle in vehicles
+        if vehicle.status == 'available' and vehicle.is_coming_soon
+    ]
+    available_vehicles = [
+        vehicle for vehicle in vehicles
+        if vehicle.status == 'available' and not vehicle.is_coming_soon
+    ]
+    archived_vehicles = [
+        vehicle for vehicle in vehicles
+        if vehicle.status != 'available' and not vehicle.is_coming_soon
+    ]
     pages = [
         {'loc': url_for('main.index', _external=True), 'priority': '1.00', 'changefreq': 'daily'},
         {'loc': url_for('main.about', _external=True), 'priority': '0.70', 'changefreq': 'monthly'},
@@ -1403,6 +1462,8 @@ def sitemap():
     ]
     if available_vehicles:
         pages.append({'loc': url_for('main.inventory', _external=True), 'priority': '0.90', 'changefreq': 'daily', 'lastmod': inventory_lastmod})
+    if coming_soon_vehicles:
+        pages.append({'loc': url_for('main.coming_soon', _external=True), 'priority': '0.70', 'changefreq': 'daily', 'lastmod': inventory_lastmod})
     if archived_vehicles:
         pages.append({'loc': url_for('main.vehicle_archive', _external=True), 'priority': '0.50', 'changefreq': 'weekly', 'lastmod': inventory_lastmod})
 
@@ -1436,6 +1497,8 @@ def sitemap():
             })
 
     for vehicle in vehicles:
+        if vehicle.is_coming_soon and vehicle.status == 'available':
+            continue
         images = vehicle.ordered_images()[:5]
         pages.append({
             'loc': url_for('main.vehicle_detail', slug=vehicle.slug, _external=True),

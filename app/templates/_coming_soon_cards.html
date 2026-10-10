@@ -1,0 +1,24 @@
+<div class="row g-4">
+    {% for vehicle in vehicles %}
+    <div class="col-md-6 col-xl-4">
+        <article class="coming-soon-card">
+            <div class="position-relative">
+                <img src="{{ vehicle.primary_image_url() }}"
+                     alt="{{ vehicle.title }} coming soon at {{ business_name }}"
+                     loading="lazy" decoding="async" width="600" height="400">
+                <span class="badge text-bg-info coming-soon-badge">Coming Soon</span>
+            </div>
+            <div class="p-4">
+                <h3 class="h5 fw-bold mb-2">{{ vehicle.title }}</h3>
+                <p class="text-muted mb-3">
+                    {% if vehicle.exterior_color %}{{ vehicle.exterior_color }}{% if vehicle.body_style %} {{ vehicle.body_style|lower }}{% endif %}.{% elif vehicle.body_style %}{{ vehicle.body_style }}.{% endif %}
+                    {% if vehicle.description %} {{ vehicle.description|striptags|truncate(145, True, '...') }}{% else %}Details are being prepared. Ask us when this vehicle will be ready.{% endif %}
+                </p>
+                <a href="{{ url_for('main.contact', vehicle_id=vehicle.id) }}" class="btn btn-outline-primary">
+                    <i class="bi bi-bell me-1" aria-hidden="true"></i> Get updates
+                </a>
+            </div>
+        </article>
+    </div>
+    {% endfor %}
+</div>

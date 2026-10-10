@@ -102,6 +102,13 @@
             {{ form.status(class="form-select", id="status") }}
             <div class="form-text">Save with status Sold to enter private sale notes, the amount received, and buyer ID photos.</div>
         </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.is_coming_soon(class="form-check-input", id="is_coming_soon") }}
+                <label class="form-check-label fw-semibold" for="is_coming_soon">{{ form.is_coming_soon.label.text }}</label>
+            </div>
+            <div class="form-text">Tease this vehicle on the Coming Soon page without showing its price in sale inventory. It must have Available status to appear there.</div>
+        </div>
         {% if vehicle and vehicle.status == 'sold' %}
         <div class="col-12">
             <div class="alert alert-info mb-0">
