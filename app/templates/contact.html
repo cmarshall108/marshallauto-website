@@ -45,7 +45,7 @@
                     <div class="d-flex mb-0">
                         <div class="feature-icon me-3" style="margin-bottom: 0;"><i class="bi bi-clock-fill"></i></div>
                         <div>
-                            <h6 class="fw-bold mb-1">Hours</h6>
+                            <h6 class="fw-bold mb-1" id="business-hours">Hours</h6>
                             {% for day, hours in business_hours.items() %}
                             <p class="mb-0 small">{{ day }}: {{ hours }}</p>
                             {% endfor %}

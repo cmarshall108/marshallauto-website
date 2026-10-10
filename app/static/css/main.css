@@ -272,6 +272,10 @@ a:hover {
     box-shadow: 0 -2px 15px rgba(0, 0, 0, 0.25);
 }
 
+.cookie-consent-banner p {
+    flex: 1 1 320px;
+}
+
 /* Live chat widget */
 .chat-widget {
     position: fixed;
@@ -297,6 +301,9 @@ a:hover {
 
 .chat-widget-panel {
     width: min(320px, calc(100vw - 2.5rem));
+    max-height: calc(100dvh - 8rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: #fff;
     border-radius: var(--border-radius);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
@@ -317,6 +324,28 @@ a:hover {
 @media (max-width: 767.98px) {
     body.has-mobile-cta .chat-widget {
         bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    }
+
+    body.cookie-consent-visible .chat-widget,
+    body.has-compare-bar .chat-widget {
+        display: none;
+    }
+
+    body.has-mobile-cta .cookie-consent-banner {
+        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    }
+
+    .cookie-consent-banner .container {
+        gap: 0.75rem !important;
+    }
+
+    .cookie-consent-banner .d-flex {
+        width: 100%;
+    }
+
+    .cookie-consent-banner .btn {
+        flex: 1;
+        min-height: 44px;
     }
 }
 
@@ -1398,6 +1427,15 @@ body.gallery-lightbox-open {
     height: 100%;
 }
 
+.contact-info-card .d-flex > div:last-child {
+    min-width: 0;
+}
+
+.contact-info-card a,
+.footer a {
+    overflow-wrap: anywhere;
+}
+
 .map-embed {
     height: 400px;
 }
@@ -1842,9 +1880,15 @@ body.gallery-lightbox-open {
         padding: 0.75rem 0 1rem;
         border-top: 1px solid #eef1f5;
         margin-top: 0.75rem;
+        max-height: calc(100dvh - 10.75rem - env(safe-area-inset-bottom));
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     .navbar-nav .nav-link {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
         padding: 0.75rem 0.5rem;
         margin: 0;
         border-radius: 8px;
@@ -1861,7 +1905,13 @@ body.gallery-lightbox-open {
     }
 
     .navbar-nav .btn {
+        min-height: 44px;
         width: 100%;
+    }
+
+    .navbar-toggler {
+        min-width: 48px;
+        min-height: 44px;
     }
 
     .inventory-grid {
@@ -1901,8 +1951,27 @@ body.gallery-lightbox-open {
         padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
     }
 
+    body.has-mobile-cta.has-compare-bar {
+        padding-bottom: calc(10.25rem + env(safe-area-inset-bottom));
+    }
+
     body.has-mobile-cta .compare-bar {
         bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    }
+
+    .compare-bar .container {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .compare-bar .container > span:last-child {
+        display: flex;
+        width: 100%;
+    }
+
+    .compare-bar .btn {
+        flex: 1;
+        min-height: 44px;
     }
 
     .top-bar .top-bar-mobile {
@@ -1948,6 +2017,12 @@ body.gallery-lightbox-open {
     .navbar-brand img {
         width: 34px;
         height: 34px;
+    }
+
+    .form-control,
+    .form-select,
+    textarea {
+        font-size: 16px;
     }
 
     .hero-section {
@@ -2171,17 +2246,35 @@ body.gallery-lightbox-open {
 
     /* Stack vehicle quick stats cleanly */
     .vehicle-quick-stats .col-4 {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
         border-right: 0 !important;
+        text-align: left;
     }
 
     .vehicle-quick-stats .col-4:not(:last-child) {
         border-bottom: 1px solid #e9ecef;
         padding-bottom: 0.65rem;
         margin-bottom: 0.65rem;
+    }
 
     .map-embed {
         height: 260px;
     }
+
+    #compare-table {
+        min-width: 680px;
+    }
+
+    #compare-table th[scope="row"] {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        min-width: 112px;
+        background: #fff;
+        box-shadow: 1px 0 #dee2e6;
     }
 
     h1.fw-bold,

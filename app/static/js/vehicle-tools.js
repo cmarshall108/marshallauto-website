@@ -218,6 +218,7 @@
         var countEl = document.getElementById('compare-bar-count');
         if (countEl) countEl.textContent = count;
         bar.classList.toggle('d-none', count === 0);
+        document.body.classList.toggle('has-compare-bar', count > 0);
     }
 
     function bindCardControls() {

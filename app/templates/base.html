@@ -191,14 +191,16 @@
                     <small class="ms-3"><i class="bi bi-geo-alt-fill me-1"></i> {{ business_address }}</small>
                 </div>
                 <div>
-                    <small>Mon-Fri: 9am-5pm | Sat-Sun: Closed</small>
+                    <small><a href="{{ url_for('main.contact') }}#business-hours" class="text-white text-decoration-none"><i class="bi bi-clock-fill me-1"></i>Hours &amp; Directions</a></small>
                 </div>
             </div>
             <div class="top-bar-mobile d-lg-none">
                 <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="text-white text-decoration-none">
                     <small><i class="bi bi-telephone-fill me-1"></i>{{ business_phone }}</small>
                 </a>
-                <small class="text-white-50">Mon–Fri 9–5</small>
+                <a href="{{ url_for('main.contact') }}#business-hours" class="text-white-50 text-decoration-none">
+                    <small><i class="bi bi-clock-fill me-1"></i>Hours</small>
+                </a>
             </div>
         </div>
     </div>
@@ -274,7 +276,7 @@
             <div class="row g-4">
                 <div class="col-lg-4 col-md-6">
                     <h4 class="fw-bold mb-3"><span class="brand-primary">MARSHALL</span> <span class="brand-secondary">AUTO</span></h4>
-                    <p>{{ site_setting.get('about_text', '')[:160] }}...</p>
+                    <p>{{ (site_setting.get('about_text') or '')[:160] }}...</p>
                     {% if social_links %}
                     <div class="d-flex gap-3 fs-5">
                         {% for network, url in social_links %}
