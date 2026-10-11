@@ -1,0 +1,61 @@
+{% extends "admin/base.html" %}
+{% block title %}Live Chat{% endblock %}
+{% block content %}
+<div id="live-chat-inbox" data-csrf="{{ csrf_token() }}">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Live Chat</h2>
+            <p class="text-muted mb-0">Shared team inbox. Customers can leave a message when no agent is available.</p>
+        </div>
+        <div>
+            <button id="chat-availability" class="btn btn-outline-primary" type="button" aria-pressed="false">Go available</button>
+            <span id="chat-presence-status" class="small text-muted d-block mt-2" role="status">You are away.</span>
+        </div>
+    </div>
+    <p class="small text-muted">Keep this inbox open while available. Availability expires after 90 seconds without a heartbeat. All signed-in staff can read and reply; replies are labeled as the Marshall Auto team.</p>
+    <div id="chat-inbox-error" class="alert alert-danger d-none" role="alert"></div>
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="table-card p-3">
+                <label for="chat-inbox-filter" class="form-label">Conversations</label>
+                <select id="chat-inbox-filter" class="form-select mb-3">
+                    <option value="open">Open chats</option>
+                    <option value="closed">Ended chats</option>
+                </select>
+                <div id="chat-conversations" class="chat-conversation-list" aria-label="Customer conversations"></div>
+                <div class="d-flex align-items-center justify-content-between gap-2 mt-3">
+                    <button id="chat-page-prev" type="button" class="btn btn-outline-secondary btn-sm" disabled>Previous</button>
+                    <span id="chat-page" class="small">Page 1</span>
+                    <button id="chat-page-next" type="button" class="btn btn-outline-secondary btn-sm" disabled>Next</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="table-card p-3 p-md-4">
+                <p id="chat-inbox-empty" class="text-muted mb-0">Select a conversation to read and reply.</p>
+                <div id="chat-inbox-conversation" class="d-none">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                        <div>
+                            <h4 id="chat-customer-name" class="fw-bold"></h4>
+                            <p id="chat-customer-contact" class="small text-muted mb-1 text-break"></p>
+                            <a id="chat-customer-lead" class="small" href="{{ url_for('admin.leads') }}">View in Leads</a>
+                        </div>
+                        <button id="chat-inbox-end" type="button" class="btn btn-outline-secondary btn-sm">End chat</button>
+                        <button id="chat-inbox-block" type="button" class="btn btn-outline-danger btn-sm">Block as spam</button>
+                    </div>
+                    <p id="chat-conversation-status" class="small text-muted" role="status"></p>
+                    <div id="chat-inbox-messages" class="chat-messages chat-messages-admin" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation messages"></div>
+                    <form id="chat-inbox-reply" class="mt-3">
+                        <label for="chat-inbox-body" class="form-label">Reply as Marshall Auto</label>
+                        <textarea id="chat-inbox-body" class="form-control" rows="3" maxlength="5000" required></textarea>
+                        <button type="submit" class="btn btn-primary mt-2">Send reply</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ asset_url('js/admin-chat.js') }}"></script>
+{% endblock %}

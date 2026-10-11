@@ -1,0 +1,46 @@
+.chat-messages {
+    height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem;
+    background: #f2efe8;
+    border: 1px solid #e4dfd6;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.chat-message {
+    flex: 0 0 auto;
+    max-width: 90%;
+    align-self: flex-start;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #d8d4cb;
+    border-radius: 12px 12px 12px 3px;
+    background: #fffefa;
+    color: #303236;
+    overflow-wrap: anywhere;
+}
+.chat-message-own {
+    align-self: flex-end;
+    background: #353b42;
+    color: #fff;
+    border-color: #353b42;
+    border-radius: 12px 12px 3px 12px;
+}
+.chat-message-sender { display: block; font-size: 0.7rem; margin-bottom: 0.2rem; }
+.chat-message p { white-space: pre-wrap; margin: 0; font-size: 0.85rem; }
+.chat-message time { display: block; font-size: 0.65rem; margin-top: 0.35rem; }
+.chat-spam-warning { display: block; margin-top: 0.4rem; color: #875300; font-weight: 600; }
+.chat-has-unread { outline: 3px solid #d6bc90; outline-offset: 3px; }
+.chat-messages-admin { height: 420px; }
+.chat-conversation-list { max-height: 540px; overflow-y: auto; }
+.chat-conversation-item { display: block; width: 100%; text-align: left; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid #dedede; border-radius: 10px; background: #fff; color: #303236; overflow-wrap: anywhere; }
+.chat-conversation-item[aria-pressed="true"] { border-color: #353b42; background: #f2efe8; }
+.admin-chat-action { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 1030; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #353b42; color: #fff; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18); }
+.admin-chat-action:hover { background: #202428; color: #fff; }
+.admin-chat-action:focus-visible,
+.chat-conversation-item:focus-visible { outline: 3px solid #876334; outline-offset: 3px; }
+@media (max-width: 575.98px) {
+    .chat-messages-admin { height: 320px; }
+}

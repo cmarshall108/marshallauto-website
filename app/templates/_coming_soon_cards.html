@@ -1,7 +1,9 @@
 <div class="row g-4">
     {% for vehicle in vehicles %}
     <div class="col-md-6 col-xl-4">
-        <article class="coming-soon-card">
+        <article class="coming-soon-card"{% if not vehicle.primary_image() %}
+                 data-stock-year="{{ vehicle.year }}" data-stock-make="{{ vehicle.make }}"
+                 data-stock-model="{{ vehicle.model }}"{% endif %}>
             <div class="position-relative">
                 <img src="{{ vehicle.primary_image_url() }}"
                      alt="{{ vehicle.title }} coming soon at {{ business_name }}"
@@ -9,6 +11,11 @@
                 <span class="badge text-bg-info coming-soon-badge">Coming Soon</span>
             </div>
             <div class="p-4">
+                {% if not vehicle.primary_image() %}
+                <p class="small text-muted mb-2 stock-photo-note" aria-live="polite">
+                    Actual vehicle photos coming soon.
+                </p>
+                {% endif %}
                 <h3 class="h5 fw-bold mb-2">{{ vehicle.title }}</h3>
                 <p class="text-muted mb-3">
                     {% if vehicle.exterior_color %}{{ vehicle.exterior_color }}{% if vehicle.body_style %} {{ vehicle.body_style|lower }}{% endif %}.{% elif vehicle.body_style %}{{ vehicle.body_style }}.{% endif %}

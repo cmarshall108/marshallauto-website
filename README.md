@@ -30,12 +30,36 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Manage service records per vehicle
   - Upload and link CarFax PDF reports
   - View and manage customer leads (with UTM / click-ID attribution)
+  - First-party Live Chat inbox with Available/Away controls and automatic offline fallback
   - Edit site settings, SEO defaults, and analytics IDs
   - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
 
 CarFax PDFs linked from the admin list and edit pages use `/carfax/<report_id>/download`.
 Authenticated admins can view reports for available or sold vehicles; public visitors
 can only download reports for available vehicles.
+
+### Coming Soon stock photos
+
+Coming Soon cards on the showcase and homepage automatically look for a
+representative Wikimedia Commons photo when no actual vehicle photo has been
+uploaded. Matching uses the saved year/make/model, including values populated
+by the existing admin VIN decoder. No VIN, contact information, or credentials
+are sent to Commons. The visitor's browser contacts Commons directly, so the
+service receives the visitor's IP address; requests omit cookies and referrers.
+
+Only images explicitly identified as **CC0**, with a matching CC0 dedication
+URL, no attribution requirement, and no listed restrictions are accepted.
+CC BY/CC BY-SA, unknown licenses, and mismatched model years are excluded.
+CC0 waives copyright restrictions; it does not guarantee clearance of trademarks
+or other non-copyright rights. No paid service or API key is required.
+
+Stock photos are clearly labeled as representative, with a source link; color,
+trim, and equipment may differ. They are never saved as actual inventory photos
+or used in vehicle feeds, detail pages, or listings. Uploading actual photos
+automatically takes precedence. Requests are lazy-loaded, deduplicated per page,
+and time-limited. If no verified match exists, JavaScript is disabled, or the
+service fails, the existing placeholder remains. CC0 coverage is limited, so
+not every year/make/model will have a stock photo.
 
 ### Storefront visual theme
 
@@ -50,6 +74,79 @@ bars, and the footer. Status badges retain distinct warning/success/error
 colors; savings and low-mileage indicators no longer pulse. Keyboard focus
 indicators, reduced-motion preferences, and mobile shopping controls are
 preserved. Browser/PWA theme colors match the storefront.
+
+### Live customer chat
+
+Customers use the existing floating **Chat with us** button. When at least one
+staff member is available, the form starts a live conversation. Otherwise it
+sends a regular message through the existing contact/lead pipeline. If the last
+agent goes offline while the customer is starting a chat, the widget falls back
+to a regular message without discarding the form.
+
+Staff open **Admin → Live Chat**, or the chat action button in the admin panel,
+and select **Go available**. Keep the inbox open while taking questions; use
+**Go away** when finished. Availability renews every 20 seconds and expires
+after 90 seconds without a heartbeat. Closing the page attempts to clear
+availability immediately; logout clears the user's presence. Disabled accounts
+and changed passwords invalidate stored presence.
+
+- The shared inbox shows open/ended conversations and unread customer messages.
+  Any authenticated active staff member (with the existing 2FA checks) can reply.
+  Replies are labeled **Marshall Auto team**, not as a chatbot.
+- Chat pages poll for new messages approximately every five seconds. This is
+  database-backed HTTP polling, not WebSockets: it works with the existing
+  Gunicorn setup and multiple workers without Redis or an external chat provider.
+  Background-tab/browser throttling can delay delivery and expire availability.
+- A quiet two-tone incoming-message chime is available on customer pages and
+  throughout the authenticated admin panel, not just the inbox. Use **Enable
+  sounds** once after opening a page (or click/type anywhere), then **Sounds off**
+  to mute. Browsers require a user interaction before audio playback; suspended
+  audio or background throttling can prevent/delay a sound. The mute preference
+  is stored locally, separately for staff and customers. Initial transcript
+  loads and staff's own replies do not chime. Multiple admin tabs may each chime.
+  Visible unread indicators remain available without audio.
+- Conversations and transcripts persist in the database. The customer's signed
+  browser session keeps their conversation across page navigation/reloads.
+  Clearing cookies or switching browsers does not recover that conversation.
+- Each live conversation creates a lead with its contact details and existing
+  spam/attribution checks. **View in Leads** opens the linked lead. Messages sent
+  in an existing chat while staff are away remain in the transcript/unread inbox;
+  they do not create duplicate leads or send an email for every chat reply.
+  Normal offline submissions retain the existing optional email notifications.
+- Either side can end a chat. Ended transcripts remain readable and customers
+  can start a new conversation. Messages are plain text, limited to 5,000
+  characters and 1,000 messages per chat; customer replies are rate-limited.
+  Message retries use IDs to avoid duplicate replies.
+- Initial questions retain the existing lead spam checks. Every subsequent
+  customer reply is locally scored with the same configured spam thresholds:
+  obvious spam is rejected with an explicit error without creating a message;
+  suspicious messages are delivered with a staff-only score/reason warning.
+  Repeat messages with new IDs within 60 seconds are rejected; legitimate retry
+  IDs still return the original message. Existing 30/minute per-process rate
+  limits remain in force. Reply screening adds no external service calls.
+- Staff can **Block as spam** after reviewing a conversation. This ends the
+  chat, moves its linked lead to Spam, and prevents the same signed browser
+  session from starting another live chat. Use **Ended chats → Unblock chat**
+  to reverse a mistake and restore the linked lead; the ended transcript stays
+  closed. Clearing cookies or using another browser can bypass this block;
+  it is not an IP ban. Offline messages still use existing lead spam quarantine.
+  Screening cannot prove buying intent or guarantee zero spam; review flags
+  before blocking, since legitimate buyer messages can be misclassified.
+- Chat reads are private/no-store; writes require CSRF tokens. Customer access is
+  bound to their signed session, while the staff endpoints require login.
+  Transcripts contain customer information: restrict admin access and include
+  them in your backup/retention practices. There is no automatic transcript
+  deletion or external notification service.
+
+Apply the additive migration on an existing deployment and restart the app:
+
+```bash
+venv/bin/python -m flask --app run:app db upgrade
+```
+
+No additional package, worker, third-party account, or chat credentials are
+required. Test by opening the public chat in a separate browser/private window
+while a staff member has the inbox open and marked available.
 
 ### Sold-vehicle sale details
 

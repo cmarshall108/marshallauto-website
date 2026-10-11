@@ -106,6 +106,8 @@ def create_app(config_class=None):
 
     app.register_blueprint(main)
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    from app.chat import chat_bp
+    app.register_blueprint(chat_bp)
     from app.two_factor import register_commands
     register_commands(app)
     from app.buyer_guides import register_commands as register_buyer_guide_commands

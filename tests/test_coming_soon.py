@@ -4,7 +4,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 
 from app import create_app, db
-from app.models import Vehicle
+from app.models import Vehicle, VehicleImage
 from config import TestingConfig
 
 
@@ -64,6 +64,38 @@ class ComingSoonTests(unittest.TestCase):
             page.select_one(f'a[href="/contact?vehicle_id={self.teaser.id}"]')
         )
         self.assertNotIn(self.available.title, text)
+
+    def test_missing_photos_opt_into_stock_lookup_on_showcase_and_homepage(self):
+        self.teaser.vin = '2T3P1RFV0LC123456'
+        db.session.commit()
+        for path in ('/coming-soon', '/'):
+            with self.subTest(path=path):
+                page = BeautifulSoup(self.client.get(path).data, 'html.parser')
+                card = page.select_one('.coming-soon-card')
+                self.assertEqual(card['data-stock-year'], '2020')
+                self.assertEqual(card['data-stock-make'], 'Toyota')
+                self.assertEqual(card['data-stock-model'], 'RAV4')
+                self.assertNotIn(self.teaser.vin, str(card))
+                self.assertIn('vehicle-placeholder.jpg', card.img['src'])
+                self.assertIn('Actual vehicle photos coming soon', card.get_text())
+                self.assertIsNotNone(page.select_one('script[src*="coming-soon-photos.js"]'))
+
+    def test_actual_photos_do_not_use_stock_lookup_or_disclaimer(self):
+        db.session.add(VehicleImage(
+            vehicle_id=self.teaser.id, filename='actual-rav4.jpg', is_primary=True,
+        ))
+        db.session.commit()
+        for path in ('/coming-soon', '/'):
+            with self.subTest(path=path):
+                page = BeautifulSoup(self.client.get(path).data, 'html.parser')
+                card = page.select_one('.coming-soon-card')
+                self.assertNotIn('data-stock-year', card.attrs)
+                self.assertIsNone(card.select_one('.stock-photo-note'))
+                self.assertEqual(card.img['src'], '/static/uploads/vehicles/actual-rav4.jpg')
+
+    def test_sale_inventory_does_not_use_stock_lookup(self):
+        page = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')
+        self.assertIsNone(page.select_one('[data-stock-year]'))
 
     def test_teaser_is_not_in_sale_inventory_homepage_or_feed(self):
         inventory = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')

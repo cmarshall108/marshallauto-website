@@ -708,6 +708,53 @@ class Lead(db.Model):
     vehicle = db.relationship('Vehicle', backref=db.backref('leads', lazy='dynamic'))
 
 
+class ChatPresence(db.Model):
+    __tablename__ = 'chat_presence'
+
+    id = db.Column(db.String(36), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    auth_version = db.Column(db.String(32), nullable=False)
+    last_seen_at = db.Column(db.DateTime, nullable=False, index=True)
+
+
+class ChatConversation(db.Model):
+    __tablename__ = 'chat_conversations'
+
+    id = db.Column(db.String(36), primary_key=True)
+    lead_id = db.Column(db.Integer, db.ForeignKey('leads.id', ondelete='SET NULL'), nullable=True)
+    customer_name = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+    closed_at = db.Column(db.DateTime, nullable=True, index=True)
+    blocked_at = db.Column(db.DateTime, nullable=True)
+    is_suspicious = db.Column(db.Boolean, default=False, nullable=False)
+    last_message_id = db.Column(db.Integer, default=0, nullable=False)
+    last_customer_message_id = db.Column(db.Integer, default=0, nullable=False)
+    last_read_message_id = db.Column(db.Integer, default=0, nullable=False)
+    lead = db.relationship('Lead', lazy='selectin')
+
+
+class ChatMessage(db.Model):
+    __tablename__ = 'chat_messages'
+    __table_args__ = (
+        db.UniqueConstraint('conversation_id', 'client_nonce', name='uq_chat_message_nonce'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(
+        db.String(36), db.ForeignKey('chat_conversations.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    client_nonce = db.Column(db.String(36), nullable=False)
+    sender = db.Column(db.String(16), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    body = db.Column(db.String(5000), nullable=False)
+    is_suspicious = db.Column(db.Boolean, default=False, nullable=False)
+    spam_score = db.Column(db.Integer, default=0, nullable=False)
+    spam_reasons = db.Column(db.String(512), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+
 class PageView(db.Model):
     """First-party page view / session hit for admin analytics."""
     __tablename__ = 'page_views'

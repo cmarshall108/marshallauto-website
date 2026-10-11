@@ -286,6 +286,10 @@ def two_factor_recovery():
 @admin_bp.route('/logout')
 @login_required
 def logout():
+    if current_user.is_authenticated:
+        from app.models import ChatPresence
+        ChatPresence.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
     logout_user()
     session.clear()
     session['_remember'] = 'clear'
@@ -1521,6 +1525,9 @@ def leads():
     page = request.args.get('page', 1, type=int)
     view = 'spam' if request.args.get('view') == 'spam' else 'inbox'
     query = Lead.query.filter(Lead.is_spam.is_(view == 'spam'))
+    lead_id = request.args.get('lead_id', type=int)
+    if lead_id is not None:
+        query = query.filter(Lead.id == lead_id)
     pagination = query.order_by(Lead.created_at.desc()).paginate(
         page=page, per_page=25, error_out=False)
     return render_template(

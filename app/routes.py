@@ -1118,7 +1118,7 @@ def _attribution_from_request():
     }
 
 
-def _create_lead_from_form(form, source='contact'):
+def _build_lead_from_form(form, source='contact'):
     vehicle_id = parse_optional_int(form.vehicle_id.data)
     if vehicle_id is not None:
         exists = db.session.get(Vehicle, vehicle_id)
@@ -1162,6 +1162,22 @@ def _create_lead_from_form(form, source='contact'):
         landing_path=attr['landing_path'],
         referrer=attr['referrer'],
     )
+    return lead
+
+
+def _notify_lead(lead):
+    if lead.is_spam:
+        current_app.logger.info(
+            'Lead %s quarantined as spam (score=%s): %s',
+            lead.id, lead.spam_score, lead.spam_reasons,
+        )
+    else:
+        notify_new_lead(lead)
+        send_lead_confirmation(lead)
+
+
+def _create_lead_from_form(form, source='contact'):
+    lead = _build_lead_from_form(form, source)
     db.session.add(lead)
     try:
         db.session.commit()
@@ -1169,14 +1185,7 @@ def _create_lead_from_form(form, source='contact'):
         db.session.rollback()
         current_app.logger.exception('Lead save failed (source=%s)', source)
         return None
-    if spam.is_spam:
-        # Kept in the admin spam folder for review, but no notification email.
-        current_app.logger.info(
-            'Lead %s quarantined as spam (score=%s): %s', lead.id, spam.score, spam.reason_text
-        )
-    else:
-        notify_new_lead(lead)
-        send_lead_confirmation(lead)
+    _notify_lead(lead)
     return lead
 
 
@@ -1246,6 +1255,9 @@ def contact_submit_ajax():
     if form.validate_on_submit():
         if form.honeypot.data:
             return jsonify({'success': True, 'message': 'Thank you! We will be in touch soon.'})
+        if request.form.get('chat_mode') == 'live':
+            from app.chat import start_conversation
+            return start_conversation(form)
         source = (request.form.get('source') or 'ajax')[:64]
         lead = _create_lead_from_form(form, source=source)
         if lead is None:
