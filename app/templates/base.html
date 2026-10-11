@@ -343,7 +343,7 @@
             </div>
             <div class="chat-widget-body">
                 <p id="chat-widget-status" class="small text-muted mb-2" role="status">Checking team availability...</p>
-                <button id="customer-chat-sounds" type="button" class="btn btn-outline-secondary btn-sm mb-2" aria-pressed="true">Enable sounds</button>
+                <button id="customer-chat-sounds" type="button" class="btn btn-outline-secondary btn-sm mb-2 chat-sound-toggle" aria-label="Enable sounds" title="Enable sounds" aria-pressed="true"><i class="bi bi-volume-down" aria-hidden="true"></i></button>
                 <p class="small text-muted mb-2">Need help now? Call <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a>.</p>
                 <form id="chat-widget-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

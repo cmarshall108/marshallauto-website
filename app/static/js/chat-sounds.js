@@ -7,10 +7,13 @@
         try { enabled = window.localStorage.getItem(key) !== 'off'; }
         catch (error) { console.warn('Chat sound preference could not be read:', error); }
         function render() {
-            button.textContent = !AudioContext || failed ? 'Sounds unavailable'
+            var label = !AudioContext || failed ? 'Sounds unavailable'
                 : !enabled ? 'Sounds off' : context && context.state === 'running' ? 'Sounds on' : 'Enable sounds';
+            button.querySelector('i').className = 'bi ' + (!AudioContext || failed || !enabled
+                ? 'bi-volume-mute' : context && context.state === 'running' ? 'bi-volume-up' : 'bi-volume-down');
+            button.setAttribute('aria-label', label);
             button.setAttribute('aria-pressed', String(enabled && !!AudioContext && !failed));
-            button.title = 'Incoming-message sounds. Browsers require a click or keypress before audio can play.';
+            button.title = label + '. Incoming-message sounds. Browsers require a click or keypress before audio can play.';
             button.disabled = !AudioContext || failed;
         }
         async function unlock() {

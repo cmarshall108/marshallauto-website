@@ -13,7 +13,8 @@ function setup(options = {}) {
     const played = [], contexts = [];
     if (options.muted) values.set('marshall-chat-sounds-customer', 'off');
     const button = {
-        attributes: {}, listeners: {},
+        attributes: {}, listeners: {}, icon: {},
+        querySelector() { return this.icon; },
         setAttribute(name, value) { this.attributes[name] = value; },
         addEventListener(name, callback) { this.listeners[name] = callback; },
     };
@@ -69,9 +70,12 @@ test('incoming-message sound waits for interaction and never plays initial histo
     s.sounds.observe('chat', 11);
     assert.equal(s.contexts.length, 0);
     assert.equal(s.played.length, 0);
-    assert.equal(s.button.textContent, 'Enable sounds');
+    assert.equal(s.button.attributes['aria-label'], 'Enable sounds');
+    assert.equal(s.button.icon.className, 'bi bi-volume-down');
     await s.handlers.click();
-    assert.equal(s.button.textContent, 'Sounds on');
+    assert.equal(s.button.attributes['aria-label'], 'Sounds on');
+    assert.equal(s.button.icon.className, 'bi bi-volume-up');
+    assert.match(s.button.title, /^Sounds on/);
     s.sounds.observe('chat', 11);
     assert.equal(s.played.length, 0);
     s.sounds.observe('chat', 12);
@@ -89,7 +93,8 @@ test('mute persists, suppresses incoming sounds, and synchronizes between tabs',
     await s.handlers.keydown();
     s.sounds.observe('chat', 1);
     s.button.listeners.click();
-    assert.equal(s.button.textContent, 'Sounds off');
+    assert.equal(s.button.attributes['aria-label'], 'Sounds off');
+    assert.equal(s.button.icon.className, 'bi bi-volume-mute');
     assert.equal(s.values.get('marshall-chat-sounds-customer'), 'off');
     s.sounds.observe('chat', 2);
     assert.equal(s.played.length, 0);
@@ -102,22 +107,22 @@ test('mute persists, suppresses incoming sounds, and synchronizes between tabs',
     const muted = setup({ muted: true });
     await muted.handlers.click();
     assert.equal(muted.contexts.length, 0);
-    assert.equal(muted.button.textContent, 'Sounds off');
+    assert.equal(muted.button.attributes['aria-label'], 'Sounds off');
 });
 
 test('unsupported or rejected audio and unavailable storage do not break chat', async () => {
     const unavailable = setup({ unsupported: true });
     await unavailable.handlers.click();
     assert.equal(unavailable.button.disabled, true);
-    assert.equal(unavailable.button.textContent, 'Sounds unavailable');
+    assert.equal(unavailable.button.attributes['aria-label'], 'Sounds unavailable');
     const denied = setup({ audioError: true });
     await denied.handlers.click();
-    assert.equal(denied.button.textContent, 'Sounds unavailable');
+    assert.equal(denied.button.attributes['aria-label'], 'Sounds unavailable');
     assert.equal(denied.warnings.length, 1);
     const noStorage = setup({ storageError: true });
     await noStorage.handlers.click();
     noStorage.button.listeners.click();
-    assert.equal(noStorage.button.textContent, 'Sounds off');
+    assert.equal(noStorage.button.attributes['aria-label'], 'Sounds off');
     assert.equal(noStorage.warnings.length, 2);
 });
 

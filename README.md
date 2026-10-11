@@ -105,9 +105,10 @@ and changed passwords invalidate stored presence.
   Gunicorn setup and multiple workers without Redis or an external chat provider.
   Background-tab/browser throttling can delay delivery and expire availability.
 - A quiet two-tone incoming-message chime is available on customer pages and
-  throughout the authenticated admin panel, not just the inbox. Use **Enable
-  sounds** once after opening a page (or click/type anywhere), then **Sounds off**
-  to mute. Browsers require a user interaction before audio playback; suspended
+  throughout the authenticated admin panel, not just the inbox. Use the **speaker
+  icon** to enable or mute sounds; its icon, accessible label, and tooltip reflect
+  the current state. A muted speaker means sounds are off. Browsers require a
+  click or keypress before audio playback; suspended
   audio or background throttling can prevent/delay a sound. The mute preference
   is stored locally, separately for staff and customers. Initial transcript
   loads and staff's own replies do not chime. Multiple admin tabs may each chime.

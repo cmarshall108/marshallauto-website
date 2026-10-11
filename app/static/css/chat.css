@@ -33,6 +33,8 @@
 .chat-message time { display: block; font-size: 0.65rem; margin-top: 0.35rem; }
 .chat-spam-warning { display: block; margin-top: 0.4rem; color: #875300; font-weight: 600; }
 .chat-has-unread { outline: 3px solid #d6bc90; outline-offset: 3px; }
+.chat-sound-toggle { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.chat-sound-toggle .bi { font-size: 1.2rem; line-height: 1; }
 .chat-messages-admin { height: 420px; }
 .chat-conversation-list { max-height: 540px; overflow-y: auto; }
 .chat-conversation-item { display: block; width: 100%; text-align: left; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid #dedede; border-radius: 10px; background: #fff; color: #303236; overflow-wrap: anywhere; }
