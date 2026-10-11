@@ -65,7 +65,14 @@ not every year/make/model will have a stock photo.
 
 The customer-facing theme lives in `app/static/css/public.css`, loaded after
 the shared `main.css` by `app/templates/base.html`. Its rules and design tokens
-are scoped to `.public-site` so admin pages retain their existing appearance.
+are scoped to `.public-site`. Staff pages use the matching palette in
+`app/static/css/admin.css`, scoped to `.admin-theme` and loaded after shared
+styles by both admin base templates. This covers the dashboard, lists, forms,
+analytics, live chat, login, and two-factor authentication without applying
+storefront navigation or promotional layouts to staff workflows. Semantic
+warning/danger controls keep their meanings, and printable agreements retain
+their dedicated print layout. Both themes include visible keyboard focus and
+reduced-motion rules.
 The palette uses graphite (`#25282c`), warm white (`#faf8f4`), and champagne
 (`#d6bc90`), with darker accents for readable text on light surfaces.
 

@@ -1,4 +1,4 @@
-/* Public storefront only; the admin retains its existing theme. */
+/* Public storefront only; staff workflows use the matching admin.css theme. */
 .public-site {
     --primary: #353b42;
     --primary-dark: #202428;

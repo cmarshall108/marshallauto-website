@@ -1,0 +1,239 @@
+/* Storefront palette adapted to denser staff workflows. */
+.admin-theme {
+    --primary: #353b42;
+    --primary-dark: #202428;
+    --secondary: #876334;
+    --dark: #25282c;
+    --light: #faf8f4;
+    --text-muted: #686660;
+    --accent: #d6bc90;
+    --surface: #fffefa;
+    --line: #e4dfd6;
+    --border-radius: 18px;
+    --box-shadow: 0 8px 28px rgba(37, 40, 44, 0.06);
+    --bs-primary-rgb: 53, 59, 66;
+    --bs-secondary-rgb: 104, 102, 96;
+    --bs-light-rgb: 250, 248, 244;
+    --bs-dark-rgb: 37, 40, 44;
+    --bs-body-color: #303236;
+    --bs-body-bg: #faf8f4;
+    --bs-secondary-color: #686660;
+    --bs-border-color: #e4dfd6;
+    --bs-link-color: #353b42;
+    --bs-link-hover-color: #202428;
+    --bs-link-color-rgb: 53, 59, 66;
+    --bs-link-hover-color-rgb: 32, 36, 40;
+    background: var(--light);
+    color: var(--bs-body-color);
+    -webkit-font-smoothing: antialiased;
+}
+
+.admin-theme :is(h1, h2, h3, h4) { letter-spacing: -0.035em; }
+.admin-theme .brand-primary { color: var(--dark); }
+.admin-theme .brand-secondary { color: var(--secondary); margin-left: 0.25em; }
+.admin-theme .admin-sidebar {
+    background: var(--dark);
+    border-right: 1px solid #3a3c3f;
+    height: 100dvh;
+    min-height: 0;
+    padding: 2rem 1.25rem;
+}
+.admin-theme .admin-sidebar .brand-primary { color: var(--surface); }
+.admin-theme .admin-sidebar .brand-secondary { color: var(--accent); }
+.admin-theme .admin-sidebar > div:first-child { padding: 0 0.75rem 1.5rem; border-bottom: 1px solid #454649; }
+.admin-theme .admin-sidebar .nav-link {
+    color: #dfdcd5 !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.8rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.admin-theme .admin-sidebar .nav-link .bi { color: var(--accent); }
+.admin-theme .admin-sidebar .nav-link:hover { background: #353739; color: #fff !important; }
+.admin-theme .admin-sidebar .nav-link.active {
+    background: #3c3933;
+    color: #f4e4c8 !important;
+    border-color: #76664e;
+}
+.admin-theme .admin-sidebar .nav-link.text-danger { color: #f1b9b4 !important; }
+.admin-theme .admin-sidebar .nav-link.text-danger .bi { color: inherit; }
+.admin-theme .admin-content { background: var(--light); padding: 2.5rem; min-width: 0; }
+.admin-theme .admin-content > .d-flex.justify-content-between {
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.admin-theme .admin-mobile-nav { background: var(--dark) !important; border-bottom: 1px solid #454649; }
+.admin-theme .admin-mobile-nav .navbar-brand { letter-spacing: -0.035em; color: #f5eee2; }
+.admin-theme .admin-mobile-nav .nav-link { color: #e5e0d7 !important; border-radius: 8px; padding-inline: 0.75rem; }
+.admin-theme .admin-mobile-nav .nav-link:hover { background: #3c3933; color: #fff !important; }
+.admin-theme .admin-mobile-nav .nav-link .bi { color: var(--accent); }
+.admin-theme .admin-mobile-nav .nav-link.text-danger { color: #f1b9b4 !important; }
+.admin-theme .admin-mobile-nav .navbar-toggler { border-color: #706b62; }
+
+.admin-theme :is(.stat-card, .table-card, .card, .modal-content, .login-card) {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+.admin-theme .stat-card { height: 100%; border-top: 3px solid var(--accent); }
+.admin-theme .stat-card .stat-value { color: var(--dark); font-weight: 700; letter-spacing: -0.04em; }
+.admin-theme .stat-card p { font-weight: 500; }
+.admin-theme .card-header,
+.admin-theme .modal-header { background: #f5f1e9; border-bottom-color: var(--line); }
+.admin-theme .card-footer,
+.admin-theme .modal-footer { background: var(--surface); border-top-color: var(--line); }
+.admin-theme .table {
+    --bs-table-color: #303236;
+    --bs-table-bg: #fffefa;
+    --bs-table-border-color: #e4dfd6;
+    --bs-table-hover-bg: #f2eee6;
+    --bs-table-hover-color: #25282c;
+    --bs-table-striped-bg: #f7f4ee;
+    --bs-table-striped-color: #303236;
+}
+.admin-theme .table thead th {
+    background: #f3efe7;
+    color: #686660;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding-block: 1rem;
+}
+.admin-theme .table td { padding-block: 0.9rem; font-size: 0.875rem; }
+.admin-theme .table-primary {
+    --bs-table-bg: #eee4d3;
+    --bs-table-color: #303236;
+    --bs-table-border-color: #d8c8ae;
+    --bs-table-hover-bg: #e6dac6;
+    --bs-table-hover-color: #25282c;
+}
+.admin-theme .table-responsive { overscroll-behavior-x: contain; }
+.admin-theme :is(.form-control, .form-select) {
+    background-color: var(--surface);
+    color: var(--bs-body-color);
+    border-color: #d8d2c7;
+    border-radius: 10px;
+}
+.admin-theme :is(.form-control, .form-select):focus {
+    background-color: var(--surface);
+    color: var(--bs-body-color);
+    border-color: #876334;
+    box-shadow: 0 0 0 0.2rem rgba(135, 99, 52, 0.15);
+}
+.admin-theme .form-control:disabled,
+.admin-theme .form-select:disabled { background-color: #efebe3; }
+.admin-theme .form-label { font-size: 0.85rem; font-weight: 600; }
+.admin-theme .form-check-input:checked { background-color: var(--primary); border-color: var(--primary); }
+.admin-theme .form-check-input:focus { border-color: #876334; box-shadow: 0 0 0 0.2rem rgba(135, 99, 52, 0.15); }
+.admin-theme .input-group-text { background: #f3efe7; border-color: #d8d2c7; color: #686660; }
+.admin-theme .btn {
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.admin-theme .btn-sm { padding: 0.45rem 0.75rem; }
+.admin-theme .btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #353b42;
+    --bs-btn-border-color: #353b42;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #202428;
+    --bs-btn-hover-border-color: #202428;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #202428;
+    --bs-btn-active-border-color: #202428;
+    --bs-btn-disabled-bg: #353b42;
+    --bs-btn-disabled-border-color: #353b42;
+    --bs-btn-focus-shadow-rgb: 135, 99, 52;
+}
+.admin-theme .btn-secondary {
+    background-color: var(--bs-btn-bg);
+    border-color: var(--bs-btn-border-color);
+    color: var(--bs-btn-color);
+    --bs-btn-color: #25282c;
+    --bs-btn-bg: #d6bc90;
+    --bs-btn-border-color: #d6bc90;
+    --bs-btn-hover-color: #25282c;
+    --bs-btn-hover-bg: #c5a978;
+    --bs-btn-hover-border-color: #c5a978;
+    --bs-btn-active-color: #25282c;
+    --bs-btn-active-bg: #c5a978;
+    --bs-btn-active-border-color: #c5a978;
+    --bs-btn-disabled-color: #25282c;
+    --bs-btn-disabled-bg: #d6bc90;
+    --bs-btn-disabled-border-color: #d6bc90;
+}
+.admin-theme .btn-secondary:hover {
+    background-color: var(--bs-btn-hover-bg);
+    border-color: var(--bs-btn-hover-border-color);
+    color: var(--bs-btn-hover-color);
+}
+.admin-theme .btn-secondary:is(:active, .active) {
+    background-color: var(--bs-btn-active-bg);
+    border-color: var(--bs-btn-active-border-color);
+    color: var(--bs-btn-active-color);
+}
+.admin-theme :is(.btn-outline-primary, .btn-outline-secondary) {
+    color: var(--bs-btn-color);
+    border-color: var(--bs-btn-border-color);
+    --bs-btn-color: #353b42;
+    --bs-btn-border-color: #b6b0a6;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #353b42;
+    --bs-btn-hover-border-color: #353b42;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #353b42;
+    --bs-btn-active-border-color: #353b42;
+    --bs-btn-disabled-color: #686660;
+    --bs-btn-disabled-border-color: #b6b0a6;
+    --bs-btn-focus-shadow-rgb: 135, 99, 52;
+}
+.admin-theme :is(.btn-outline-primary, .btn-outline-secondary):hover {
+    background-color: var(--bs-btn-hover-bg);
+    border-color: var(--bs-btn-hover-border-color);
+    color: var(--bs-btn-hover-color);
+}
+.admin-theme :is(.btn-outline-primary, .btn-outline-secondary):is(:active, .active) {
+    background-color: var(--bs-btn-active-bg);
+    border-color: var(--bs-btn-active-border-color);
+    color: var(--bs-btn-active-color);
+}
+.admin-theme .page-link { background: var(--surface); color: var(--primary); border-color: var(--line); }
+.admin-theme .page-link:hover { background: #f0ebe2; color: var(--dark); }
+.admin-theme .active > .page-link { background: var(--primary); border-color: var(--primary); color: #fff; }
+.admin-theme .nav-tabs { --bs-nav-tabs-border-color: #e4dfd6; }
+.admin-theme .nav-tabs .nav-link.active { background: var(--surface); color: var(--dark); border-color: var(--line) var(--line) var(--surface); }
+.admin-theme .badge.bg-warning { background: #eee3cf !important; color: #65491f !important; }
+.admin-theme .badge.bg-success { background: #e4eee3 !important; color: #315231 !important; }
+.admin-theme .badge.bg-danger { background: #f5e1df !important; color: #8b3532 !important; }
+.admin-theme .badge.bg-info { background: #e3ecee !important; color: #31545d !important; }
+.admin-theme .badge.bg-primary { background: #353b42 !important; color: #fff !important; }
+.admin-theme .chat-conversation-item { background: var(--surface); border-color: var(--line); }
+.admin-theme .chat-conversation-item[aria-pressed="true"] { background: #f2efe8; border-color: #876334; }
+.admin-theme .analytics-mini-stat { background: #f5f1e9; border-color: var(--line); }
+.admin-theme.login-page { background: radial-gradient(ellipse at top, #48433a, #25282c 70%); padding: 2rem 1rem; }
+.admin-theme .login-card { border-top: 4px solid var(--accent); }
+.admin-theme :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #876334; outline-offset: 3px; }
+.admin-theme :is(.admin-sidebar, .admin-mobile-nav) :focus-visible { outline-color: #e3cba5; }
+
+@media (max-width: 991.98px) {
+    .admin-theme .admin-content { margin-left: 0; padding: 1.5rem; }
+}
+@media (max-width: 575.98px) {
+    .admin-theme .admin-content { padding: 1rem; }
+    .admin-theme :is(.form-control, .form-select) { font-size: 16px; min-height: 44px; }
+    .admin-theme .btn { min-height: 44px; }
+    .admin-theme .login-card { padding: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .admin-theme *, .admin-theme *::before, .admin-theme *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+}
