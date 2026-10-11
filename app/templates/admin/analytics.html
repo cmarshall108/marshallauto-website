@@ -488,6 +488,70 @@
     </div>
 </div>
 
+<div class="table-card p-3 p-md-4 mb-4">
+    <h5 class="fw-bold mb-1">Source-to-inquiry performance</h5>
+    <p class="small text-muted mb-3">
+        Credit goes to each session's first recorded landing source, even when contact happens on a later page.
+        Sessions include visitors who viewed a matching page in this date range.
+        {% if page_type_filter %}Inquiries are limited to the selected page type.{% endif %}
+        {% if device_filter %}Sessions must include a page view on the selected device.{% endif %}
+    </p>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Source / medium</th>
+                    <th>Campaign</th>
+                    <th class="text-end">Sessions</th>
+                    <th class="text-end">Converting sessions</th>
+                    <th class="text-end">Conversion rate</th>
+                    <th class="text-end">Call clicks</th>
+                    <th class="text-end">Text clicks</th>
+                    <th class="text-end">Email clicks</th>
+                    <th class="text-end">Lead submissions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in acquisition.rows %}
+                <tr>
+                    <td class="text-break">{{ row.source }} / {{ row.medium }}</td>
+                    <td class="text-break">{{ row.campaign }}</td>
+                    <td class="text-end">{{ row.sessions }}</td>
+                    <td class="text-end">{{ row.converting_sessions }}</td>
+                    <td class="text-end">{{ row.conversion_rate }}%</td>
+                    <td class="text-end">{{ row.calls }}</td>
+                    <td class="text-end">{{ row.texts }}</td>
+                    <td class="text-end">{{ row.emails }}</td>
+                    <td class="text-end">{{ row.leads }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-muted">No matching sessions to attribute yet.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if acquisition.rows %}
+            <tfoot class="fw-bold">
+                <tr>
+                    <td colspan="2">Total</td>
+                    <td class="text-end">{{ acquisition.totals.sessions }}</td>
+                    <td class="text-end">{{ acquisition.totals.converting_sessions }}</td>
+                    <td class="text-end">{{ acquisition.totals.conversion_rate }}%</td>
+                    <td class="text-end">{{ acquisition.totals.calls }}</td>
+                    <td class="text-end">{{ acquisition.totals.texts }}</td>
+                    <td class="text-end">{{ acquisition.totals.emails }}</td>
+                    <td class="text-end">{{ acquisition.totals.leads }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+    <p class="small text-muted mt-3 mb-0">
+        Conversion rate = sessions with at least one contact click or reported lead submission / matching sessions.
+        Repeated actions count in the action columns, but each session converts only once.
+        Clicks indicate intent, not completed calls, texts, emails, or sales; submissions are browser-reported, not verified leads.
+        Unmatched events and bots are excluded. Facebook click IDs do not imply paid traffic.
+    </p>
+</div>
+
 {# ---- Top pages & landings ---- #}
 <div class="row g-4 mb-4">
     <div class="col-lg-7">

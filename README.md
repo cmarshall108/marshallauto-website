@@ -420,6 +420,37 @@ Client-side tracking lives in `app/static/js/main.js` (`MarshallAnalytics`). Eve
 
 UTM parameters (`utm_*`, `gclid`, `fbclid`) are stored in `sessionStorage` and attached to lead form submissions. Leads persist attribution fields in the database for reporting.
 
+### First-party source-to-inquiry reporting
+
+**Admin → Analytics → Source-to-inquiry performance** groups sessions by their
+first recorded source, medium, and campaign, and shows contact clicks,
+browser-reported lead submissions, converting sessions, and conversion rate.
+No external analytics service or new schema migration is required.
+
+- A session qualifies when it has a non-bot page view matching the selected date,
+  page-type, and device filters. Attribution uses its earliest recorded non-bot
+  page view, including landings before the reporting period or on another page type.
+- Only contact events within the reporting period, at or after that landing,
+  are counted. The page-type filter also applies to contact events; device
+  filtering selects sessions through their page views.
+- Events match on both anonymous visitor and session IDs, not just the page-view
+  ID, so contacts on later pages retain the landing source. Events without a
+  qualifying session are excluded.
+- Explicit UTM values take precedence. Otherwise Google click IDs map to
+  `google / cpc`; Facebook click IDs map to `facebook / (not set)` (not necessarily
+  paid); external referrers map to referral traffic and missing/internal
+  referrers map to direct traffic. Unknown campaign/medium values are labeled
+  `(not set)` rather than inferred.
+- Conversion rate is the percentage of qualifying sessions with at least one
+  call/text/email click or reported lead submission. Repeated actions increase
+  action counts, but never count a session as converting more than once.
+
+This is first-recorded-session attribution, not cross-session attribution.
+Current browser session IDs last for a tab's session, not a 30-minute inactivity
+window. Historical reporting depends on retained page views and captured tags.
+Contact clicks are intent signals, not completed conversations or sales, and
+browser-reported submissions are not reconciled with verified/non-spam leads.
+
 ## SEO Checklist
 
 ### Inventory and VIN indexing

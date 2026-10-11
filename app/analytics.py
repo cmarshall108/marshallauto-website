@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
-from flask import current_app, request
+from flask import current_app, has_request_context, request
 from sqlalchemy import case, func
 
 from app import db
@@ -535,6 +535,109 @@ def _avg(total, count):
     if not count:
         return 0.0
     return round(total / count, 1)
+
+
+def build_acquisition_report(start, end, page_type=None, device=None):
+    """Attribute in-range inquiries to the first recorded page of each session."""
+    eligible = _pv_filter(
+        db.session.query(PageView.visitor_id, PageView.session_id),
+        start, end, page_type=page_type, device=device,
+    ).distinct().subquery()
+    ranked = (
+        db.session.query(
+            PageView.visitor_id, PageView.session_id, PageView.created_at,
+            PageView.utm_source, PageView.utm_medium, PageView.utm_campaign,
+            PageView.gclid, PageView.fbclid, PageView.referrer_host,
+            func.row_number().over(
+                partition_by=(PageView.visitor_id, PageView.session_id),
+                order_by=(PageView.created_at, PageView.id),
+            ).label('position'),
+        )
+        .join(eligible, (PageView.visitor_id == eligible.c.visitor_id)
+              & (PageView.session_id == eligible.c.session_id))
+        .filter(PageView.device_type != 'bot', PageView.created_at <= end)
+        .subquery()
+    )
+    # Rank before applying date/page filters so later pages cannot steal credit.
+    landings = db.session.query(ranked).filter(ranked.c.position == 1).subquery()
+    event_names = ('click_to_call', 'click_to_sms', 'click_to_email', 'generate_lead')
+    events = _ev_filter(
+        db.session.query(
+            AnalyticsEvent.visitor_id, AnalyticsEvent.session_id,
+            *[
+                func.sum(case((AnalyticsEvent.event_name == name, 1), else_=0)).label(name)
+                for name in event_names
+            ],
+        ),
+        start, end,
+    ).join(
+        landings,
+        (AnalyticsEvent.visitor_id == landings.c.visitor_id)
+        & (AnalyticsEvent.session_id == landings.c.session_id),
+    ).filter(
+        AnalyticsEvent.event_name.in_(event_names),
+        AnalyticsEvent.created_at >= landings.c.created_at,
+    )
+    if page_type:
+        events = events.filter(AnalyticsEvent.page_type == page_type)
+    counts = events.group_by(
+        AnalyticsEvent.visitor_id, AnalyticsEvent.session_id,
+    ).subquery()
+    sessions = db.session.query(
+        landings,
+        *[func.coalesce(counts.c[name], 0).label(name) for name in event_names],
+    ).outerjoin(
+        counts,
+        (landings.c.visitor_id == counts.c.visitor_id)
+        & (landings.c.session_id == counts.c.session_id),
+    )
+
+    own_hosts = {_referrer_host(current_app.config.get('SITE_URL', ''))}
+    if has_request_context():
+        own_hosts.add(_referrer_host(request.url_root))
+    groups = {}
+    for session in sessions.yield_per(500):
+        referrer = session.referrer_host
+        external = bool(referrer and referrer not in own_hosts)
+        source = session.utm_source or (
+            'google' if session.gclid else
+            'facebook' if session.fbclid else
+            referrer if external else '(direct)'
+        )
+        medium = session.utm_medium or (
+            'cpc' if session.gclid else
+            '(not set)' if session.utm_source or session.fbclid else
+            'referral' if external else '(none)'
+        )
+        campaign = session.utm_campaign or '(not set)'
+        key = (source, medium, campaign)
+        if key not in groups:
+            groups[key] = {
+                'source': source, 'medium': medium, 'campaign': campaign,
+                'sessions': 0, 'converting_sessions': 0,
+                'calls': 0, 'texts': 0, 'emails': 0, 'leads': 0,
+            }
+        row = groups[key]
+        row['sessions'] += 1
+        values = [getattr(session, name) for name in event_names]
+        row['converting_sessions'] += int(any(values))
+        for metric, value in zip(('calls', 'texts', 'emails', 'leads'), values):
+            row[metric] += value
+
+    rows = sorted(
+        groups.values(),
+        key=lambda row: (
+            -row['converting_sessions'], -row['sessions'],
+            row['source'], row['medium'], row['campaign'],
+        ),
+    )
+    totals = {
+        key: sum(row[key] for row in rows)
+        for key in ('sessions', 'converting_sessions', 'calls', 'texts', 'emails', 'leads')
+    }
+    for row in [*rows, totals]:
+        row['conversion_rate'] = _pct(row['converting_sessions'], row['sessions'])
+    return {'rows': rows, 'totals': totals}
 
 
 def build_analytics_dashboard(args):
@@ -1107,6 +1210,7 @@ def build_analytics_dashboard(args):
         'referrers': referrers_data,
         'utm_sources': utm_sources_data,
         'utm_campaigns': utm_campaigns_data,
+        'acquisition': build_acquisition_report(start, end, page_type=page_type, device=device),
         'gclid_views': gclid_views,
         'fbclid_views': fbclid_views,
         'top_vehicles': top_vehicles_data,
