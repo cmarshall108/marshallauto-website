@@ -128,6 +128,13 @@ if ! FLASK_APP=run.py "$PYTHON" -m flask db upgrade; then
   exit 1
 fi
 
+# Publish only missing guides; preserve admin edits and publication choices.
+if ! FLASK_APP=run.py "$PYTHON" -m flask publish-buyer-guides; then
+  log "FAILED: buyer guide publication"
+  rollback
+  exit 1
+fi
+
 # Non-fatal: leftover photos stay HEIC and are retried next deploy.
 if ! FLASK_APP=run.py "$PYTHON" -m flask convert-heic; then
   log "WARNING: some HEIC photos could not be converted"

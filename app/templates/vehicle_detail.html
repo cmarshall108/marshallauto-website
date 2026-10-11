@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set gallery_sizes = "(min-width: 1400px) 746px, (min-width: 1200px) 641px, (min-width: 992px) 536px, (min-width: 768px) 696px, (min-width: 576px) 516px, calc(100vw - 24px)" %}
 
 {% block meta_title %}{{ meta_title }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
@@ -13,7 +14,10 @@
 {% block twitter_image %}{{ og_image_absolute or vehicle.primary_image_url(absolute=True) }}{% endblock %}
 
 {% block extra_head %}
-<link rel="preload" as="image" href="{{ vehicle.primary_image_url() }}" fetchpriority="high">
+{% set primary = vehicle.primary_image() %}
+<link rel="preload" as="image" href="{{ vehicle.primary_image_url() }}"
+      {% if primary and primary.srcset %}imagesrcset="{{ primary.srcset }}" imagesizes="{{ gallery_sizes }}"{% endif %}
+      fetchpriority="high">
 {% endblock %}
 
 {% block content %}
@@ -78,6 +82,8 @@
                     <div class="gallery-stage" id="gallery-stage">
                         <img id="main-gallery-image"
                              src="{{ vehicle.primary_image_url() }}"
+                             {% if primary and primary.srcset %}srcset="{{ primary.srcset }}"{% endif %}
+                             sizes="{{ gallery_sizes }}"
                              alt="{{ vehicle.title }} {{ vehicle.exterior_color or '' }} {{ 'for sale' if vehicle.status == 'available' else 'previous listing' }} in {{ business_city }}, {{ business_state }} at {{ business_name }}"
                              width="{{ primary.width if primary and primary.width else 800 }}"
                              height="{{ primary.height if primary and primary.height else 600 }}"
@@ -139,6 +145,7 @@
                     <button type="button"
                             class="thumbnail-btn{% if (primary and image.id == primary.id) or (not primary and loop.first) %} active{% endif %}"
                             data-full="{{ image.url }}"
+                            data-srcset="{{ image.srcset or '' }}"
                             data-index="{{ loop.index0 }}"
                             data-image-id="{{ image.id }}"
                             data-highlights='{{ image.highlights_payload() | tojson }}'
@@ -554,7 +561,8 @@
         <i class="bi bi-x-lg" aria-hidden="true"></i>
     </button>
     <div class="visit-prompt-intro">
-        <img src="{{ vehicle.primary_image_url() }}" alt="" width="72" height="54" loading="lazy">
+        {% set visit_image = vehicle.primary_image() %}
+        <img src="{{ visit_image.variant_url('thumbnail') if visit_image else vehicle.primary_image_url() }}" alt="" width="72" height="54" loading="lazy">
         <div>
             <h2 id="visit-prompt-title">Want a closer look?</h2>
             <p>Come see this {{ vehicle.make }} {{ vehicle.model }} at Marshall Auto.</p>
@@ -567,6 +575,7 @@
     </div>
 </aside>
 {% endif %}
+{% include "_buyer_guides.html" %}
 {% endblock %}
 
 {% block extra_js %}

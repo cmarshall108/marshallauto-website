@@ -64,6 +64,36 @@ Individual photos can be deleted; deleting a vehicle also removes its sale photo
 a vehicle retains its private sale records for later use, without changing the
 public price. Run `flask db upgrade` before deploying this feature.
 
+## Buyer guides and local SEO
+
+Three starter articles cover North Carolina salvage/rebuilt titles, rebuilt-title
+financing, and a used-car inspection checklist. Their legal and loan references
+link to NC General Statutes and the CFPB; they do not promise safety certification,
+financing approval, or insurance coverage.
+
+After upgrading the database, publish them with:
+
+```bash
+venv/bin/python -m flask --app run publish-buyer-guides
+```
+
+On its first run, the command inserts only missing article slugs and sets actual
+publication dates. A database setting records completion, so later runs also
+respect deleted articles. It never overwrites existing articles, edits, or unpublished drafts. Manage them
+through **Admin -> Blog** afterward. The pull-based auto-deployer runs this command
+after migrations; other deployment methods must run it explicitly. Published
+guides appear in the blog, sitemap, inventory, vehicle detail, and service-area
+pages. Related articles exclude drafts and the current article.
+
+Local inventory pages use the configured business address/hours and map directions
+from the selected service area. They do not invent travel times, branch locations,
+or customer stories. Keep business configuration accurate.
+
+Vehicle hero images reuse the existing responsive variants, with matching
+responsive preloads and gallery navigation. Blog covers reserve a 16:9 display
+area without cropping the article image. Measure mobile performance and organic
+inquiries in production; these changes do not guarantee rankings.
+
 ## Admin two-factor authentication
 
 Two-factor authentication is **off by default**, including for accounts that

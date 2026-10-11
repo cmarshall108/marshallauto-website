@@ -26,7 +26,10 @@
         <h1 class="fw-bold mb-2">{{ post.title }}</h1>
         <p class="text-muted mb-0">
             {% if post.author_name %}By {{ post.author_name }} &middot; {% endif %}
-            {{ (post.published_at or post.created_at).strftime('%B %-d, %Y') }}
+            Published <time datetime="{{ (post.published_at or post.created_at).isoformat() }}Z">{{ (post.published_at or post.created_at).strftime('%B %-d, %Y') }}</time>
+            {% if post.updated_at and post.updated_at.date() > (post.published_at or post.created_at).date() %}
+            &middot; Updated <time datetime="{{ post.updated_at.isoformat() }}Z">{{ post.updated_at.strftime('%B %-d, %Y') }}</time>
+            {% endif %}
         </p>
     </div>
 </section>
@@ -36,11 +39,28 @@
         <div class="row justify-content-center">
             <div class="col-lg-8">
                 {% if post.cover_image_url %}
-                <img src="{{ post.cover_image_url }}" class="img-fluid rounded-4 shadow-sm mb-4" alt="{{ post.title }}">
+                <div class="ratio ratio-16x9 mb-4">
+                    <img src="{{ post.cover_image_url }}" class="rounded-4 shadow-sm w-100 h-100 object-fit-contain" alt="{{ post.title }}" width="1200" height="675" fetchpriority="high">
+                </div>
                 {% endif %}
                 <div class="blog-post-content">
                     {{ post.content | safe }}
                 </div>
+                <aside class="border-top mt-4 pt-4" aria-label="About the publisher">
+                    <h2 class="h5 fw-bold">About {{ business_name }}</h2>
+                    <p>We are a used-car dealership at {{ business_address }}, {{ business_city }}, {{ business_state }} {{ business_zip }}. <a href="{{ url_for('main.about') }}">Learn about our dealership</a> or <a href="{{ url_for('main.contact') }}">ask us about a specific vehicle</a>.</p>
+                    <p class="small text-muted">This guide is general information, not a vehicle inspection, legal advice, or a financing or insurance guarantee. Verify current requirements and the details of the vehicle you are considering.</p>
+                </aside>
+                {% if related_posts %}
+                <aside class="mt-4" aria-label="Related buying guides">
+                    <h2 class="h5 fw-bold">More buying guides</h2>
+                    <ul>
+                        {% for related in related_posts %}
+                        <li><a href="{{ url_for('main.blog_post_detail', slug=related.slug) }}">{{ related.title }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </aside>
+                {% endif %}
                 <hr class="my-5">
                 <div class="text-center">
                     <a href="{{ url_for('main.blog_list') }}" class="btn btn-outline-primary">&larr; Back to Blog</a>

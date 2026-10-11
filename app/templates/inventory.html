@@ -241,6 +241,33 @@
 </section>
 {% endif %}
 
+{% if landing_area %}
+<section class="section-padding bg-light-brand">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <h2 class="fw-bold">Plan your visit from {{ landing_area[0] }}</h2>
+                <p>Our dealership is at {{ business_address }}, {{ business_city }}, {{ business_state }} {{ business_zip }}{% if landing_area[0] != business_city %}, not in {{ landing_area[0] }}{% endif %}. The vehicles above are our current listings at this location.</p>
+                <p>Before traveling, <a href="{{ url_for('main.contact') }}">contact us</a> with the stock number or VIN to confirm availability and arrange a test drive. Ask about title status, available CarFax reports, service records, and any condition notes for the vehicle you want to see.</p>
+                <a class="btn btn-primary" href="https://www.google.com/maps/dir/?api=1&amp;origin={{ (landing_area[0] ~ ', ' ~ landing_area[1]) | urlencode }}&amp;destination={{ (business_address ~ ', ' ~ business_city ~ ', ' ~ business_state ~ ' ' ~ business_zip) | urlencode }}" target="_blank" rel="noopener">Directions from {{ landing_area[0] }}</a>
+                <a class="btn btn-outline-primary" href="{{ url_for('main.financing') }}">Ask about financing</a>
+            </div>
+            <div class="col-lg-5">
+                <h3 class="h5 fw-bold">Dealership hours in {{ business_city }}</h3>
+                <dl class="row mb-0">
+                    {% for day, hours in business_hours.items() %}
+                    <dt class="col-5">{{ day }}</dt><dd class="col-7">{{ hours }}</dd>
+                    {% endfor %}
+                </dl>
+                <p class="small mb-0">Financing approval and insurance availability depend on the applicant, lender, insurer, and vehicle. Confirm terms before committing to a purchase.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% include "_buyer_guides.html" %}
+
 {% if landing_faqs %}
 <section class="section-padding bg-light-brand">
     <div class="container">

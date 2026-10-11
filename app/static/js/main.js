@@ -614,6 +614,7 @@
                     el,
                     index,
                     src: el.dataset.full || (img && (img.dataset.full || img.currentSrc || img.src)) || '',
+                    srcset: el.dataset.srcset || '',
                     alt: (img && img.alt) || mainImage.alt || '',
                     highlights: parseHighlights(el.dataset.highlights),
                     imageId: el.dataset.imageId || null,
@@ -933,6 +934,11 @@
                         gallery.classList.add('is-changing');
                     }
                     mainImage.style.transform = 'translate3d(0,0,0)';
+                    if (slide.srcset) {
+                        mainImage.setAttribute('srcset', slide.srcset);
+                    } else {
+                        mainImage.removeAttribute('srcset');
+                    }
                     if (mainImage.getAttribute('src') !== slide.src) {
                         mainImage.src = slide.src;
                     }
@@ -983,6 +989,10 @@
                             const n = slides[((i % total) + total) % total];
                             if (!n) return;
                             const pre = new Image();
+                            if (n.srcset) {
+                                pre.sizes = mainImage.sizes;
+                                pre.srcset = n.srcset;
+                            }
                             pre.src = n.src;
                         });
                     }
@@ -1352,6 +1362,10 @@
                 if (multi) {
                     slides.forEach((slide) => {
                         const img = new Image();
+                        if (slide.srcset) {
+                            img.sizes = mainImage.sizes;
+                            img.srcset = slide.srcset;
+                        }
                         img.src = slide.src;
                     });
                 }

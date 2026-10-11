@@ -1,12 +1,13 @@
 import json
 import unittest
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
 
 from app import create_app, db
-from app.models import Vehicle
+from app.buyer_guides import BUYER_GUIDES
+from app.models import BlogPost, Vehicle, VehicleImage
 from config import TestingConfig
 
 
@@ -158,3 +159,135 @@ class SeoTests(unittest.TestCase):
         vehicle = next(schema for schema in schemas if schema.get('@type') == 'Car')
         self.assertNotIn('priceValidUntil', vehicle['offers'])
         self.assertEqual(vehicle['offers']['availability'], 'https://schema.org/InStock')
+
+    def publish_guides(self):
+        result = self.app.test_cli_runner().invoke(args=['publish-buyer-guides'])
+        self.assertEqual(result.exit_code, 0, result.output)
+        return result
+
+    def test_guides_publish_once_and_preserve_admin_changes(self):
+        self.assertIn('Published 3', self.publish_guides().output)
+        guide = BlogPost.query.filter_by(slug=BUYER_GUIDES[0]['slug']).one()
+        published_at = guide.published_at
+        guide.content = '<p>Edited by admin</p>'
+        guide.is_published = False
+        db.session.commit()
+        updated_at = guide.updated_at
+        self.assertIn('Published 0', self.publish_guides().output)
+        db.session.refresh(guide)
+        self.assertEqual(BlogPost.query.count(), 3)
+        self.assertEqual(guide.content, '<p>Edited by admin</p>')
+        self.assertFalse(guide.is_published)
+        self.assertEqual(guide.published_at, published_at)
+        self.assertEqual(guide.updated_at, updated_at)
+        self.assertEqual(self.client.get(f'/blog/{guide.slug}').status_code, 404)
+        self.assertNotIn(f'http://localhost/blog/{guide.slug}', self.sitemap_pages())
+        for path in ('/inventory', '/service-area', '/inventory/test-car-0'):
+            html = self.page(path)
+            self.assertIsNone(html.select_one(f'a[href="/blog/{guide.slug}"]'))
+
+    def test_guides_are_indexable_linked_and_have_real_schema_dates(self):
+        self.publish_guides()
+        sitemap = self.sitemap_pages()
+        for guide in BlogPost.query.all():
+            path = f'/blog/{guide.slug}'
+            html = self.page(path)
+            self.assertEqual(html.select_one('link[rel="canonical"]')['href'],
+                             f'http://localhost{path}')
+            self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'index, follow')
+            schema = next(json.loads(script.string)
+                          for script in html.select('script[type="application/ld+json"]')
+                          if json.loads(script.string).get('@type') == 'Article')
+            self.assertEqual(schema['datePublished'], guide.published_at.isoformat() + 'Z')
+            self.assertEqual(schema['dateModified'], guide.updated_at.isoformat() + 'Z')
+            self.assertEqual(sitemap[f'http://localhost{path}'].text,
+                             guide.updated_at.isoformat() + 'Z')
+            self.assertTrue(html.select('.blog-post-content a[href^="https://"]'))
+            for anchor in html.select('.blog-post-content a[href^="/"]'):
+                self.assertEqual(self.client.get(anchor['href']).status_code, 200, anchor['href'])
+            for source in ('/blog', '/inventory', '/service-area', '/inventory/test-car-0'):
+                self.assertIsNotNone(self.page(source).select_one(f'a[href="{path}"]'))
+            related = html.select_one('aside[aria-label="Related buying guides"]')
+            self.assertIsNotNone(related)
+            self.assertIsNone(related.select_one(f'a[href="{path}"]'))
+
+    def test_guide_initialization_preserves_existing_draft_and_later_deletion(self):
+        draft = BlogPost(slug=BUYER_GUIDES[0]['slug'], title='Existing draft',
+                         content='<p>Original draft</p>', is_published=False)
+        db.session.add(draft)
+        db.session.commit()
+        self.assertIn('Published 2', self.publish_guides().output)
+        db.session.refresh(draft)
+        self.assertEqual(draft.title, 'Existing draft')
+        self.assertFalse(draft.is_published)
+        self.assertIsNone(draft.published_at)
+        db.session.delete(draft)
+        db.session.commit()
+        self.assertIn('Published 0', self.publish_guides().output)
+        self.assertEqual(BlogPost.query.count(), 2)
+
+    def test_article_dates_cover_space_and_draft_related_exclusion(self):
+        self.publish_guides()
+        guide = BlogPost.query.first()
+        guide.cover_image_url = '/static/images/og-default.jpg'
+        guide.published_at = datetime(2026, 1, 1)
+        guide.updated_at = guide.published_at + timedelta(days=2)
+        draft = BlogPost.query.filter(BlogPost.id != guide.id).first()
+        draft.is_published = False
+        db.session.commit()
+        html = self.page(f'/blog/{guide.slug}')
+        self.assertEqual(len(html.select('time')), 2)
+        image = html.select_one('.ratio-16x9 img')
+        self.assertEqual((image['width'], image['height']), ('1200', '675'))
+        self.assertIn('object-fit-contain', image['class'])
+        related = html.select_one('aside[aria-label="Related buying guides"]')
+        self.assertIsNone(related.select_one(f'a[href="/blog/{draft.slug}"]'))
+
+    def test_local_visit_details_use_configuration_and_actual_location(self):
+        self.app.config.update(
+            BUSINESS_ADDRESS='123 Test Street', BUSINESS_CITY='Sanford',
+            BUSINESS_HOURS={'Monday': '11:00 AM - 5:00 PM'},
+        )
+        for prefix in ('used-cars', 'used-toyota', 'used-sedans'):
+            html = self.page(f'/inventory/{prefix}-for-sale-in-raleigh-nc')
+            text = html.get_text(' ', strip=True)
+            self.assertIn('123 Test Street', text)
+            self.assertIn('not in Raleigh', text)
+            self.assertIn('11:00 AM - 5:00 PM', text)
+            directions = html.select_one('a[href*="maps/dir/"]')
+            self.assertIn('origin=Raleigh', directions['href'])
+            self.assertIn('destination=123', directions['href'])
+            self.assertIsNotNone(html.select_one('.vehicle-card'))
+        self.assertNotIn('not in Sanford', self.page(
+            '/inventory/used-cars-for-sale-in-sanford-nc').get_text())
+        self.assertIsNone(self.page('/inventory').select_one('a[href*="origin="]'))
+
+    def test_vehicle_hero_preload_and_slides_share_responsive_candidates(self):
+        vehicle = Vehicle.query.filter_by(slug='test-car-0').one()
+        db.session.add_all([
+            VehicleImage(vehicle_id=vehicle.id, filename='hero.jpg', width=1200,
+                         height=900, is_primary=True),
+            VehicleImage(vehicle_id=vehicle.id, filename='small.jpg', width=250, height=200),
+        ])
+        db.session.commit()
+        html = self.page('/inventory/test-car-0')
+        hero = html.select_one('#main-gallery-image')
+        preload = html.select_one('link[rel="preload"][as="image"][fetchpriority="high"]')
+        self.assertEqual(hero['srcset'], preload['imagesrcset'])
+        self.assertEqual(hero['sizes'], preload['imagesizes'])
+        self.assertEqual(hero['src'], preload['href'])
+        self.assertIn('hero_thumbnail.jpg 300w', hero['srcset'])
+        self.assertIn('hero_card.jpg 600w', hero['srcset'])
+        self.assertIn('hero.jpg 1200w', hero['srcset'])
+        self.assertNotIn('hero_detail', hero['srcset'])
+        thumbs = html.select('.thumbnail-btn')
+        self.assertEqual(thumbs[0]['data-srcset'], hero['srcset'])
+        self.assertEqual(thumbs[1]['data-srcset'], '')
+
+    def test_vehicle_without_images_keeps_hero_fallback(self):
+        html = self.page('/inventory/test-car-0')
+        hero = html.select_one('#main-gallery-image')
+        preload = html.select_one('link[rel="preload"][as="image"][fetchpriority="high"]')
+        self.assertEqual(hero['src'], preload['href'])
+        self.assertNotIn('srcset', hero.attrs)
+        self.assertNotIn('imagesrcset', preload.attrs)

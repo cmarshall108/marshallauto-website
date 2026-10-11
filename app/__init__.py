@@ -108,6 +108,8 @@ def create_app(config_class=None):
     app.register_blueprint(admin_bp, url_prefix='/admin')
     from app.two_factor import register_commands
     register_commands(app)
+    from app.buyer_guides import register_commands as register_buyer_guide_commands
+    register_buyer_guide_commands(app)
 
     # Public analytics beacon (sendBeacon / no form token)
     csrf.exempt(analytics_collect)

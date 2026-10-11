@@ -14,6 +14,7 @@ from app import db
 from app.forms import ContactForm
 from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, VehicleImage
 from app.models import BlogPost
+from app.buyer_guides import published_buyer_guides
 from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import is_valid_vin, normalize_vin
 from app.utils import (
@@ -287,6 +288,8 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         analytics_inventory=analytics_inventory,
         landing_faqs=landing_faqs or [],
         inventory_links=inventory_links,
+        landing_area=area if landing_h1 else None,
+        buyer_guides=published_buyer_guides(),
     )
 
 
@@ -813,6 +816,7 @@ def service_area():
     return render_template(
         'service_area.html',
         areas=areas,
+        buyer_guides=published_buyer_guides(),
         area_inventory_links=area_inventory_links,
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
@@ -984,6 +988,7 @@ def vehicle_detail(slug):
     return render_template(
         'vehicle_detail.html',
         vehicle=vehicle,
+        buyer_guides=published_buyer_guides(),
         related=related,
         form=form,
         structured_vehicle=structured_vehicle,
@@ -1431,8 +1436,8 @@ def blog_post_detail(slug):
             "name": current_app.config['BUSINESS_NAME'],
             "logo": {"@type": "ImageObject", "url": f"{site}/static/images/logo-icon.png"},
         },
-        "datePublished": post.published_at.strftime('%Y-%m-%dT%H:%M:%S') if post.published_at else None,
-        "dateModified": post.updated_at.strftime('%Y-%m-%dT%H:%M:%S') if post.updated_at else None,
+        "datePublished": (post.published_at or post.created_at).isoformat() + 'Z',
+        "dateModified": (post.updated_at or post.created_at).isoformat() + 'Z',
         "mainEntityOfPage": f"{site}/blog/{post.slug}",
     }
     if post.cover_image_url:
@@ -1442,6 +1447,10 @@ def blog_post_detail(slug):
     return render_template(
         'blog_post.html',
         post=post,
+        related_posts=(
+            BlogPost.query.filter(BlogPost.is_published.is_(True), BlogPost.id != post.id)
+            .order_by(BlogPost.published_at.desc(), BlogPost.id.desc()).limit(3).all()
+        ),
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),

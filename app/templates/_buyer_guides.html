@@ -1,0 +1,19 @@
+{% if buyer_guides %}
+<section class="section-padding">
+    <div class="container">
+        <h2 class="fw-bold mb-4">Research before you buy</h2>
+        <div class="row g-4">
+            {% for guide in buyer_guides %}
+            <div class="col-md-4">
+                <article class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <h3 class="h5"><a href="{{ url_for('main.blog_post_detail', slug=guide.slug) }}">{{ guide.title }}</a></h3>
+                        <p class="text-muted mb-0">{{ guide.excerpt }}</p>
+                    </div>
+                </article>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
