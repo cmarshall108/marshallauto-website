@@ -35,6 +35,9 @@
 .chat-has-unread { outline: 3px solid #d6bc90; outline-offset: 3px; }
 .chat-sound-toggle { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 .chat-sound-toggle .bi { font-size: 1.2rem; line-height: 1; }
+.chat-send-actions { display: flex; align-items: stretch; gap: 0.5rem; }
+.chat-send-actions > [type="submit"] { flex: 1; min-width: 0; }
+.chat-send-actions > .chat-sound-toggle { flex: 0 0 auto; }
 .chat-messages-admin { height: 420px; }
 .chat-conversation-list { max-height: 540px; overflow-y: auto; }
 .chat-conversation-item { display: block; width: 100%; text-align: left; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid #dedede; border-radius: 10px; background: #fff; color: #303236; overflow-wrap: anywhere; }

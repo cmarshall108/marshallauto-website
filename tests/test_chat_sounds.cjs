@@ -75,7 +75,7 @@ test('incoming-message sound waits for interaction and never plays initial histo
     await s.handlers.click();
     assert.equal(s.button.attributes['aria-label'], 'Sounds on');
     assert.equal(s.button.icon.className, 'bi bi-volume-up');
-    assert.match(s.button.title, /^Sounds on/);
+    assert.match(s.button.title, /Mute sounds for new incoming chat messages/);
     s.sounds.observe('chat', 11);
     assert.equal(s.played.length, 0);
     s.sounds.observe('chat', 12);
@@ -95,6 +95,7 @@ test('mute persists, suppresses incoming sounds, and synchronizes between tabs',
     s.button.listeners.click();
     assert.equal(s.button.attributes['aria-label'], 'Sounds off');
     assert.equal(s.button.icon.className, 'bi bi-volume-mute');
+    assert.match(s.button.title, /Turn on sounds for new incoming chat messages/);
     assert.equal(s.values.get('marshall-chat-sounds-customer'), 'off');
     s.sounds.observe('chat', 2);
     assert.equal(s.played.length, 0);
@@ -198,6 +199,7 @@ test('customer widget baselines recovered history and notifies only new agent me
                 toggle(name, active) { if (active) classes.add(name); else classes.delete(name); },
             },
             setAttribute() {}, focus() {}, replaceChildren() {},
+            appendChild(child) { child.parentElement = this; },
             addEventListener(event, callback) { this.listeners[event] = callback; },
             querySelector(selector) { return element(id + selector); },
         };
@@ -230,6 +232,7 @@ test('customer widget baselines recovered history and notifies only new agent me
     const flush = () => new Promise(resolve => setImmediate(resolve));
     await flush();
     assert.deepEqual(observations, [['first-chat', 2]]);
+    assert.equal(element('customer-chat-sounds').parentElement, element('chat-reply-actions'));
     messages.push({ id: 3, sender: 'customer' });
     await intervals[0]();
     await flush();
@@ -248,4 +251,9 @@ test('customer widget baselines recovered history and notifies only new agent me
     await flush();
     assert.deepEqual(observations[2], ['second-chat', 6]);
     assert.equal(rendered.length, 6);
+    conversation = null;
+    await intervals[0]();
+    await flush();
+    element('chat-new').listeners.click();
+    assert.equal(element('customer-chat-sounds').parentElement, element('chat-initial-actions'));
 });

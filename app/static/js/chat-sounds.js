@@ -13,7 +13,10 @@
                 ? 'bi-volume-mute' : context && context.state === 'running' ? 'bi-volume-up' : 'bi-volume-down');
             button.setAttribute('aria-label', label);
             button.setAttribute('aria-pressed', String(enabled && !!AudioContext && !failed));
-            button.title = label + '. Incoming-message sounds. Browsers require a click or keypress before audio can play.';
+            button.title = !AudioContext || failed ? 'Incoming-message sounds are unavailable in this browser.'
+                : !enabled ? 'Turn on sounds for new incoming chat messages.'
+                : context && context.state === 'running' ? 'Mute sounds for new incoming chat messages.'
+                : 'Enable sounds for new incoming chat messages. Click to allow audio playback.';
             button.disabled = !AudioContext || failed;
         }
         async function unlock() {

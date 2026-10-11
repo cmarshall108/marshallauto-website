@@ -16,7 +16,8 @@
         var end = document.getElementById('chat-end');
         var newChat = document.getElementById('chat-new');
         var csrf = form.querySelector('[name="csrf_token"]').value;
-        var sounds = window.MarshallChatSounds.create(document.getElementById('customer-chat-sounds'), 'customer');
+        var soundButton = document.getElementById('customer-chat-sounds');
+        var sounds = window.MarshallChatSounds.create(soundButton, 'customer');
         var online = false, conversation = null, cursor = 0, polling = false;
         var transcriptLoaded = false;
         var startingNew = false, initialSending = false, pending = null, transcriptPending = null;
@@ -26,6 +27,8 @@
         }
         function clearError() { errorEl.classList.add('d-none'); }
         function renderStatus() {
+            var actions = document.getElementById(conversation ? 'chat-reply-actions' : 'chat-initial-actions');
+            if (soundButton.parentElement !== actions) actions.appendChild(soundButton);
             if (conversation) {
                 statusEl.textContent = conversation.blocked
                     ? 'This chat was blocked by our team. Please call us for assistance.'

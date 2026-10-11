@@ -107,7 +107,10 @@ and changed passwords invalidate stored presence.
 - A quiet two-tone incoming-message chime is available on customer pages and
   throughout the authenticated admin panel, not just the inbox. Use the **speaker
   icon** to enable or mute sounds; its icon, accessible label, and tooltip reflect
-  the current state. A muted speaker means sounds are off. Browsers require a
+  the current state. On customer pages it sits to the right of the initial
+  Send Message button and moves beside Send during a live chat. Its tooltip
+  explains how to enable or mute incoming-message sounds.
+  A muted speaker means sounds are off. Browsers require a
   click or keypress before audio playback; suspended
   audio or background throttling can prevent/delay a sound. The mute preference
   is stored locally, separately for staff and customers. Initial transcript
