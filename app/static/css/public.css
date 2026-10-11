@@ -1,0 +1,322 @@
+/* Public storefront only; the admin retains its existing theme. */
+.public-site {
+    --primary: #353b42;
+    --primary-dark: #202428;
+    --secondary: #876334;
+    --dark: #25282c;
+    --light: #faf8f4;
+    --text-muted: #686660;
+    --accent: #d6bc90;
+    --surface: #fffefa;
+    --line: #e4dfd6;
+    --border-radius: 18px;
+    --box-shadow: 0 8px 28px rgba(37, 40, 44, 0.06);
+    --bs-primary: #353b42;
+    --bs-primary-rgb: 53, 59, 66;
+    --bs-secondary-rgb: 104, 102, 96;
+    --bs-light-rgb: 250, 248, 244;
+    --bs-dark-rgb: 37, 40, 44;
+    --bs-body-color: #303236;
+    --bs-body-bg: #faf8f4;
+    --bs-secondary-color: #686660;
+    --bs-border-color: #e4dfd6;
+    --bs-link-color: #353b42;
+    --bs-link-hover-color: #202428;
+    --bs-link-color-rgb: 53, 59, 66;
+    --bs-link-hover-color-rgb: 32, 36, 40;
+    background: var(--light);
+    color: var(--bs-body-color);
+    -webkit-font-smoothing: antialiased;
+}
+
+.public-site h1,
+.public-site h2,
+.public-site h3 {
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+}
+
+.public-site .brand-primary { color: var(--dark); }
+.public-site .brand-secondary { color: var(--secondary); margin-left: 0.25em; }
+.public-site .bg-light-brand { background-color: #f1eee7 !important; }
+.public-site .top-bar { background: var(--dark); letter-spacing: 0.015em; }
+.public-site .top-bar .bi { color: var(--accent); }
+
+.public-site .navbar {
+    background: rgba(255, 254, 250, 0.97) !important;
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 4px 20px rgba(37, 40, 44, 0.03) !important;
+    padding-block: 1.1rem;
+}
+
+.public-site .navbar-brand { font-size: 1.35rem; letter-spacing: -0.04em; }
+.public-site .navbar-brand img { width: 36px; height: 36px; }
+.public-site .navbar .nav-link {
+    color: #52534f !important;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-inline: 0.1rem;
+    border-radius: 8px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.public-site .navbar .nav-link:hover,
+.public-site .navbar .nav-link.active {
+    color: var(--dark) !important;
+    background: #f0ebe2;
+}
+.public-site .navbar-toggler { border-color: var(--line); min-height: 44px; }
+
+.public-site .btn {
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.public-site .btn-sm { padding: 0.55rem 0.9rem; }
+.public-site .btn-lg { padding: 0.95rem 1.5rem; font-size: 1rem; }
+.public-site .btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #353b42;
+    --bs-btn-border-color: #353b42;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #202428;
+    --bs-btn-hover-border-color: #202428;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #202428;
+    --bs-btn-active-border-color: #202428;
+    --bs-btn-disabled-bg: #353b42;
+    --bs-btn-disabled-border-color: #353b42;
+    --bs-btn-focus-shadow-rgb: 135, 99, 52;
+}
+.public-site .btn-secondary {
+    --bs-btn-color: #25282c;
+    --bs-btn-active-color: #25282c;
+    --bs-btn-active-bg: #c5a978;
+    --bs-btn-active-border-color: #c5a978;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--dark);
+}
+.public-site .btn-secondary:hover { background: #c5a978; border-color: #c5a978; color: var(--dark); }
+.public-site .btn-outline-primary,
+.public-site .btn-outline-secondary {
+    --bs-btn-color: #353b42;
+    --bs-btn-border-color: #b6b0a6;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #353b42;
+    --bs-btn-hover-border-color: #353b42;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #353b42;
+    --bs-btn-active-border-color: #353b42;
+    --bs-btn-focus-shadow-rgb: 135, 99, 52;
+    color: var(--primary);
+    border-color: #b6b0a6;
+}
+.public-site .btn-outline-primary:hover { background: var(--primary); color: #fff; }
+.public-site :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid #876334;
+    outline-offset: 3px;
+}
+.public-site :is(.top-bar, .footer, .cta-section, .mobile-cta-bar, .compare-bar, .cookie-consent-banner) :focus-visible,
+.public-site .hero-section .col-lg-7 :focus-visible { outline-color: #e3cba5; }
+
+.public-site .hero-section {
+    min-height: 660px;
+    padding-block: 5rem;
+    background: linear-gradient(90deg, rgba(25, 28, 31, 0.94), rgba(25, 28, 31, 0.6) 58%, rgba(25, 28, 31, 0.35)),
+        url('../images/gallardo_cover.jpg') center / cover no-repeat;
+}
+.public-site .hero-section h1 {
+    font-size: clamp(2.5rem, 4.2vw, 4.25rem);
+    line-height: 1.06;
+    font-weight: 700;
+    max-width: 12ch;
+    text-shadow: none;
+    margin-bottom: 1.5rem;
+}
+.public-site .hero-section p { font-size: 1.05rem; text-shadow: none; max-width: 34rem; }
+.public-site .hero-section .hero-eyebrow,
+.public-site .section-eyebrow {
+    display: block;
+    color: var(--secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 0.9rem;
+    opacity: 1;
+}
+.public-site .hero-section .hero-eyebrow { color: #e3cba5; }
+.public-site .hero-badges .badge {
+    color: #f2e8d9;
+    border: 1px solid rgba(214, 188, 144, 0.4);
+    background: rgba(37, 40, 44, 0.4);
+    font-size: 0.7rem;
+    font-weight: 500;
+    border-radius: 999px;
+}
+.public-site :is(.hero-section, .cta-section, .mobile-cta-bar) .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--dark);
+}
+.public-site :is(.hero-section, .cta-section, .mobile-cta-bar) .btn-primary:hover,
+.public-site :is(.hero-section, .cta-section, .mobile-cta-bar) .btn-primary:active {
+    background: #e6d1ae;
+    border-color: #e6d1ae;
+    color: var(--dark);
+}
+.public-site .hero-section .btn-outline-light { border-color: #aea99f; }
+.public-site .search-box {
+    background: var(--surface);
+    color: var(--dark);
+    padding: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+    max-width: 420px;
+    margin-left: auto;
+}
+.public-site .search-box h5 { font-size: 1.45rem; letter-spacing: -0.035em; margin-bottom: 0.5rem !important; }
+.public-site .hero-section .search-box-subtitle { color: var(--text-muted); font-size: 0.9rem; opacity: 1; }
+.public-site .search-box .btn { margin-top: 0.75rem; }
+.public-site .hero-assurances { background: var(--surface); border-bottom: 1px solid var(--line); }
+.public-site .hero-assurances .container { display: flex; justify-content: center; flex-wrap: wrap; gap: 1rem 3rem; padding-block: 1.35rem; }
+.public-site .hero-assurances .container > div { display: flex; align-items: center; gap: 0.65rem; font-size: 0.8rem; font-weight: 500; }
+.public-site .hero-assurances .bi { color: var(--secondary); font-size: 1.1rem; }
+
+.public-site .section-padding { padding-block: 5.5rem; }
+.public-site .section-title { font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 700; }
+.public-site .section-subtitle { font-size: 1rem; line-height: 1.75; }
+.public-site .vehicle-card,
+.public-site .coming-soon-card,
+.public-site .card,
+.public-site .contact-info-card,
+.public-site .filter-sidebar,
+.public-site .modal-content {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--line);
+    box-shadow: var(--box-shadow);
+}
+.public-site .card.border-0 { border: 1px solid var(--line) !important; }
+.public-site .card:is(.shadow, .shadow-sm) { box-shadow: var(--box-shadow) !important; }
+.public-site .vehicle-card .card-body { padding: 1.5rem !important; }
+.public-site .vehicle-card .card-title { font-size: 1.1rem; letter-spacing: -0.025em; line-height: 1.4; }
+.public-site .vehicle-card .price { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.04em; margin-top: 0.75rem; }
+.public-site .vehicle-card .badge-condition { background: rgba(37, 40, 44, 0.92); }
+.public-site .vehicle-card .vehicle-card-badges { top: auto; bottom: 0.75rem; left: 0.75rem; right: auto; justify-content: flex-start; max-width: calc(100% - 1.5rem); }
+.public-site .vehicle-card .badge-title-status { box-shadow: none; border-radius: 6px; }
+.public-site .vehicle-card > .favorite-btn { width: 44px; height: 44px; }
+.public-site .badge.bg-warning { background-color: #eee3cf !important; color: #65491f !important; }
+.public-site .badge.bg-success { background-color: #e4eee3 !important; color: #315231; }
+.public-site .badge.bg-danger { background-color: #f5e1df !important; color: #8b3532; }
+.public-site .text-warning { color: #876334 !important; }
+.public-site .badge-low-miles {
+    background: #eee5d6;
+    color: #65491f;
+    border: 1px solid #d5c4a7;
+    box-shadow: none;
+    animation: none;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.public-site .savings-callout,
+.public-site .savings-banner {
+    background: #edf2eb;
+    color: #3a5939;
+    border: 1px solid #d3dfcf;
+    box-shadow: none;
+    animation: none;
+}
+.public-site .savings-callout { border-radius: 6px; flex-wrap: wrap; font-size: 0.72rem; }
+.public-site .savings-banner { border-radius: 12px; }
+.public-site .feature-icon { background: #eee7db; color: var(--secondary); border-radius: 18px; }
+.public-site .ownership-section .col-md-4 { padding-block: 1rem; }
+.public-site .feature-tag { background: #efebe3; color: var(--dark); }
+.public-site .vehicle-price { color: var(--dark); font-weight: 700; letter-spacing: -0.04em; }
+.public-site .gallery-toolbar { background: #eeeae2; border-color: var(--line); }
+.public-site .gallery-mode-btn { color: #555650; }
+.public-site .gallery-mode-btn.active,
+.public-site .vehicle-gallery,
+.public-site .gallery-stage { background: var(--dark); }
+
+.public-site .form-label { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.4rem; color: #52534f; }
+.public-site .form-control,
+.public-site .form-select { background-color: #fffefa; border-color: #d4cfc5; color: var(--dark); min-height: 46px; }
+.public-site .form-control::placeholder { color: #757168; }
+.public-site .form-control:focus,
+.public-site .form-select:focus { border-color: #876334; box-shadow: 0 0 0 0.2rem rgba(135, 99, 52, 0.13); }
+.public-site .form-check-input:checked { background-color: var(--dark); border-color: var(--dark); }
+.public-site .form-control:disabled,
+.public-site .form-select:disabled { background-color: #eeebe4; }
+.public-site .accordion {
+    --bs-accordion-bg: #fffefa;
+    --bs-accordion-border-color: #e4dfd6;
+    --bs-accordion-border-radius: 14px;
+    --bs-accordion-inner-border-radius: 13px;
+    --bs-accordion-active-bg: #f0ebe2;
+    --bs-accordion-active-color: #353b42;
+    --bs-accordion-btn-focus-box-shadow: 0 0 0 0.2rem rgba(135, 99, 52, 0.13);
+}
+.public-site .accordion-button { font-weight: 600; padding: 1.3rem; }
+.public-site .page-link { background: var(--surface); color: var(--primary); border-color: var(--line); }
+.public-site .active > .page-link { background: var(--dark); border-color: var(--dark); color: #fff; }
+.public-site .nav-tabs .nav-link.active { background: var(--surface); border-color: var(--line) var(--line) var(--surface); }
+.public-site .breadcrumb { font-size: 0.8rem; margin-top: 0.75rem; }
+.public-site .cta-section {
+    background: radial-gradient(ellipse at top right, #47443d, transparent 65%), var(--dark);
+    padding-block: 5.5rem;
+}
+.public-site .cta-section h2 { font-size: clamp(1.8rem, 3vw, 2.6rem); }
+.public-site .cta-section p { color: #d6d1c7; font-size: 1rem; }
+.public-site .footer { background: #1e2124; border-top: 1px solid #44423c; }
+.public-site .footer .brand-primary { color: #fffefa; }
+.public-site .footer .brand-secondary { color: var(--accent); }
+.public-site .footer :is(p, li) { color: #c6c3bd; font-size: 0.85rem; line-height: 1.85; }
+.public-site .footer h5 { font-size: 0.85rem; }
+.public-site .footer-links a { color: #c6c3bd; }
+.public-site .footer-links a:hover { color: #e3cba5; }
+.public-site .mobile-cta-bar,
+.public-site .cookie-consent-banner,
+.public-site .compare-bar { background: rgba(37, 40, 44, 0.98); }
+.public-site .compare-bar .btn-outline-secondary { color: #fffefa; border-color: #aea99f; }
+.public-site .vehicle-visit-prompt { background: var(--surface); border-color: var(--line); border-top-color: var(--secondary); border-radius: 16px; }
+
+@media (hover: hover) and (pointer: fine) {
+    .public-site .vehicle-card:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(37, 40, 44, 0.1); }
+}
+@media (max-width: 1199.98px) and (min-width: 992px) {
+    .public-site .navbar-brand { font-size: 1.1rem; }
+    .public-site .navbar .nav-link { font-size: 0.74rem; padding-inline: 0.35rem; margin: 0; }
+    .public-site .navbar .btn-sm { padding-inline: 0.65rem; font-size: 0.75rem; }
+}
+@media (max-width: 991.98px) {
+    .public-site .navbar { padding-block: 0.85rem; }
+    .public-site .navbar .nav-link { font-size: 0.95rem; }
+    .public-site .navbar-collapse { border-color: var(--line); }
+    .public-site .hero-section { min-height: auto; padding-block: 3.5rem; text-align: center; }
+    .public-site .hero-section h1,
+    .public-site .hero-section p { margin-inline: auto; }
+    .public-site .hero-section h1 { max-width: 18ch; }
+    .public-site .search-box { margin-inline: auto; text-align: left; }
+    .public-site .section-padding { padding-block: 3.5rem; }
+}
+@media (max-width: 575.98px) {
+    .public-site .hero-section { padding-block: 2.75rem; }
+    .public-site .hero-section h1 { font-size: 2.6rem; }
+    .public-site .hero-section .btn-lg { flex: 1 1 100%; }
+    .public-site .search-box { padding: 1.5rem; }
+    .public-site .hero-assurances .container { gap: 0.75rem; justify-content: flex-start; padding-inline: 1.5rem; }
+    .public-site .hero-assurances .container > div { width: 100%; }
+    .public-site .form-control,
+    .public-site .form-select { font-size: 16px; }
+    .public-site .cta-section { padding-block: 3.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .public-site *,
+    .public-site *::before,
+    .public-site *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+    .public-site .vehicle-card:hover,
+    .public-site .vehicle-card:hover .card-img-top { transform: none; }
+}

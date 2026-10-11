@@ -11,9 +11,10 @@
     <div class="container">
         <div class="row align-items-center">
             <div class="col-lg-7 mb-5 mb-lg-0">
-                <div class="d-flex flex-wrap gap-2 justify-content-lg-start justify-content-center mb-3">
-                    <span class="badge bg-secondary px-3 py-2">Trusted Used Car Dealer</span>
-                    <span class="badge bg-warning text-dark px-3 py-2">Rebuilt Title Specialists</span>
+                <p class="hero-eyebrow">{{ business_city }}, {{ business_state }} &middot; Marshall Auto</p>
+                <div class="hero-badges d-flex flex-wrap gap-2 justify-content-lg-start justify-content-center mb-3">
+                    <span class="badge px-3 py-2">Used cars. Real value.</span>
+                    <span class="badge px-3 py-2">Rebuilt Title Specialists</span>
                 </div>
                 <h1>{{ site_setting.get('home_hero_title') }}</h1>
                 <p class="mb-4">{{ site_setting.get('home_hero_subtitle') }}</p>
@@ -29,11 +30,14 @@
             </div>
             <div class="col-lg-5">
                 <div class="search-box">
+                    <span class="section-eyebrow">Your next chapter</span>
                     <h5 class="fw-bold mb-3">Find Your Perfect Car</h5>
+                    <p class="search-box-subtitle">Start with what matters to you.</p>
                     <form action="{{ url_for('main.inventory') }}" method="GET">
                         <div class="row g-2">
                             <div class="col-12">
-                                <select name="make" class="form-select">
+                                <label for="hero-make" class="form-label">Make</label>
+                                <select id="hero-make" name="make" class="form-select">
                                     <option value="">All Makes</option>
                                     {% for make in makes %}
                                     <option value="{{ make }}">{{ make }}</option>
@@ -41,7 +45,8 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <select name="model" class="form-select">
+                                <label for="hero-model" class="form-label">Model</label>
+                                <select id="hero-model" name="model" class="form-select">
                                     <option value="">All Models</option>
                                     {% for model in models %}
                                     <option value="{{ model }}">{{ model }}</option>
@@ -49,7 +54,8 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <input type="number" name="max_price" class="form-control" placeholder="Max Price">
+                                <label for="hero-max-price" class="form-label">Budget</label>
+                                <input id="hero-max-price" type="number" name="max_price" class="form-control" placeholder="Maximum price" min="0" inputmode="numeric">
                             </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary w-100">
@@ -64,10 +70,19 @@
     </div>
 </section>
 
+<div class="hero-assurances">
+    <div class="container">
+        <div><i class="bi bi-file-earmark-text" aria-hidden="true"></i> History reports on qualifying vehicles</div>
+        <div><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Trade-ins welcome</div>
+        <div><i class="bi bi-calendar-check" aria-hidden="true"></i> Test drives on your schedule</div>
+    </div>
+</div>
+
 <!-- Featured Inventory -->
 <section class="section-padding bg-light-brand">
     <div class="container">
         <div class="text-center mb-5">
+            <span class="section-eyebrow">Explore the collection</span>
             <h2 class="section-title">Featured Vehicles</h2>
             <p class="section-subtitle mx-auto">Hand-picked quality used cars, trucks, and SUVs ready for delivery. Ask about our huge discounts on rebuilt title inventory.</p>
         </div>
@@ -180,7 +195,7 @@
 {% endif %}
 
 <!-- Why Choose Us -->
-<section class="section-padding">
+<section class="section-padding ownership-section">
     <div class="container">
         <div class="text-center mb-5">
             <h2 class="section-title">Why Buy From Marshall Auto LLC?</h2>

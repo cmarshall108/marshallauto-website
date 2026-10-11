@@ -5,7 +5,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 ## Features
 
 - **Public Website**
-  - Responsive, modern design with Bootstrap 5
+  - Responsive Bootstrap 5 storefront with a graphite, warm-white, and champagne visual theme
   - Home page with featured inventory and search
   - Inventory listing with filters (make, body style, price, mileage, search)
   - Coming Soon showcase for teaser vehicles, with contact links for availability updates
@@ -36,6 +36,20 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 CarFax PDFs linked from the admin list and edit pages use `/carfax/<report_id>/download`.
 Authenticated admins can view reports for available or sold vehicles; public visitors
 can only download reports for available vehicles.
+
+### Storefront visual theme
+
+The customer-facing theme lives in `app/static/css/public.css`, loaded after
+the shared `main.css` by `app/templates/base.html`. Its rules and design tokens
+are scoped to `.public-site` so admin pages retain their existing appearance.
+The palette uses graphite (`#25282c`), warm white (`#faf8f4`), and champagne
+(`#d6bc90`), with darker accents for readable text on light surfaces.
+
+The theme covers navigation, vehicle cards, forms, galleries, consent/compare
+bars, and the footer. Status badges retain distinct warning/success/error
+colors; savings and low-mileage indicators no longer pulse. Keyboard focus
+indicators, reduced-motion preferences, and mobile shopping controls are
+preserved. Browser/PWA theme colors match the storefront.
 
 ### Sold-vehicle sale details
 
