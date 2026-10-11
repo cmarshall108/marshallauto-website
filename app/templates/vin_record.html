@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block robots %}{{ robots_content }}{% endblock %}
+{% block og_title %}{{ meta_title }}{% endblock %}
+{% block og_description %}{{ meta_description }}{% endblock %}
+{% block og_image %}{{ og_image_absolute }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block twitter_title %}{{ meta_title }}{% endblock %}
+{% block twitter_description %}{{ meta_description }}{% endblock %}
+{% block twitter_image %}{{ og_image_absolute }}{% endblock %}
+
+{% block content %}
+<section class="bg-light-brand py-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-3">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">VIN {{ vehicle.vin }}</li>
+            </ol>
+        </nav>
+        <h1 class="h2 fw-bold mb-2">VIN {{ vehicle.vin }}: {{ vehicle.title }}</h1>
+        <p class="lead text-muted mb-0">Dealership vehicle record and listing status for this exact vehicle identification number.</p>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row g-4 align-items-start">
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm overflow-hidden mb-4">
+                    <img src="{{ vehicle.primary_image_url() }}"
+                         class="card-img-top"
+                         alt="{{ vehicle.title }} associated with VIN {{ vehicle.vin }}"
+                         width="900"
+                         height="600"
+                         loading="eager"
+                         fetchpriority="high">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                            {% if vehicle.status == 'available' %}
+                            <span class="badge bg-success">Currently Available</span>
+                            {% elif vehicle.status == 'sold' %}
+                            <span class="badge bg-secondary">Sold</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Unavailable</span>
+                            {% endif %}
+                            <span class="badge bg-light text-dark border">{{ (vehicle.title_status or 'clean').replace('_', ' ') | title }} Title</span>
+                        </div>
+                        <h2 class="h4 fw-bold">Vehicle identity</h2>
+                        <dl class="row specs-table mb-0">
+                            <dt class="col-sm-4">VIN</dt>
+                            <dd class="col-sm-8 text-break">{{ vehicle.vin }}</dd>
+                            <dt class="col-sm-4">Year</dt>
+                            <dd class="col-sm-8">{{ vehicle.year }}</dd>
+                            <dt class="col-sm-4">Make</dt>
+                            <dd class="col-sm-8">{{ vehicle.make }}</dd>
+                            <dt class="col-sm-4">Model</dt>
+                            <dd class="col-sm-8">{{ vehicle.model }}</dd>
+                            <dt class="col-sm-4">Trim</dt>
+                            <dd class="col-sm-8">{{ vehicle.trim or 'Not recorded' }}</dd>
+                            <dt class="col-sm-4">Body Style</dt>
+                            <dd class="col-sm-8">{{ vehicle.body_style or 'Not recorded' }}</dd>
+                            <dt class="col-sm-4">Mileage</dt>
+                            <dd class="col-sm-8">{{ vehicle.mileage | format_mileage }}</dd>
+                            <dt class="col-sm-4">Engine</dt>
+                            <dd class="col-sm-8">{{ vehicle.engine or 'Not recorded' }}</dd>
+                            <dt class="col-sm-4">Transmission</dt>
+                            <dd class="col-sm-8">{{ vehicle.transmission or 'Not recorded' }}</dd>
+                            <dt class="col-sm-4">Drivetrain</dt>
+                            <dd class="col-sm-8">{{ vehicle.drivetrain or 'Not recorded' }}</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card border-0 bg-light p-4">
+                    <h2 class="h5 fw-bold">About this VIN record</h2>
+                    <p class="mb-2">
+                        This page documents VIN <strong>{{ vehicle.vin }}</strong> as it appears in
+                        {{ business_name }} inventory records. A VIN identifies one specific vehicle;
+                        similar VINs belong to different vehicles and are not interchangeable.
+                    </p>
+                    <p class="small text-muted mb-0">
+                        This dealership record is not a complete vehicle-history report or a title guarantee.
+                        Buyers should independently verify the VIN, title, condition, and history before purchase.
+                    </p>
+                </div>
+            </div>
+
+            <aside class="col-lg-5">
+                <div class="card border-0 shadow-sm p-4 mb-4">
+                    <h2 class="h4 fw-bold">Full vehicle listing</h2>
+                    <p class="text-muted">
+                        View photos, description, features, service information, pricing history, and contact options.
+                    </p>
+                    <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="btn btn-primary">
+                        View {{ vehicle.title }}
+                    </a>
+                </div>
+
+                {% if related %}
+                <div class="card border-0 shadow-sm p-4">
+                    <h2 class="h5 fw-bold">Similar vehicles currently available</h2>
+                    <ul class="list-group list-group-flush">
+                        {% for similar in related %}
+                        <li class="list-group-item px-0">
+                            <a href="{{ url_for('main.vehicle_detail', slug=similar.slug) }}" class="fw-semibold">{{ similar.title }}</a>
+                            <div class="small text-muted">{{ similar.mileage | format_mileage }} &middot; {{ similar.display_price | format_price }}</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{{ url_for('main.inventory') }}" class="btn btn-outline-primary mt-3">Browse Current Inventory</a>
+                </div>
+                {% endif %}
+            </aside>
+        </div>
+    </div>
+</section>
+{% endblock %}

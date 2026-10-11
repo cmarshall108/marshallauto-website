@@ -58,6 +58,56 @@ class InventoryVINSEOTests(unittest.TestCase):
                 self.assertEqual(html.select_one('link[rel="canonical"]')['href'], f'https://dealer.example/inventory/{vehicle.slug}')
                 self.assertEqual(self.schema(html, 'Car')['vehicleIdentificationNumber'], vehicle.vin)
 
+    def test_real_vins_have_indexable_vin_record_pages(self):
+        for vehicle in (self.available, self.sold, self.pending):
+            with self.subTest(status=vehicle.status):
+                html = self.page(f'/vin/{vehicle.vin}')
+                self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'index, follow')
+                self.assertEqual(
+                    html.select_one('link[rel="canonical"]')['href'],
+                    f'https://dealer.example/vin/{vehicle.vin}',
+                )
+                self.assertIn(vehicle.vin, html.title.string)
+                self.assertIn(vehicle.title, html.select_one('h1').get_text())
+                self.assertIsNotNone(
+                    html.select_one(f'a[href="/inventory/{vehicle.slug}"]')
+                )
+                self.assertEqual(
+                    self.schema(html, 'Car')['vehicleIdentificationNumber'],
+                    vehicle.vin,
+                )
+                item_page = self.schema(html, 'ItemPage')
+                self.assertEqual(item_page['url'], f'https://dealer.example/vin/{vehicle.vin}')
+
+    def test_vin_record_normalizes_case_and_rejects_unknown_or_invalid_vins(self):
+        response = self.client.get(f'/vin/{self.available.vin.lower()}')
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.headers['Location'], f'/vin/{self.available.vin}')
+
+        for path in ('/vin/not-a-vin', '/vin/1HGCM82633A999999'):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 404)
+                self.assertIn('noindex', response.headers['X-Robots-Tag'])
+
+    def test_vin_pages_are_not_linked_from_primary_shopping_pages(self):
+        for path in ('/', '/inventory'):
+            html = self.page(path)
+            self.assertIsNone(html.select_one('a[href^="/vin/"]'))
+
+    def test_unlisted_or_malformed_vehicle_vins_do_not_create_search_pages(self):
+        coming_soon = self.add_vehicle(
+            'available', '1HGCM82633A004355', 'coming-soon-accord',
+        )
+        coming_soon.is_coming_soon = True
+        malformed = self.add_vehicle('sold', 'NOT-A-VALID-VIN', 'malformed-vin')
+        db.session.commit()
+
+        self.assertEqual(self.client.get(f'/vin/{coming_soon.vin}').status_code, 404)
+        _, entries = self.sitemap_entries()
+        self.assertNotIn(f'https://dealer.example/vin/{coming_soon.vin}', entries)
+        self.assertNotIn(f'https://dealer.example/vin/{malformed.vin}', entries)
+
     def test_sold_metadata_overrides_stale_for_sale_copy(self):
         self.sold.seo_title = 'Honda Accord for Sale'
         self.sold.seo_description = 'Buy this car today.'
@@ -95,6 +145,7 @@ class InventoryVINSEOTests(unittest.TestCase):
         response, entries = self.sitemap_entries()
         for vehicle in (self.available, self.sold, self.pending):
             self.assertEqual(entries[f'https://dealer.example/inventory/{vehicle.slug}'].text, '2026-09-20T14:30:00Z')
+            self.assertEqual(entries[f'https://dealer.example/vin/{vehicle.vin}'].text, '2026-09-20T14:30:00Z')
         self.assertIn('https://dealer.example/inventory/history', entries)
         self.assertIsNone(entries['https://dealer.example/about'])
         self.assertEqual(response.data, self.client.get('/sitemap.xml').data)
@@ -148,6 +199,7 @@ class InventoryVINSEOTests(unittest.TestCase):
     def test_robots_advertises_configured_sitemap(self):
         response = self.client.get('/robots.txt')
         self.assertIn('Sitemap: https://dealer.example/sitemap.xml', response.get_data(as_text=True))
+        self.assertIn('Allow: /vin/', response.get_data(as_text=True))
 
     def test_missing_vehicle_is_not_indexable(self):
         response = self.client.get('/inventory/missing')

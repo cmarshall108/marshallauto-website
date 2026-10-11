@@ -15,6 +15,7 @@ from app.forms import ContactForm
 from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, VehicleImage
 from app.models import BlogPost
 from app.spam_filter import check_lead_spam_for_request
+from app.vin_decode import is_valid_vin, normalize_vin
 from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_price,
     notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
@@ -826,6 +827,74 @@ def service_area():
     )
 
 
+@main.route('/vin/<vin>')
+def vehicle_vin_record(vin):
+    normalized_vin = normalize_vin(vin)
+    if not is_valid_vin(normalized_vin):
+        abort(404)
+    if vin != normalized_vin:
+        return redirect(url_for('main.vehicle_vin_record', vin=normalized_vin), code=301)
+
+    vehicle = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(vin=normalized_vin)
+        .first_or_404()
+    )
+    if vehicle.is_coming_soon and vehicle.status == 'available':
+        abort(404)
+
+    related = (
+        _vehicle_list_query()
+        .filter(
+            Vehicle.id != vehicle.id,
+            or_(Vehicle.make == vehicle.make, Vehicle.body_style == vehicle.body_style),
+        )
+        .order_by(Vehicle.created_at.desc())
+        .limit(4)
+        .all()
+    )
+    structured_vehicle = structured_data_vehicle(vehicle)
+    canonical = _canonical_url()
+    listing_status = (
+        'currently available' if vehicle.status == 'available'
+        else 'sold' if vehicle.status == 'sold'
+        else 'no longer available'
+    )
+    meta_title = f"VIN {normalized_vin} Lookup: {vehicle.title} | {current_app.config['BUSINESS_NAME']}"
+    meta_description = (
+        f"Look up VIN {normalized_vin}, a {vehicle.title} recorded by "
+        f"{current_app.config['BUSINESS_NAME']} as {listing_status}. "
+        f"Review vehicle specifications, listing status, and similar {vehicle.make} vehicles."
+    )
+
+    return render_template(
+        'vin_record.html',
+        vehicle=vehicle,
+        related=related,
+        meta_title=meta_title,
+        meta_description=meta_description,
+        robots_content='index, follow',
+        og_image_absolute=vehicle.primary_image_url(absolute=True),
+        structured_vehicle=structured_vehicle,
+        breadcrumbs=structured_data_breadcrumb([
+            ('Home', current_app.config['SITE_URL']),
+            (f'VIN {normalized_vin}', canonical),
+        ]),
+        structured_page={
+            '@context': 'https://schema.org',
+            '@type': 'ItemPage',
+            '@id': canonical + '#webpage',
+            'url': canonical,
+            'name': meta_title,
+            'datePublished': vehicle.created_at.isoformat() + 'Z',
+            'dateModified': (vehicle.updated_at or vehicle.created_at).isoformat() + 'Z',
+            'mainEntity': {'@id': structured_vehicle['@id']},
+        },
+        page_type='vin_record',
+    )
+
+
 @main.route('/inventory/<slug>')
 def vehicle_detail(slug):
     vehicle = (
@@ -1507,6 +1576,14 @@ def sitemap():
             'lastmod': (vehicle.updated_at or vehicle.created_at).isoformat() + 'Z',
             'images': [{'loc': img.absolute_url, 'caption': vehicle.title} for img in images]
         })
+        normalized_vin = normalize_vin(vehicle.vin)
+        if is_valid_vin(normalized_vin):
+            pages.append({
+                'loc': url_for('main.vehicle_vin_record', vin=normalized_vin, _external=True),
+                'priority': '0.60',
+                'changefreq': 'monthly',
+                'lastmod': (vehicle.updated_at or vehicle.created_at).isoformat() + 'Z',
+            })
     for page in pages:
         parsed = urlsplit(page['loc'])
         page['loc'] = current_app.config['SITE_URL'].rstrip('/') + parsed.path
@@ -1530,6 +1607,7 @@ Disallow: /saved-vehicles
 Disallow: /compare
 Allow: /
 Allow: /inventory/
+Allow: /vin/
 Allow: /inventory/used-cars-for-sale-in-*
 Allow: /inventory/used-*-for-sale-in-*
 Allow: /inventory/rebuilt-title-cars-for-sale-in-*

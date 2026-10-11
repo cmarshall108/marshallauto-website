@@ -13,6 +13,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Carvana-style photo highlight bubbles (features + condition notes) powered by a local OpenCV worker
   - Financing, sell-your-car, about, and contact pages
   - SEO: meta tags, Open Graph, JSON-LD (AutoDealer, Car, FAQ, HowTo, ItemList, Breadcrumb), sitemap.xml, robots.txt
+  - Search-only VIN record pages for valid VINs in current and archived inventory, discoverable through sitemap.xml but omitted from site navigation
   - Local SEO landings for cities, makes, body styles, and rebuilt-title inventory
   - Site analytics: GTM (preferred), GA4 fallback, Facebook Pixel, custom event layer
 
