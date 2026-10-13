@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ asset_url('css/chat.css') }}">
     <title>Test Drive Agreement — {{ test_drive.customer_name }}</title>
     <style>
         body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 2rem; max-width: 800px; margin: 0 auto; }
@@ -52,5 +54,9 @@
     </p>
 
     <div class="sig-line">Customer Signature &amp; Date</div>
+    {% include "admin/_chat_monitor.html" %}
+    <script src="{{ asset_url('js/chat-client.js') }}"></script>
+    <script src="{{ asset_url('js/chat-sounds.js') }}"></script>
+    <script src="{{ asset_url('js/admin-chat-notifications.js') }}"></script>
 </body>
 </html>

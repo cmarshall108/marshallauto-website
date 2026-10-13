@@ -1,0 +1,13 @@
+{% if current_user.is_authenticated %}
+<div id="admin-chat-monitor" class="d-flex flex-wrap align-items-center gap-2 mt-4 no-print" data-csrf="{{ csrf_token() }}" data-user-id="{{ current_user.id }}">
+    <button id="admin-chat-sounds" class="btn btn-outline-secondary btn-sm chat-sound-toggle" type="button" aria-label="Enable sounds" title="Enable sounds" aria-pressed="true"><i class="bi bi-volume-down" aria-hidden="true"></i></button>
+    <span id="admin-chat-presence-status" class="small text-muted" role="status">Connecting live chat...</span>
+    <span id="admin-chat-notification-status" class="small text-muted" role="status">Checking chat alerts...</span>
+</div>
+<div id="admin-chat-toast" class="admin-chat-toast no-print" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <button id="admin-chat-toast-dismiss" class="admin-chat-toast-dismiss" type="button" aria-label="Dismiss chat notification">&times;</button>
+    <strong id="admin-chat-toast-title">New chat message</strong>
+    <p id="admin-chat-toast-message"></p>
+    <a href="{{ url_for('chat.inbox') }}">Open Live Chat inbox</a>
+</div>
+{% endif %}

@@ -44,6 +44,16 @@
 .chat-conversation-item[aria-pressed="true"] { border-color: #353b42; background: #f2efe8; }
 .admin-chat-action { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 1030; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #353b42; color: #fff; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18); }
 .admin-chat-action:hover { background: #202428; color: #fff; }
+.admin-chat-toast { position: fixed; right: max(1.25rem, env(safe-area-inset-right)); bottom: max(5.5rem, env(safe-area-inset-bottom)); z-index: 1090; width: min(360px, calc(100vw - 2.5rem)); padding: 1rem 2.75rem 1rem 1rem; border: 1px solid #d6bc90; border-radius: 12px; background: #fffefa; color: #25282c; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2); text-align: left; font: 1rem/1.5 system-ui, sans-serif; overflow-wrap: anywhere; }
+.admin-chat-toast[hidden] { display: none; }
+.admin-chat-toast p { margin: 0.5rem 0; }
+.admin-chat-toast a { color: #353b42; text-decoration: underline; }
+.admin-chat-toast-dismiss { position: absolute; top: 0.25rem; right: 0.25rem; width: 44px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: #25282c; font-size: 1.5rem; }
+.admin-chat-toast a:focus-visible,
+.admin-chat-toast-dismiss:focus-visible { outline: 3px solid #876334; outline-offset: 3px; }
+@media print {
+    #admin-chat-monitor, .admin-chat-toast { display: none; }
+}
 .admin-chat-action:focus-visible,
 .chat-conversation-item:focus-visible { outline: 3px solid #876334; outline-offset: 3px; }
 @media (max-width: 575.98px) {

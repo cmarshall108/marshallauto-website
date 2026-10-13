@@ -30,7 +30,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Manage service records per vehicle
   - Upload and link CarFax PDF reports
   - View and manage customer leads (with UTM / click-ID attribution)
-  - First-party Live Chat inbox with Available/Away controls and automatic offline fallback
+  - First-party Live Chat inbox with automatic signed-in staff availability, cross-page toast alerts, and offline fallback
   - Edit site settings, SEO defaults, and analytics IDs
   - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
 
@@ -90,12 +90,15 @@ sends a regular message through the existing contact/lead pipeline. If the last
 agent goes offline while the customer is starting a chat, the widget falls back
 to a regular message without discarding the form.
 
-Staff open **Admin → Live Chat**, or the chat action button in the admin panel,
-and select **Go available**. Keep the inbox open while taking questions; use
-**Go away** when finished. Availability renews every 20 seconds and expires
-after 90 seconds without a heartbeat. Closing the page attempts to clear
-availability immediately; logout clears the user's presence. Disabled accounts
-and changed passwords invalidate stored presence.
+Staff automatically become available when a signed-in page opens, without
+having to open **Admin → Live Chat**. Availability follows staff across admin
+and storefront pages, including printable agreements, and renews every 20 seconds.
+Each open page has its own presence: closing one tab does not disconnect another.
+Closing the last signed-in page sends a close beacon with a 10-second grace
+period so navigation/reloads do not briefly take the team offline. If the browser
+cannot send that beacon (for example, a crash), availability expires within
+90 seconds of the last heartbeat. Logout clears the user's presence immediately.
+Disabled accounts and changed passwords invalidate stored presence.
 
 - The shared inbox shows open/ended conversations and unread customer messages.
   Any authenticated active staff member (with the existing 2FA checks) can reply.
@@ -116,6 +119,12 @@ and changed passwords invalidate stored presence.
   is stored locally, separately for staff and customers. Initial transcript
   loads and staff's own replies do not chime. Multiple admin tabs may each chime.
   Visible unread indicators remain available without audio.
+- Bottom-right dismissible toasts announce unread customer messages on every
+  signed-in page, even outside the inbox, and link to **Live Chat**. They also
+  report chat connection/availability failures. Toasts disappear after 12 seconds;
+  the unread indicator remains. A per-tab message cursor survives navigation to
+  avoid repeating old notifications. Existing unread chats are announced on the
+  first page load. Toasts and staff controls are excluded from printed agreements.
 - Conversations and transcripts persist in the database. The customer's signed
   browser session keeps their conversation across page navigation/reloads.
   Clearing cookies or switching browsers does not recover that conversation.

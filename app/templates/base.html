@@ -435,6 +435,10 @@
     <script src="{{ asset_url('js/coming-soon-photos.js') }}" defer></script>
     <script src="{{ asset_url('js/chat-client.js') }}"></script>
     <script src="{{ asset_url('js/chat-sounds.js') }}"></script>
+    {% if current_user.is_authenticated %}
+    {% include "admin/_chat_monitor.html" %}
+    <script src="{{ asset_url('js/admin-chat-notifications.js') }}"></script>
+    {% endif %}
     <script src="{{ asset_url('js/chat-widget.js') }}"></script>
     <script src="{{ asset_url('js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}

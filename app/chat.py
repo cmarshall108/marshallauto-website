@@ -14,6 +14,7 @@ from app.utils import client_ip, rate_limit_exceeded
 
 chat_bp = Blueprint('chat', __name__)
 PRESENCE_SECONDS = 90
+CLOSE_GRACE_SECONDS = 10
 
 
 def _error(message, status=400):
@@ -301,9 +302,10 @@ def presence():
         return _error('Invalid availability request.')
     identifier = _uuid(data.get('id'))
     available = data.get('available')
+    closing = data.get('closing', False)
     if not identifier or not (
         type(available) is bool or isinstance(available, str) and available in ('true', 'false')
-    ):
+    ) or not (type(closing) is bool or closing in ('true', 'false')):
         return _error('Invalid availability request.')
     record = db.session.get(ChatPresence, identifier)
     if record and record.user_id != current_user.id:
@@ -315,7 +317,14 @@ def presence():
         record.auth_version = current_user.auth_version
         record.last_seen_at = utcnow()
     elif record:
-        db.session.delete(record)
+        if closing in (True, 'true'):
+            # Navigation renews presence on the next page before this lease expires.
+            record.last_seen_at = min(
+                record.last_seen_at,
+                utcnow() - timedelta(seconds=PRESENCE_SECONDS - CLOSE_GRACE_SECONDS),
+            )
+        else:
+            db.session.delete(record)
     ChatPresence.query.filter(
         ChatPresence.last_seen_at < utcnow() - timedelta(days=1),
     ).delete(synchronize_session=False)

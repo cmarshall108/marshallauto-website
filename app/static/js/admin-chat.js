@@ -4,73 +4,21 @@
         var root = document.getElementById('live-chat-inbox');
         var chat = window.MarshallChat;
         if (!root || !chat) return;
-        var csrf = root.dataset.csrf, presenceId = chat.nonce(), available = false;
+        var csrf = root.dataset.csrf;
         var selected = null, cursor = 0, pageNumber = 1, refreshing = false;
-        var pending = null, transcriptPending = null, drafts = {}, presencePending = Promise.resolve();
+        var pending = null, transcriptPending = null, drafts = {};
         var list = document.getElementById('chat-conversations');
         var log = document.getElementById('chat-inbox-messages');
         var filter = document.getElementById('chat-inbox-filter');
         var form = document.getElementById('chat-inbox-reply');
         var body = document.getElementById('chat-inbox-body');
         var errorEl = document.getElementById('chat-inbox-error');
-        var availability = document.getElementById('chat-availability');
-        var presenceStatus = document.getElementById('chat-presence-status');
         function error(message) {
             errorEl.textContent = message;
             errorEl.classList.remove('d-none');
         }
         function clearError() { errorEl.classList.add('d-none'); }
         function api(id, suffix) { return '/admin/api/chat/' + id + '/' + suffix; }
-        function heartbeat() {
-            var desired = available;
-            presencePending = presencePending.catch(function (err) {
-                console.warn('Retrying chat availability after a failed update:', err.message);
-            }).then(function () {
-                return chat.post('/admin/api/chat/presence', { id: presenceId, available: desired }, csrf);
-            }).then(function () {
-                if (available === desired) presenceStatus.textContent = available ? 'You are available. Keep this inbox open.' : 'You are away.';
-            });
-            return presencePending;
-        }
-        availability.addEventListener('click', async function () {
-            availability.disabled = true;
-            available = !available;
-            clearError();
-            try { await heartbeat(); }
-            catch (err) {
-                available = false;
-                presenceStatus.textContent = 'Availability could not be confirmed. Any previous availability expires within 90 seconds.';
-                error(err.message || 'Could not update availability. Please retry.');
-            }
-            finally {
-                availability.textContent = available ? 'Go away' : 'Go available';
-                availability.setAttribute('aria-pressed', String(available));
-                availability.disabled = false;
-            }
-            refresh(true);
-        });
-        window.setInterval(function () {
-            if (available && !availability.disabled) heartbeat().catch(function (err) {
-                presenceStatus.textContent = 'Connection interrupted. Availability may expire; reconnect or go away.';
-                error(err.message || 'Could not renew availability.');
-            });
-        }, 20000);
-        window.addEventListener('pagehide', function () {
-            if (!available || !navigator.sendBeacon) return;
-            var data = new FormData();
-            data.set('csrf_token', csrf);
-            data.set('id', presenceId);
-            data.set('available', 'false');
-            navigator.sendBeacon('/admin/api/chat/presence', data);
-        });
-        window.addEventListener('pageshow', function (event) {
-            if (event.persisted) {
-                available = false;
-                availability.textContent = 'Go available';
-                availability.setAttribute('aria-pressed', 'false');
-                presenceStatus.textContent = 'You are away. Go available to resume.';
-            }
-        });
         function selectConversation(conversation) {
             if (selected && selected.id === conversation.id) return;
             if (selected) drafts[selected.id] = body.value;

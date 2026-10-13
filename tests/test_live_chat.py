@@ -11,7 +11,7 @@ from flask import g
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import create_app, db
-from app.models import ChatConversation, ChatMessage, ChatPresence, Lead, User, utcnow
+from app.models import ChatConversation, ChatMessage, ChatPresence, Lead, TestDrive, User, Vehicle, utcnow
 from config import TestingConfig
 
 
@@ -101,6 +101,63 @@ class LiveChatTests(unittest.TestCase):
         user.set_password('different-password')
         db.session.commit()
         self.assertFalse(self.customer.get('/api/chat/status').get_json()['online'])
+
+    def test_page_close_grace_preserves_navigation_then_expires(self):
+        now = utcnow()
+        with patch('app.chat.utcnow', return_value=now):
+            self.online()
+            response = self.staff.post('/admin/api/chat/presence', data={
+                'id': self.presence_id, 'available': 'false', 'closing': 'true',
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(self.customer.get('/api/chat/status').get_json()['online'])
+        with patch('app.chat.utcnow', return_value=now + timedelta(seconds=9)):
+            self.assertTrue(self.customer.get('/api/chat/status').get_json()['online'])
+        with patch('app.chat.utcnow', return_value=now + timedelta(seconds=10)):
+            self.assertFalse(self.customer.get('/api/chat/status').get_json()['online'])
+        next_page = str(uuid4())
+        with patch('app.chat.utcnow', return_value=now + timedelta(seconds=11)):
+            self.staff.post('/admin/api/chat/presence', json={'id': next_page, 'available': True})
+            self.assertTrue(self.customer.get('/api/chat/status').get_json()['online'])
+            # A delayed close beacon must not extend the old lease or close the new page.
+            self.staff.post('/admin/api/chat/presence', json={
+                'id': self.presence_id, 'available': False, 'closing': True,
+            })
+            self.assertEqual(db.session.get(ChatPresence, self.presence_id).last_seen_at,
+                             now - timedelta(seconds=80))
+            self.assertTrue(self.customer.get('/api/chat/status').get_json()['online'])
+            self.staff.get('/admin/logout')
+            self.assertFalse(self.customer.get('/api/chat/status').get_json()['online'])
+
+    def test_closing_last_tab_does_not_disconnect_other_tabs(self):
+        now = utcnow()
+        second_id = str(uuid4())
+        with patch('app.chat.utcnow', return_value=now):
+            self.online()
+            self.staff.post('/admin/api/chat/presence', json={'id': second_id, 'available': True})
+            self.staff.post('/admin/api/chat/presence', json={
+                'id': self.presence_id, 'available': False, 'closing': True,
+            })
+        with patch('app.chat.utcnow', return_value=now + timedelta(seconds=10)):
+            self.assertTrue(self.customer.get('/api/chat/status').get_json()['online'])
+            self.staff.post('/admin/api/chat/presence', json={
+                'id': second_id, 'available': False, 'closing': True,
+            })
+        with patch('app.chat.utcnow', return_value=now + timedelta(seconds=20)):
+            self.assertFalse(self.customer.get('/api/chat/status').get_json()['online'])
+
+    def test_closing_presence_validates_flag_and_does_not_create_presence(self):
+        for closing in (None, 1, 'yes', [], {}):
+            with self.subTest(closing=closing):
+                response = self.staff.post('/admin/api/chat/presence', json={
+                    'id': self.presence_id, 'available': False, 'closing': closing,
+                })
+                self.assertEqual(response.status_code, 400)
+        response = self.staff.post('/admin/api/chat/presence', json={
+            'id': self.presence_id, 'available': False, 'closing': True,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ChatPresence.query.count(), 0)
 
     def test_live_start_links_lead_and_resumes_without_duplicate(self):
         identifier = self.start()
@@ -338,7 +395,8 @@ class LiveChatTests(unittest.TestCase):
         response = self.staff.get('/admin/live-chat')
         self.assertEqual(response.status_code, 200)
         html = BeautifulSoup(response.data, 'html.parser')
-        self.assertIsNotNone(html.select_one('#chat-availability'))
+        self.assertIsNone(html.select_one('#chat-availability'))
+        self.assertIsNotNone(html.select_one('#admin-chat-presence-status'))
         self.assertIsNotNone(html.select_one('#chat-inbox-reply'))
         self.assertIsNotNone(html.select_one('#chat-inbox-block'))
         self.assertIsNotNone(html.select_one('#admin-chat-sounds'))
@@ -346,6 +404,40 @@ class LiveChatTests(unittest.TestCase):
         lead_page = self.staff.get(f'/admin/leads?lead_id={conversation.lead_id}').get_data(as_text=True)
         self.assertIn('Jennifer Hayes', lead_page)
         self.assertNotIn('Another customer', lead_page)
+
+    def test_monitor_and_toast_on_all_signed_in_page_layouts_only(self):
+        vehicle = Vehicle(year=2020, make='Toyota', model='Camry', price=20000,
+                          mileage=40000, slug='chat-monitor-car')
+        db.session.add(vehicle)
+        db.session.flush()
+        drive = TestDrive(vehicle_id=vehicle.id, customer_name='Test Customer')
+        db.session.add(drive)
+        db.session.commit()
+        for path in ('/admin/dashboard', '/admin/vehicles', '/admin/leads',
+                     '/admin/live-chat', '/', f'/admin/test-drives/{drive.id}/print'):
+            with self.subTest(path=path):
+                response = self.staff.get(path)
+                self.assertEqual(response.status_code, 200)
+                html = BeautifulSoup(response.data, 'html.parser')
+                monitor = html.select_one('#admin-chat-monitor')
+                self.assertIsNotNone(monitor)
+                self.assertTrue(monitor['data-csrf'])
+                self.assertEqual(monitor['data-user-id'], str(self.user_id))
+                self.assertEqual(len(html.select('#admin-chat-toast')), 1)
+                self.assertEqual(len(html.select('script[src*="/admin-chat-notifications.js"]')), 1)
+        user = db.session.get(User, self.user_id)
+        user.totp_enabled = True
+        db.session.commit()
+        with patch('app.admin.requires_two_factor', return_value=True):
+            response = self.staff.get('/admin/settings/two-factor')
+        self.assertEqual(response.status_code, 200)
+        html = BeautifulSoup(response.data, 'html.parser')
+        self.assertIsNotNone(html.select_one('#admin-chat-monitor'))
+        self.assertIsNotNone(html.select_one('#admin-chat-toast'))
+        for path in ('/', '/admin/login'):
+            html = BeautifulSoup(self.customer.get(path).data, 'html.parser')
+            self.assertIsNone(html.select_one('#admin-chat-monitor'))
+            self.assertIsNone(html.select_one('#admin-chat-toast'))
 
     def test_staff_database_error_response_and_message_rollback(self):
         identifier = self.start()

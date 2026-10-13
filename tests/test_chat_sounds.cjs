@@ -141,48 +141,190 @@ test('suspended audio does not replay stale messages when re-enabled', async () 
     assert.equal(s.played.length, 1);
 });
 
-test('global admin monitor tracks incoming cursor, unread state, and connection errors', async () => {
-    const observations = [], intervals = [], classes = new Set(), attrs = {};
-    const button = {}, status = {}, warnings = [];
+function setupMonitor(options = {}) {
+    const observations = [], intervals = new Map(), classes = new Set(), attrs = {};
+    const elements = new Map(), handlers = {}, windowHandlers = {};
+    const warnings = [], posts = [], beacons = [], requests = [], timers = new Map();
+    const values = options.values || new Map();
+    function element(id) {
+        if (!elements.has(id)) elements.set(id, {
+            dataset: { csrf: 'csrf-token', userId: '42' }, hidden: true, listeners: {},
+            addEventListener(event, callback) { this.listeners[event] = callback; },
+        });
+        return elements.get(id);
+    }
     const action = {
         classList: { toggle(name, active) { if (active) classes.add(name); else classes.delete(name); } },
         setAttribute(name, value) { attrs[name] = value; },
     };
-    let ready, next = { success: true, latest_customer_message_id: 10, unread: 1 };
+    const s = { next: options.next || { success: true, latest_customer_message_id: 10, unread: 1 } };
+    let sequence = 0, timerId = 0;
     const context = {
         window: {
-            MarshallChat: { request: async () => {
-                if (next instanceof Error) throw next;
-                return next;
-            } },
+            MarshallChat: {
+                nonce: () => 'page-' + (++sequence),
+                async post(url, data, csrf) {
+                    posts.push({ url, data, csrf });
+                    if (s.postError) throw s.postError;
+                    if (s.pendingPost) await s.pendingPost;
+                    return { success: true };
+                },
+                async request(url, options) {
+                    requests.push({ url, options });
+                    if (options) return { success: true };
+                    if (s.next instanceof Error) throw s.next;
+                    return s.next;
+                },
+            },
             MarshallChatSounds: { create: (_, role) => {
                 assert.equal(role, 'admin');
                 return { observe: (channel, id) => observations.push([channel, id]) };
             } },
-            setInterval(callback) { intervals.push(callback); },
+            sessionStorage: {
+                getItem(key) {
+                    if (options.storageError) throw new Error('Storage disabled');
+                    return values.get(key) ?? null;
+                },
+                setItem(key, value) {
+                    if (options.storageError) throw new Error('Storage disabled');
+                    values.set(key, value);
+                },
+            },
+            setInterval(callback, delay) { intervals.set(delay, callback); },
+            setTimeout(callback) { timers.set(++timerId, callback); return timerId; },
+            clearTimeout(id) { timers.delete(id); },
+            addEventListener(event, callback) { windowHandlers[event] = callback; },
         },
         document: {
-            getElementById(id) { return id === 'admin-chat-sounds' ? button : status; },
+            visibilityState: 'visible',
+            getElementById: element,
             querySelector() { return action; },
-            addEventListener(event, callback) { if (event === 'DOMContentLoaded') ready = callback; },
+            addEventListener(event, callback) { handlers[event] = callback; },
+        },
+        FormData: class {
+            constructor() { this.values = new Map(); }
+            set(key, value) { this.values.set(key, value); }
+        },
+        navigator: {
+            sendBeacon(url, data) { beacons.push({ url, data }); return !options.beaconFailure; },
         },
         console: { warn(...args) { warnings.push(args); } },
     };
+    if (options.noSounds) delete context.window.MarshallChatSounds;
     vm.runInNewContext(monitor, context);
-    ready();
-    await new Promise(resolve => setImmediate(resolve));
+    handlers.DOMContentLoaded();
+    return Object.assign(s, {
+        observations, intervals, classes, attrs, element, warnings, posts, beacons,
+        requests, values, timers, handlers, windowHandlers, context,
+        flush: () => new Promise(resolve => setImmediate(resolve)),
+    });
+}
+
+test('global admin monitor tracks incoming cursor, unread state, toasts and connection errors', async () => {
+    const s = setupMonitor();
+    await s.flush();
+    const status = s.element('admin-chat-notification-status');
+    const toast = s.element('admin-chat-toast');
     assert.match(status.textContent, /1 unread/);
-    assert.ok(classes.has('chat-has-unread'));
-    next = { latest_customer_message_id: 10, unread: 0 };
-    await intervals[0]();
+    assert.ok(s.classes.has('chat-has-unread'));
+    assert.equal(toast.hidden, false);
+    s.element('admin-chat-toast-dismiss').listeners.click();
+    assert.equal(toast.hidden, true);
+    s.next = { latest_customer_message_id: 10, unread: 0 };
+    await s.intervals.get(5000)();
     assert.equal(status.textContent, 'No unread chats');
-    next = { latest_customer_message_id: 12, unread: 1 };
-    await intervals[0]();
-    assert.deepEqual(observations, [['inbox', 10], ['inbox', 10], ['inbox', 12]]);
-    next = new Error('Disconnected');
-    await intervals[0]();
+    assert.equal(toast.hidden, true);
+    s.next = { latest_customer_message_id: 12, unread: 1 };
+    await s.intervals.get(5000)();
+    assert.equal(toast.hidden, false);
+    assert.deepEqual(s.observations, [['inbox', 10], ['inbox', 10], ['inbox', 12]]);
+    [...s.timers.values()][0]();
+    assert.equal(toast.hidden, true);
+    await s.intervals.get(5000)();
+    assert.equal(toast.hidden, true);
+    s.next = new Error('Disconnected');
+    await s.intervals.get(5000)();
     assert.equal(status.textContent, 'Chat alerts disconnected');
-    assert.equal(warnings.length, 1);
+    assert.equal(s.element('admin-chat-toast-title').textContent, 'Chat connection alert');
+    s.element('admin-chat-toast-dismiss').listeners.click();
+    await s.intervals.get(5000)();
+    assert.equal(toast.hidden, true);
+    assert.equal(s.warnings.length, 2);
+    s.next = { latest_customer_message_id: 13, unread: 2 };
+    await s.intervals.get(5000)();
+    assert.equal(s.element('admin-chat-toast-message').textContent, '2 conversations need your attention.');
+});
+
+test('automatic presence renews on every page, even hidden, and releases on close with CSRF', async () => {
+    const s = setupMonitor({ noSounds: true });
+    await s.flush();
+    assert.equal(s.posts.length, 1);
+    assert.equal(s.posts[0].url, '/admin/api/chat/presence');
+    assert.equal(s.posts[0].data.available, true);
+    assert.equal(s.posts[0].csrf, 'csrf-token');
+    assert.equal(s.element('admin-chat-presence-status').textContent, 'You are available for live chat');
+    s.context.document.visibilityState = 'hidden';
+    await s.intervals.get(20000)();
+    assert.equal(s.posts.length, 2);
+    s.windowHandlers.pagehide();
+    const data = s.beacons[0].data.values;
+    assert.equal(data.get('id'), s.posts[0].data.id);
+    assert.equal(data.get('available'), 'false');
+    assert.equal(data.get('closing'), 'true');
+    assert.equal(data.get('csrf_token'), 'csrf-token');
+    await s.intervals.get(20000)();
+    assert.equal(s.posts.length, 2);
+    const requests = s.requests.length;
+    await s.intervals.get(5000)();
+    assert.equal(s.requests.length, requests);
+    s.windowHandlers.pageshow({ persisted: true });
+    await s.flush();
+    assert.equal(s.posts.length, 3);
+    assert.notEqual(s.posts[2].data.id, s.posts[0].data.id);
+});
+
+test('toast cursor survives page navigation without replaying unread history', async () => {
+    const first = setupMonitor();
+    await first.flush();
+    const next = setupMonitor({ values: first.values });
+    await next.flush();
+    assert.equal(next.element('admin-chat-toast').hidden, true);
+    next.next = { latest_customer_message_id: 11, unread: 1 };
+    await next.intervals.get(5000)();
+    assert.equal(next.element('admin-chat-toast').hidden, false);
+    const noUnread = setupMonitor({ next: { latest_customer_message_id: 20, unread: 0 } });
+    await noUnread.flush();
+    assert.equal(noUnread.element('admin-chat-toast').hidden, true);
+});
+
+test('availability failures notify once, retry and recover; disabled storage does not break monitoring', async () => {
+    const s = setupMonitor({ storageError: true });
+    await s.flush();
+    assert.equal(s.warnings.length, 1);
+    s.postError = new Error('Offline');
+    await s.intervals.get(20000)();
+    assert.match(s.element('admin-chat-presence-status').textContent, /disconnected/);
+    assert.equal(s.element('admin-chat-toast-title').textContent, 'Chat availability alert');
+    s.element('admin-chat-toast-dismiss').listeners.click();
+    await s.intervals.get(20000)();
+    assert.equal(s.element('admin-chat-toast').hidden, true);
+    s.postError = null;
+    await s.intervals.get(20000)();
+    assert.equal(s.element('admin-chat-presence-status').textContent, 'You are available for live chat');
+});
+
+test('failed close beacon uses keepalive and a late heartbeat is released again', async () => {
+    const s = setupMonitor({ beaconFailure: true });
+    await s.flush();
+    let finish;
+    s.pendingPost = new Promise(resolve => { finish = resolve; });
+    const heartbeat = s.intervals.get(20000)();
+    s.windowHandlers.pagehide();
+    assert.equal(s.requests.at(-1).options.keepalive, true);
+    finish();
+    await heartbeat;
+    assert.equal(s.beacons.length, 2);
+    assert.equal(s.requests.at(-1).options.body.values.get('closing'), 'true');
 });
 
 test('customer widget baselines recovered history and notifies only new agent messages, even while hidden', async () => {
