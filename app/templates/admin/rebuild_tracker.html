@@ -108,7 +108,7 @@
         <div class="card border-0 shadow-sm p-3 p-lg-4" id="add-cost">
             <h3 class="h5 fw-bold mb-1">{{ 'Edit cost item' if entry_form.entry_id.data else 'Add a cost item' }}</h3>
             <p class="small text-muted">Add parts, labor, repairs, services, and other rebuild expenses.</p>
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
                 {{ entry_form.hidden_tag() }}
                 <input type="hidden" name="action" value="save_entry">
                 <div class="mb-3">
@@ -151,6 +151,19 @@
                     {{ entry_form.notes(class="form-control", rows="2", placeholder="Optional receipt or repair notes") }}
                     {% for error in entry_form.notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                 </div>
+                <div class="mb-3">
+                    <label for="receipt_images" class="form-label">Receipt photos</label>
+                    <input class="form-control" type="file" id="receipt_images" name="receipt_images"
+                           accept="image/*" capture="environment" multiple>
+                    <div class="form-text">Take a photo or choose images. Up to 10 photos, 15 MB each.</div>
+                    {% if receipt_upload_error %}
+                    <div class="text-danger small" role="alert">{{ receipt_upload_error }}</div>
+                    {% endif %}
+                    {% if entry_form.entry_id.data %}
+                    {% set editing_entry = entries|selectattr('id', 'equalto', entry_form.entry_id.data|int)|first %}
+                    {% if editing_entry and editing_entry.receipts %}<div class="form-text">Existing photos are shown with this cost item below.</div>{% endif %}
+                    {% endif %}
+                </div>
                 <div class="d-flex gap-2">
                     {{ entry_form.submit(class="btn btn-primary") }}
                     {% if entry_form.entry_id.data %}
@@ -190,6 +203,28 @@
                                 {% if entry.vendor %}<div class="small text-muted">{{ entry.vendor }}</div>{% endif %}
                                 {% if entry.purchase_date %}<div class="small text-muted">{{ entry.purchase_date.strftime('%b %d, %Y') }}</div>{% endif %}
                                 {% if entry.notes %}<div class="small text-muted">{{ entry.notes }}</div>{% endif %}
+                                {% if entry.receipts %}
+                                <div class="d-flex flex-wrap gap-2 mt-2" aria-label="Receipt photos">
+                                    {% for receipt in entry.receipts %}
+                                    <a href="{{ url_for('admin.vehicle_rebuild_receipt_view', id=vehicle.id, entry_id=entry.id, receipt_id=receipt.id) }}"
+                                       target="_blank" rel="noopener" aria-label="View receipt photo {{ loop.index }} for {{ entry.description }}">
+                                        <img src="{{ url_for('admin.vehicle_rebuild_receipt_view', id=vehicle.id, entry_id=entry.id, receipt_id=receipt.id) }}"
+                                             alt="Receipt {{ loop.index }}" width="56" height="56"
+                                             class="rounded border" style="object-fit:cover" loading="lazy">
+                                    </a>
+                                    <form method="POST"
+                                          action="{{ url_for('admin.vehicle_rebuild_receipt_delete', id=vehicle.id, entry_id=entry.id, receipt_id=receipt.id) }}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Delete this receipt photo?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                aria-label="Delete receipt photo {{ loop.index }} for {{ entry.description }}">
+                                            <i class="bi bi-trash" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </td>
                             <td><span class="badge text-bg-light">{{ category_labels.get(entry.category, entry.category|title) }}</span></td>
                             <td class="text-end">{{ entry.quantity.normalize() }}</td>

@@ -513,6 +513,13 @@ class RebuildCostEntry(db.Model):
     unit_cost = db.Column(db.Numeric(10, 2), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    receipts = db.relationship(
+        'RebuildCostReceipt',
+        backref='cost_entry',
+        lazy='selectin',
+        cascade='all, delete-orphan',
+        order_by='RebuildCostReceipt.id',
+    )
 
     @property
     def line_total(self):
@@ -521,6 +528,21 @@ class RebuildCostEntry(db.Model):
 
     def __repr__(self):
         return f'<RebuildCostEntry {self.description} for vehicle {self.vehicle_id}>'
+
+
+class RebuildCostReceipt(db.Model):
+    __tablename__ = 'rebuild_cost_receipts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cost_entry_id = db.Column(
+        db.Integer, db.ForeignKey('rebuild_cost_entries.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    filename = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    def __repr__(self):
+        return f'<RebuildCostReceipt {self.id} for cost entry {self.cost_entry_id}>'
 
 
 class CarfaxReport(db.Model):

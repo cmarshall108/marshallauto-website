@@ -29,7 +29,7 @@ from app.forms import (
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
-    RebuildCostEntry, SiteSetting, TestDrive, User, Vehicle, VehicleImage,
+    RebuildCostEntry, RebuildCostReceipt, SiteSetting, TestDrive, User, Vehicle, VehicleImage,
     VehicleImageHighlight, VehicleSaleImage, VideoUploadJob, utcnow,
 )
 from app.highlight_jobs import (
@@ -46,9 +46,11 @@ from app.marketplace_import import (
     photo_thumbnail, photo_token, preview_token, read_preview, stage_photos,
 )
 from app.utils import (
-    client_ip, delete_license_image, delete_local_video_file, is_safe_redirect,
+    MAX_PRIVATE_IMAGE_BYTES, client_ip, delete_license_image, delete_local_video_file,
+    delete_receipt_image, is_safe_redirect,
     rate_limit_exceeded, save_license_image_data_url,
     save_uploaded_image, save_uploaded_license_image, save_uploaded_pdf,
+    save_uploaded_receipt_image,
 )
 from app.video_jobs import (
     VideoUploadError, cancel_video_jobs, discard_staged_video, stage_video_upload,
@@ -819,6 +821,7 @@ def vehicle_edit(id):
 @login_required
 def vehicle_rebuild_tracker(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    receipt_upload_error = None
     edit_id = request.args.get('edit', type=int)
     edit_entry = None
     if edit_id:
@@ -849,19 +852,55 @@ def vehicle_rebuild_tracker(id):
                     entry = RebuildCostEntry.query.filter_by(
                         id=entry_id, vehicle_id=vehicle.id,
                     ).first_or_404()
+                existing_receipt_count = len(entry.receipts) if entry else 0
+                uploads = [
+                    upload for upload in request.files.getlist('receipt_images')
+                    if upload and upload.filename
+                ]
+                receipt_filenames = []
+                try:
+                    if existing_receipt_count + len(uploads) > 10:
+                        raise ValueError('Upload no more than 10 receipt photos per cost item.')
+                    for upload in uploads:
+                        size = len(upload.stream.read(MAX_PRIVATE_IMAGE_BYTES + 1))
+                        if size > MAX_PRIVATE_IMAGE_BYTES:
+                            raise ValueError('Each receipt photo must be 15 MB or smaller.')
+                        upload.stream.seek(0)
+                        filename = save_uploaded_receipt_image(upload)
+                        if not filename:
+                            raise ValueError(
+                                'Could not save a receipt photo. Use a valid JPEG, PNG, WebP, GIF, or HEIC image.'
+                            )
+                        receipt_filenames.append(filename)
+                except ValueError as exc:
+                    for filename in receipt_filenames:
+                        delete_receipt_image(filename)
+                    receipt_upload_error = str(exc)
                 else:
-                    entry = RebuildCostEntry(vehicle_id=vehicle.id)
-                    db.session.add(entry)
-                entry.category = entry_form.category.data
-                entry.description = entry_form.description.data.strip()
-                entry.vendor = (entry_form.vendor.data or '').strip() or None
-                entry.purchase_date = entry_form.purchase_date.data
-                entry.quantity = entry_form.quantity.data
-                entry.unit_cost = entry_form.unit_cost.data
-                entry.notes = (entry_form.notes.data or '').strip() or None
-                db.session.commit()
-                flash('Rebuild cost saved.', 'success')
-                return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
+                    try:
+                        if not entry:
+                            entry = RebuildCostEntry(vehicle_id=vehicle.id)
+                            db.session.add(entry)
+                        entry.category = entry_form.category.data
+                        entry.description = entry_form.description.data.strip()
+                        entry.vendor = (entry_form.vendor.data or '').strip() or None
+                        entry.purchase_date = entry_form.purchase_date.data
+                        entry.quantity = entry_form.quantity.data
+                        entry.unit_cost = entry_form.unit_cost.data
+                        entry.notes = (entry_form.notes.data or '').strip() or None
+                        db.session.flush()
+                        entry.receipts.extend(
+                            RebuildCostReceipt(filename=filename)
+                            for filename in receipt_filenames
+                        )
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+                        for filename in receipt_filenames:
+                            delete_receipt_image(filename)
+                        raise
+                    flash('Rebuild cost saved.', 'success')
+                    return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
         else:
             abort(400)
 
@@ -895,6 +934,7 @@ def vehicle_rebuild_tracker(id):
         'admin/rebuild_tracker.html',
         vehicle=vehicle,
         entries=entries,
+        receipt_upload_error=receipt_upload_error,
         acquisition_form=acquisition_form,
         entry_form=entry_form,
         category_labels=dict(entry_form.category.choices),
@@ -908,7 +948,7 @@ def vehicle_rebuild_tracker(id):
         profit_margin=profit_margin,
         return_on_cost=return_on_cost,
     ), (422 if request.method == 'POST' and (
-        acquisition_form.errors or entry_form.errors
+        acquisition_form.errors or entry_form.errors or receipt_upload_error
     ) else 200)
 
 
@@ -918,9 +958,51 @@ def vehicle_rebuild_cost_delete(id, entry_id):
     entry = RebuildCostEntry.query.filter_by(
         id=entry_id, vehicle_id=id,
     ).first_or_404()
+    for receipt in entry.receipts:
+        delete_receipt_image(receipt.filename)
     db.session.delete(entry)
     db.session.commit()
     flash('Rebuild cost deleted.', 'success')
+    return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
+
+
+@admin_bp.get('/vehicles/<int:id>/rebuild/<int:entry_id>/receipts/<int:receipt_id>')
+@login_required
+def vehicle_rebuild_receipt_view(id, entry_id, receipt_id):
+    receipt = (
+        RebuildCostReceipt.query
+        .join(RebuildCostEntry)
+        .filter(
+            RebuildCostReceipt.id == receipt_id,
+            RebuildCostReceipt.cost_entry_id == entry_id,
+            RebuildCostEntry.vehicle_id == id,
+        )
+        .first_or_404()
+    )
+    directory = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'rebuild_receipts')
+    response = send_from_directory(directory, os.path.basename(receipt.filename), mimetype='image/jpeg')
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@admin_bp.post('/vehicles/<int:id>/rebuild/<int:entry_id>/receipts/<int:receipt_id>/delete')
+@login_required
+def vehicle_rebuild_receipt_delete(id, entry_id, receipt_id):
+    receipt = (
+        RebuildCostReceipt.query
+        .join(RebuildCostEntry)
+        .filter(
+            RebuildCostReceipt.id == receipt_id,
+            RebuildCostReceipt.cost_entry_id == entry_id,
+            RebuildCostEntry.vehicle_id == id,
+        )
+        .first_or_404()
+    )
+    delete_receipt_image(receipt.filename)
+    db.session.delete(receipt)
+    db.session.commit()
+    flash('Receipt photo deleted.', 'success')
     return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
 
 
@@ -1130,6 +1212,7 @@ def vehicle_delete(id):
         .options(
             selectinload(Vehicle.images),
             selectinload(Vehicle.carfax_reports),
+            selectinload(Vehicle.rebuild_cost_entries).selectinload(RebuildCostEntry.receipts),
         )
         .filter_by(id=id)
         .first_or_404()
@@ -1141,6 +1224,9 @@ def vehicle_delete(id):
             _delete_carfax_file(report.filename)
     for image in list(vehicle.sale_images):
         _delete_sale_image_file(image.filename)
+    for entry in list(vehicle.rebuild_cost_entries):
+        for receipt in list(entry.receipts):
+            delete_receipt_image(receipt.filename)
     delete_local_video_file(vehicle.video_url)
     cancel_video_jobs(vehicle)
     db.session.delete(vehicle)

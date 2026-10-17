@@ -320,12 +320,12 @@ def save_uploaded_pdf(file_obj):
     return filename
 
 
-def _save_license_image_bytes(raw_bytes):
-    """Shared save path for license images, whatever the source (file or camera capture)."""
+def _save_private_image_bytes(raw_bytes, subfolder):
+    """Validate, normalize, and securely save an image outside the public static tree."""
     import io
 
     if len(raw_bytes) > MAX_PRIVATE_IMAGE_BYTES:
-        current_app.logger.warning('Rejected private ID image exceeding byte limit')
+        current_app.logger.warning('Rejected private image exceeding byte limit')
         return None
     path = None
     try:
@@ -333,7 +333,7 @@ def _save_license_image_bytes(raw_bytes):
             warnings.simplefilter('error', Image.DecompressionBombWarning)
             with Image.open(io.BytesIO(raw_bytes)) as source:
                 if source.width * source.height > MAX_PRIVATE_IMAGE_PIXELS:
-                    current_app.logger.warning('Rejected private ID image exceeding pixel limit')
+                    current_app.logger.warning('Rejected private image exceeding pixel limit')
                     return None
                 source.verify()
             with Image.open(io.BytesIO(raw_bytes)) as source:
@@ -343,7 +343,7 @@ def _save_license_image_bytes(raw_bytes):
                     converted = img.convert('RGB')
                     try:
                         filename = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}.jpg"
-                        upload_path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
+                        upload_path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], subfolder)
                         os.makedirs(upload_path, mode=0o700, exist_ok=True)
                         destination = os.path.join(upload_path, filename)
                         fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -362,10 +362,15 @@ def _save_license_image_bytes(raw_bytes):
         UnidentifiedImageError, OSError, ValueError,
         Image.DecompressionBombError, Image.DecompressionBombWarning,
     ):
-        current_app.logger.warning('Private ID image rejected or could not be saved', exc_info=True)
+        current_app.logger.warning('Private image rejected or could not be saved', exc_info=True)
         if path and os.path.exists(path):
             os.remove(path)
         return None
+
+
+def _save_license_image_bytes(raw_bytes):
+    """Shared save path for license images, whatever the source (file or camera capture)."""
+    return _save_private_image_bytes(raw_bytes, 'licenses')
 
 
 def save_uploaded_license_image(file_obj):
@@ -377,6 +382,19 @@ def save_uploaded_license_image(file_obj):
         return None
     file_obj.seek(0)
     return _save_license_image_bytes(file_obj.read(MAX_PRIVATE_IMAGE_BYTES + 1))
+
+
+def save_uploaded_receipt_image(file_obj):
+    """Store a receipt photo privately as a normalized JPEG."""
+    if not file_obj or not getattr(file_obj, 'filename', None):
+        return None
+    if not allowed_file(file_obj.filename, current_app.config['ALLOWED_IMAGE_EXTENSIONS']):
+        current_app.logger.warning('Rejected unsupported receipt image extension')
+        return None
+    file_obj.seek(0)
+    return _save_private_image_bytes(
+        file_obj.read(MAX_PRIVATE_IMAGE_BYTES + 1), 'rebuild_receipts',
+    )
 
 
 def save_license_image_data_url(data_url):
@@ -405,6 +423,23 @@ def delete_license_image(filename):
             os.remove(path)
     except OSError:
         pass
+
+
+def delete_receipt_image(filename):
+    if not filename:
+        return
+    path = os.path.join(
+        current_app.config['PRIVATE_UPLOAD_FOLDER'],
+        'rebuild_receipts',
+        os.path.basename(filename),
+    )
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        current_app.logger.warning('Receipt image already missing: %s', filename)
+    except OSError:
+        current_app.logger.exception('Could not delete receipt image: %s', filename)
+        raise
 
 
 def slugify(text):
