@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 from app import create_app, db
 from app.buyer_guides import BUYER_GUIDES
-from app.models import BlogPost, Vehicle, VehicleImage
+from app.models import BlogPost, Review, Vehicle, VehicleImage
 from config import TestingConfig
 
 
@@ -57,6 +57,25 @@ class SeoTests(unittest.TestCase):
             preload['href'],
             '/static/images/gallardo_cover.jpg',
         )
+
+    def test_dealership_schema_omits_self_serving_rating_markup(self):
+        db.session.add(Review(
+            author_name='Test Customer',
+            rating=5,
+            content='A test review.',
+            is_approved=True,
+        ))
+        db.session.commit()
+
+        html = self.page('/')
+        schemas = [
+            json.loads(script.string)
+            for script in html.select('script[type="application/ld+json"]')
+        ]
+        dealership = next(schema for schema in schemas if schema.get('@type') == 'AutoDealer')
+        self.assertNotIn('aggregateRating', dealership)
+        self.assertIn('A test review.', html.get_text())
+        self.assertIn('Rated 5.0 out of 5 stars based on 1 reviews.', html.get_text())
 
     def test_inventory_pagination_canonical_keeps_page_not_tracking(self):
         html = self.page('/inventory?page=2&utm_source=test')

@@ -898,9 +898,6 @@ def structured_data_local_business():
         },
         "sameAs": social
     }
-    aggregate = aggregate_rating_data()
-    if aggregate:
-        data['aggregateRating'] = aggregate
     return data
 
 
