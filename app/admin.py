@@ -535,6 +535,29 @@ def vehicles():
     return render_template('admin/vehicles.html', pagination=pagination, status=status)
 
 
+@admin_bp.get('/vehicles/<int:id>/qr-print')
+@login_required
+def vehicle_qr_print(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    if vehicle.is_coming_soon and vehicle.status == 'available':
+        public_path = f"{url_for('main.coming_soon')}#vehicle-{vehicle.slug}"
+    else:
+        public_path = url_for('main.vehicle_detail', slug=vehicle.slug)
+    public_url = f"{current_app.config['SITE_URL'].rstrip('/')}{public_path}"
+
+    qr_image = qrcode.make(public_url, image_factory=SvgPathImage)
+    qr_output = BytesIO()
+    qr_image.save(qr_output)
+    qr_code = base64.b64encode(qr_output.getvalue()).decode('ascii')
+
+    return render_template(
+        'admin/vehicle_qr_print.html',
+        vehicle=vehicle,
+        public_url=public_url,
+        qr_code=qr_code,
+    )
+
+
 CSV_IMPORT_FIELDS = [
     'year', 'make', 'model', 'trim', 'vin', 'stock_number', 'price', 'sale_price',
     'mileage', 'condition', 'title_status', 'status', 'is_coming_soon', 'body_style', 'exterior_color',

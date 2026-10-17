@@ -1,7 +1,7 @@
 <div class="row g-4">
     {% for vehicle in vehicles %}
     <div class="col-md-6 col-xl-4">
-        <article class="coming-soon-card"{% if not vehicle.primary_image() %}
+        <article class="coming-soon-card" id="vehicle-{{ vehicle.slug }}"{% if not vehicle.primary_image() %}
                  data-stock-year="{{ vehicle.year }}" data-stock-make="{{ vehicle.make }}"
                  data-stock-model="{{ vehicle.model }}"{% endif %}>
             <div class="position-relative">

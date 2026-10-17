@@ -1,0 +1,123 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Print Window QR - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="qr-print-container">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3 no-print">
+        <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Vehicles
+        </a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>Print Window Sheet
+        </button>
+    </div>
+
+    <article class="qr-window-sheet text-center">
+        <header>
+            <p class="qr-business-name mb-1">{{ business_name }}</p>
+            <p class="qr-prompt mb-3">
+                {% if vehicle.is_coming_soon and vehicle.status == 'available' %}
+                Scan for updates when this vehicle is ready
+                {% else %}
+                Scan to see current price and vehicle details
+                {% endif %}
+            </p>
+        </header>
+
+        <h1 class="qr-vehicle-title">{{ vehicle.title }}</h1>
+        {% if vehicle.stock_number %}
+        <p class="text-muted mb-2">Stock #{{ vehicle.stock_number }}</p>
+        {% endif %}
+
+        {% if vehicle.is_coming_soon and vehicle.status == 'available' %}
+        <p class="qr-coming-soon-notice">
+            Price and full details will be posted when this vehicle is ready.
+        </p>
+        {% else %}
+        <p class="qr-price-label mb-0">
+            {% if vehicle.status == 'available' %}
+            Website price
+            {% else %}
+            Last listed price
+            {% endif %}
+        </p>
+        <p class="qr-price">{{ vehicle.display_price | format_price }}</p>
+        {% endif %}
+
+        <img class="qr-code-image"
+             src="data:image/svg+xml;base64,{{ qr_code }}"
+             alt="QR code linking to the {{ vehicle.title }} listing">
+
+        <p class="qr-scan-caption mt-3 mb-2">Point your phone camera here</p>
+        <p class="qr-url mb-0">{{ public_url }}</p>
+    </article>
+</div>
+
+<style>
+    .qr-print-container { max-width: 760px; margin: 0 auto; }
+    .qr-window-sheet {
+        min-height: 760px;
+        padding: 3rem 2rem;
+        border: 1px solid #d5dbe2;
+        border-radius: 12px;
+        background: #fff;
+        color: #142238;
+        box-shadow: 0 12px 36px rgba(20, 34, 56, 0.1);
+    }
+    .qr-business-name {
+        color: #23354a;
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .qr-prompt { color: #59677a; font-size: 1.15rem; font-weight: 600; }
+    .qr-vehicle-title { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; }
+    .qr-price-label { color: #59677a; font-size: 1rem; font-weight: 600; }
+    .qr-price { color: #142238; font-size: clamp(3rem, 8vw, 4.5rem); font-weight: 900; line-height: 1.1; }
+    .qr-coming-soon-notice { max-width: 30rem; margin: 1rem auto; color: #59677a; font-size: 1.15rem; font-weight: 600; }
+    .qr-code-image {
+        display: block;
+        width: min(340px, 76vw);
+        height: auto;
+        margin: 1rem auto 0;
+        padding: 0.75rem;
+        border: 1px solid #e1e6eb;
+        background: #fff;
+    }
+    .qr-scan-caption { color: #23354a; font-size: 1.1rem; font-weight: 700; }
+    .qr-url { color: #59677a; font-size: 0.78rem; overflow-wrap: anywhere; }
+    @page { size: letter portrait; margin: 0.5in; }
+    @media print {
+        body { background: #fff !important; }
+        .admin-sidebar,
+        .admin-mobile-nav,
+        .admin-content > *:not(.qr-print-container),
+        .no-print { display: none !important; }
+        .admin-content { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        .qr-print-container { width: 100%; max-width: none; margin: 0; }
+        .qr-window-sheet {
+            display: flex;
+            min-height: 9.5in;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.35in;
+            border: 2px solid #23354a;
+            border-radius: 0.2in;
+            box-shadow: none;
+            break-inside: avoid;
+        }
+        .qr-business-name { font-size: 22pt; }
+        .qr-prompt { font-size: 16pt; }
+        .qr-vehicle-title { font-size: 26pt; }
+        .qr-price-label { font-size: 14pt; }
+        .qr-price { font-size: 52pt; }
+        .qr-coming-soon-notice { font-size: 16pt; }
+        .qr-code-image { width: 3.25in; max-width: 100%; margin-top: 0.1in; }
+        .qr-scan-caption { font-size: 16pt; }
+        .qr-url { font-size: 9pt; }
+    }
+</style>
+{% endblock %}

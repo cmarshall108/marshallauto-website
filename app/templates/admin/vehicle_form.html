@@ -7,6 +7,9 @@
     <h2 class="fw-bold mb-0">{{ title }}</h2>
     <div class="d-flex gap-2">
         {% if vehicle %}
+        <a href="{{ url_for('admin.vehicle_qr_print', id=vehicle.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-qr-code me-1"></i>Print Window QR
+        </a>
         <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-receipt me-1"></i>Rebuild Costs
         </a>
