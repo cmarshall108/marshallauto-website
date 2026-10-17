@@ -71,7 +71,7 @@
     font-weight: 600;
     border-radius: 10px;
     padding: 0.75rem 1.25rem;
-    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.18s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .public-site .btn-sm { padding: 0.55rem 0.9rem; }
 .public-site .btn-lg { padding: 0.95rem 1.5rem; font-size: 1rem; }
@@ -208,6 +208,34 @@
 .public-site .vehicle-card .vehicle-card-badges { top: auto; bottom: 0.75rem; left: 0.75rem; right: auto; justify-content: flex-start; max-width: calc(100% - 1.5rem); }
 .public-site .vehicle-card .badge-title-status { box-shadow: none; border-radius: 6px; }
 .public-site .vehicle-card > .favorite-btn { width: 44px; height: 44px; }
+.public-site a:not(.btn):not(.navbar-brand):not(.skip-to-content) { transition: color 0.18s ease; }
+.public-site :is(.vehicle-card, .coming-soon-card, .contact-info-card) {
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.public-site :is(.vehicle-card, .coming-soon-card) img {
+    transition: transform 0.35s ease;
+}
+.public-site .motion-entered {
+    animation: site-motion-enter 0.48s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: var(--motion-delay, 0ms);
+}
+@keyframes site-motion-enter {
+    from { opacity: 0.78; translate: 0 12px; }
+    to { opacity: 1; translate: 0 0; }
+}
+@media (hover: hover) and (pointer: fine) {
+    .public-site .btn:not(:disabled):not(.disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 40, 44, 0.12);
+    }
+    .public-site .btn:not(:disabled):not(.disabled):active { transform: translateY(0); }
+    .public-site :is(.vehicle-card, .coming-soon-card, .contact-info-card):hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 36px rgba(37, 40, 44, 0.12);
+        border-color: #d2c8b8;
+    }
+    .public-site :is(.vehicle-card, .coming-soon-card):hover img { transform: scale(1.025); }
+}
 .public-site .badge.bg-warning { background-color: #eee3cf !important; color: #65491f !important; }
 .public-site .badge.bg-success { background-color: #e4eee3 !important; color: #315231; }
 .public-site .badge.bg-danger { background-color: #f5e1df !important; color: #8b3532; }
@@ -238,7 +266,7 @@
         0 0 0 5px #ffdc00,
         0 5px 14px rgba(0, 0, 0, 0.65),
         0 0 18px rgba(255, 34, 0, 0.9);
-    animation: low-mileage-pop 1.5s ease-in-out infinite, low-mileage-colors 3s linear infinite;
+    animation: low-mileage-pop 1.8s ease-in-out infinite;
     line-height: 1;
     text-align: center;
     white-space: nowrap;
@@ -293,7 +321,7 @@
     align-items: center;
     text-align: center;
     transform: none;
-    animation: low-mileage-colors 3s linear infinite, low-mileage-inline-pop 1.5s ease-in-out infinite;
+    animation: low-mileage-inline-pop 1.8s ease-in-out infinite;
 }
 @keyframes low-mileage-pop {
     0%, 100% { transform: rotate(-5deg) scale(1); }
@@ -303,13 +331,9 @@
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.06); }
 }
-@keyframes low-mileage-colors {
-    from { background-position: 0% 50%; }
-    to { background-position: 190% 50%; }
-}
 @keyframes low-mileage-shine {
-    0%, 25% { left: -45%; }
-    65%, 100% { left: 145%; }
+    0%, 25% { transform: translate3d(0, 0, 0) skewX(-24deg); }
+    65%, 100% { transform: translate3d(590%, 0, 0) skewX(-24deg); }
 }
 .public-site .savings-callout,
 .public-site .savings-banner {
@@ -410,6 +434,6 @@
     .public-site *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
     .public-site .badge-low-miles,
     .public-site .badge-low-miles-inline { transform: none; }
-    .public-site .vehicle-card:hover,
-    .public-site .vehicle-card:hover .card-img-top { transform: none; }
+    .public-site :is(.vehicle-card, .coming-soon-card, .contact-info-card):hover,
+    .public-site :is(.vehicle-card, .coming-soon-card):hover img { transform: none; }
 }

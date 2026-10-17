@@ -537,8 +537,36 @@
 
     window.MarshallAnalytics = Analytics;
 
+    function initMotionSystem() {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+                !('IntersectionObserver' in window)) {
+            return;
+        }
+
+        const targets = document.querySelectorAll(
+            '.public-site main > section:not(.hero-section), ' +
+            '.public-site main .vehicle-card, .public-site main .coming-soon-card, ' +
+            '.public-site main .contact-info-card, .public-site main .card'
+        );
+        if (!targets.length) return;
+
+        const observer = new IntersectionObserver((entries, activeObserver) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('motion-entered');
+                activeObserver.unobserve(entry.target);
+            });
+        }, { rootMargin: '0px 0px 80px 0px', threshold: 0.08 });
+
+        targets.forEach((target, index) => {
+            target.style.setProperty('--motion-delay', `${(index % 4) * 55}ms`);
+            observer.observe(target);
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         Analytics.init();
+        initMotionSystem();
 
         // Reserve space for sticky mobile CTA
         if (document.querySelector('.mobile-cta-bar')) {
