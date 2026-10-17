@@ -149,6 +149,44 @@ class VehicleSaleForm(FlaskForm):
     submit = SubmitField('Save Sale Details')
 
 
+class VehicleAcquisitionCostForm(FlaskForm):
+    acquisition_cost = DecimalField(
+        'Vehicle Purchase / Acquisition Cost',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+    )
+    submit = SubmitField('Save Acquisition Cost')
+
+
+class RebuildCostEntryForm(FlaskForm):
+    entry_id = HiddenField()
+    category = SelectField('Cost Type', choices=[
+        ('parts', 'Parts & Materials'),
+        ('labor', 'Labor'),
+        ('service', 'Service / Repair'),
+        ('supplies', 'Shop Supplies'),
+        ('transport', 'Transport'),
+        ('fees', 'Fees & Taxes'),
+        ('other', 'Other'),
+    ], validators=[DataRequired()])
+    description = StringField(
+        'Item or service',
+        validators=[DataRequired(), Length(max=180)],
+    )
+    vendor = StringField('Store / Provider', validators=[Optional(), Length(max=128)])
+    purchase_date = DateField('Date', validators=[Optional()])
+    quantity = DecimalField(
+        'Quantity',
+        default=1,
+        validators=[DataRequired(), NumberRange(min=0.01, max=100000)],
+    )
+    unit_cost = DecimalField(
+        'Unit Cost',
+        validators=[DataRequired(), NumberRange(min=0, max=99999999.99)],
+    )
+    notes = TextAreaField('Notes', validators=[Optional(), Length(max=2000)])
+    submit = SubmitField('Add Cost')
+
+
 class ServiceRecordForm(FlaskForm):
     vehicle_id = SelectField('Vehicle *', coerce=int, validators=[DataRequired()])
     service_date = DateField('Service Date *', validators=[DataRequired()])

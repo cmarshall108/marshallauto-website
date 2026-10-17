@@ -21,6 +21,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Secure login with Flask-Login
   - Optional site-wide authenticator-app two-factor authentication, with single-use recovery codes
   - Add/edit/delete vehicles with image uploads
+  - Per-vehicle rebuild cost tracker for acquisition, parts, labor, services, and other expenses, with projected/actual profit and margin calculations
   - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes

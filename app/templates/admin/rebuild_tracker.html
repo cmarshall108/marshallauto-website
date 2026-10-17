@@ -1,0 +1,223 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Rebuild Cost Tracker - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <a href="{{ url_for('admin.vehicles') }}" class="small text-decoration-none">
+            <i class="bi bi-arrow-left me-1"></i>Vehicles
+        </a>
+        <h2 class="fw-bold mb-1 mt-2">Rebuild Cost Tracker</h2>
+        <div class="text-muted">{{ vehicle.title }}{% if vehicle.stock_number %} &middot; Stock #{{ vehicle.stock_number }}{% endif %}{% if vehicle.vin %} &middot; VIN {{ vehicle.vin }}{% endif %}</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil me-1"></i>Edit Vehicle
+        </a>
+        {% if vehicle.status == 'sold' %}
+        <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-receipt me-1"></i>Sale Details
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="alert alert-light border d-flex gap-2 align-items-start mb-4">
+    <i class="bi bi-info-circle text-primary mt-1"></i>
+    <div>
+        <strong>Private cost records.</strong>
+        Track what you paid to acquire and prepare this vehicle. Profit uses the actual sold amount when recorded; otherwise, it shows an estimate from the vehicle's current listed price.
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm p-3">
+            <div class="small text-muted">Acquisition</div>
+            <div class="fs-4 fw-bold">{{ acquisition_cost | format_currency }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm p-3">
+            <div class="small text-muted">Rebuild &amp; Prep Costs</div>
+            <div class="fs-4 fw-bold">{{ expense_total | format_currency }}</div>
+            <div class="small text-muted">Service / repair: {{ service_total | format_currency }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm p-3">
+            <div class="small text-muted">Total Cost Basis</div>
+            <div class="fs-4 fw-bold">{{ total_cost | format_currency }}</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm p-3">
+            <div class="small text-muted">{{ 'Actual Sale Price' if sale_is_actual else 'Current Asking Price' }}</div>
+            <div class="fs-4 fw-bold">{{ sale_price | format_currency if sale_price is not none else 'Not set' }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm p-3 p-lg-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <div class="small text-muted">{{ 'Actual Profit' if sale_is_actual else 'Estimated Profit at Asking Price' }}</div>
+            <div class="display-6 fw-bold {{ 'text-success' if profit is not none and profit >= 0 else 'text-danger' }}">
+                {{ profit | format_currency if profit is not none else 'Not available' }}
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-4">
+            <div>
+                <div class="small text-muted">Profit Margin</div>
+                <div class="h3 fw-bold mb-0">{{ (profit_margin|string ~ '%') if profit_margin is not none else 'N/A' }}</div>
+                <div class="small text-muted">Profit &divide; sale price</div>
+            </div>
+            <div>
+                <div class="small text-muted">Return on Cost</div>
+                <div class="h3 fw-bold mb-0">{{ (return_on_cost|string ~ '%') if return_on_cost is not none else 'N/A' }}</div>
+                <div class="small text-muted">Profit &divide; total cost</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm p-3 p-lg-4 mb-4">
+    <div class="row align-items-end g-3">
+        <div class="col-lg">
+            <h3 class="h5 fw-bold mb-1">Vehicle acquisition cost</h3>
+            <p class="small text-muted mb-lg-0">Enter the amount paid to buy or acquire this vehicle. Count preparation expenses below, not here.</p>
+        </div>
+        <div class="col-lg-5">
+            <form method="POST" class="row g-2 align-items-end">
+                {{ acquisition_form.hidden_tag() }}
+                <input type="hidden" name="action" value="save_acquisition">
+                <div class="col">
+                    {{ acquisition_form.acquisition_cost.label(class="form-label small mb-1") }}
+                    {{ acquisition_form.acquisition_cost(class="form-control", type="number", step="0.01", min="0", placeholder="e.g. 4500.00") }}
+                    {% for error in acquisition_form.acquisition_cost.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-auto">{{ acquisition_form.submit(class="btn btn-primary") }}</div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-4">
+        <div class="card border-0 shadow-sm p-3 p-lg-4" id="add-cost">
+            <h3 class="h5 fw-bold mb-1">{{ 'Edit cost item' if entry_form.entry_id.data else 'Add a cost item' }}</h3>
+            <p class="small text-muted">Add parts, labor, repairs, services, and other rebuild expenses.</p>
+            <form method="POST">
+                {{ entry_form.hidden_tag() }}
+                <input type="hidden" name="action" value="save_entry">
+                <div class="mb-3">
+                    {{ entry_form.category.label(class="form-label") }}
+                    {{ entry_form.category(class="form-select") }}
+                    {% for error in entry_form.category.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ entry_form.description.label(class="form-label") }}
+                    {{ entry_form.description(class="form-control", placeholder="e.g. Front bumper, alignment, mechanic labor") }}
+                    {% for error in entry_form.description.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        {{ entry_form.quantity.label(class="form-label") }}
+                        {{ entry_form.quantity(class="form-control", type="number", min="0.01", step="0.01") }}
+                        {% for error in entry_form.quantity.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-6">
+                        {{ entry_form.unit_cost.label(class="form-label") }}
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ entry_form.unit_cost(class="form-control", type="number", min="0", step="0.01", placeholder="0.00") }}
+                        </div>
+                        {% for error in entry_form.unit_cost.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ entry_form.vendor.label(class="form-label") }}
+                    {{ entry_form.vendor(class="form-control", placeholder="Store, shop, or provider") }}
+                    {% for error in entry_form.vendor.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ entry_form.purchase_date.label(class="form-label") }}
+                    {{ entry_form.purchase_date(class="form-control", type="date") }}
+                    {% for error in entry_form.purchase_date.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ entry_form.notes.label(class="form-label") }}
+                    {{ entry_form.notes(class="form-control", rows="2", placeholder="Optional receipt or repair notes") }}
+                    {% for error in entry_form.notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="d-flex gap-2">
+                    {{ entry_form.submit(class="btn btn-primary") }}
+                    {% if entry_form.entry_id.data %}
+                    <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=vehicle.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-xl-8">
+        <div class="card border-0 shadow-sm p-3 p-lg-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">Cost breakdown</h3>
+                    <p class="small text-muted mb-0">{{ entries|length }} item{{ '' if entries|length == 1 else 's' }} &middot; Total {{ expense_total | format_currency }}</p>
+                </div>
+            </div>
+            {% if entries %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Type</th>
+                            <th class="text-end">Qty</th>
+                            <th class="text-end">Unit Cost</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr>
+                            <td>
+                                <strong>{{ entry.description }}</strong>
+                                {% if entry.vendor %}<div class="small text-muted">{{ entry.vendor }}</div>{% endif %}
+                                {% if entry.purchase_date %}<div class="small text-muted">{{ entry.purchase_date.strftime('%b %d, %Y') }}</div>{% endif %}
+                                {% if entry.notes %}<div class="small text-muted">{{ entry.notes }}</div>{% endif %}
+                            </td>
+                            <td><span class="badge text-bg-light">{{ category_labels.get(entry.category, entry.category|title) }}</span></td>
+                            <td class="text-end">{{ entry.quantity.normalize() }}</td>
+                            <td class="text-end">{{ entry.unit_cost | format_currency }}</td>
+                            <td class="text-end fw-semibold">{{ entry.line_total | format_currency }}</td>
+                            <td class="text-end text-nowrap">
+                                <a href="{{ url_for('admin.vehicle_rebuild_cost_edit', id=vehicle.id, entry_id=entry.id) }}#add-cost" class="btn btn-sm btn-outline-primary" aria-label="Edit {{ entry.description }}"><i class="bi bi-pencil"></i></a>
+                                <form method="POST" action="{{ url_for('admin.vehicle_rebuild_cost_delete', id=vehicle.id, entry_id=entry.id) }}" class="d-inline" onsubmit="return confirm('Delete this cost item?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete {{ entry.description }}"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr><th colspan="4" class="text-end">Rebuild &amp; prep total</th><th class="text-end">{{ expense_total | format_currency }}</th><th></th></tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-receipt-cutoff display-5 text-muted"></i>
+                <h4 class="h6 fw-bold mt-3">No rebuild costs yet</h4>
+                <p class="small text-muted mb-0">Add the first part, repair, or service on the left to start tracking this vehicle's costs.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

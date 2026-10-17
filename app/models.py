@@ -1,6 +1,7 @@
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 
 from flask import current_app
 from flask_login import UserMixin
@@ -103,6 +104,7 @@ class Vehicle(db.Model):
     # Pricing & status
     price = db.Column(db.Numeric(10, 2), nullable=False)
     sale_price = db.Column(db.Numeric(10, 2), nullable=True)
+    acquisition_cost = db.Column(db.Numeric(10, 2), nullable=True)
     mileage = db.Column(db.Integer, nullable=False)
     condition = db.Column(db.String(20), default='used', nullable=False)  # used, certified, rebuilt
     title_status = db.Column(db.String(20), default='clean', nullable=False, index=True)  # clean, rebuilt, salvage
@@ -162,6 +164,13 @@ class Vehicle(db.Model):
         lazy='selectin',
         cascade='all, delete-orphan',
         order_by='ServiceRecord.service_date.desc()',
+    )
+    rebuild_cost_entries = db.relationship(
+        'RebuildCostEntry',
+        backref='vehicle',
+        lazy='selectin',
+        cascade='all, delete-orphan',
+        order_by='RebuildCostEntry.purchase_date.desc(), RebuildCostEntry.id.desc()',
     )
     carfax_reports = db.relationship(
         'CarfaxReport',
@@ -486,6 +495,32 @@ class ServiceRecord(db.Model):
 
     def __repr__(self):
         return f'<ServiceRecord {self.service_type} on {self.service_date}>'
+
+
+class RebuildCostEntry(db.Model):
+    __tablename__ = 'rebuild_cost_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(
+        db.Integer, db.ForeignKey('vehicles.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    category = db.Column(db.String(24), nullable=False)
+    description = db.Column(db.String(180), nullable=False)
+    vendor = db.Column(db.String(128), nullable=True)
+    purchase_date = db.Column(db.Date, nullable=True)
+    quantity = db.Column(db.Numeric(10, 2), nullable=False, default=1)
+    unit_cost = db.Column(db.Numeric(10, 2), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    @property
+    def line_total(self):
+        amount = (self.quantity or Decimal('0')) * (self.unit_cost or Decimal('0'))
+        return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    def __repr__(self):
+        return f'<RebuildCostEntry {self.description} for vehicle {self.vehicle_id}>'
 
 
 class CarfaxReport(db.Model):

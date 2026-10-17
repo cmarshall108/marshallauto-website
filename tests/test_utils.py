@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -6,8 +7,8 @@ from unittest import mock
 from flask import Flask
 
 from app.utils import (
-    _ffmpeg_path, format_mileage_badge, is_low_mileage, is_safe_redirect,
-    notify_new_lead,
+    _ffmpeg_path, format_currency, format_mileage_badge, is_low_mileage,
+    is_safe_redirect, notify_new_lead,
 )
 
 
@@ -19,6 +20,9 @@ class MileageBadgeTests(unittest.TestCase):
 
     def test_invalid_mileage_uses_existing_fallback(self):
         self.assertEqual(format_mileage_badge(None), '0 mi')
+
+    def test_formats_tracker_currency_to_cents(self):
+        self.assertEqual(format_currency(Decimal('1234.5')), '$1,234.50')
 
     def test_older_vehicles_get_extended_low_mileage_threshold(self):
         current_year = datetime.now().year

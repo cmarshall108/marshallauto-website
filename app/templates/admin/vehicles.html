@@ -55,6 +55,7 @@
                     <td>
                         <a href="{{ url_for('main.coming_soon') if vehicle.is_coming_soon else url_for('main.vehicle_detail', slug=vehicle.slug) }}" target="_blank" class="btn btn-sm btn-outline-secondary mb-1"><i class="bi bi-eye"></i></a>
                         <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-sm btn-primary mb-1"><i class="bi bi-pencil"></i></a>
+                        <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=vehicle.id) }}" class="btn btn-sm btn-outline-success mb-1" title="Rebuild cost tracker"><i class="bi bi-receipt"></i> Costs</a>
                         {% if vehicle.status == 'sold' %}
                         <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-sm btn-outline-primary mb-1">Sale Details</a>
                         {% endif %}

@@ -17,7 +17,10 @@ _ENV_PATH = Path(os.environ.get('DOTENV_PATH') or _ROOT / '.env')
 load_dotenv(_ENV_PATH if _ENV_PATH.is_file() else _ROOT / '.env')
 
 from config import get_config
-from app.utils import format_mileage, format_mileage_badge, format_price, is_low_mileage
+from app.utils import (
+    format_currency, format_mileage, format_mileage_badge, format_price,
+    is_low_mileage,
+)
 
 # Reasonably strict CSP covering the third-party origins this site actually loads
 # (Bootstrap/fonts CDN, GTM/GA4, Facebook Pixel, Google Maps embed, YouTube/Vimeo video embeds).
@@ -122,6 +125,7 @@ def create_app(config_class=None):
 
     # Template filters and globals
     app.jinja_env.filters['format_price'] = format_price
+    app.jinja_env.filters['format_currency'] = format_currency
     app.jinja_env.filters['format_mileage'] = format_mileage
     app.jinja_env.filters['format_mileage_badge'] = format_mileage_badge
     app.jinja_env.filters['is_low_mileage'] = is_low_mileage

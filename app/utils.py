@@ -12,6 +12,7 @@ import time
 import warnings
 from collections import defaultdict, deque
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
 from functools import lru_cache
 
@@ -419,6 +420,14 @@ def format_price(value):
         return f"${int(float(value)):,}"
     except (TypeError, ValueError):
         return '$0'
+
+
+def format_currency(value):
+    try:
+        amount = Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"${amount:,.2f}"
+    except (InvalidOperation, TypeError, ValueError):
+        return '$0.00'
 
 
 def format_mileage(value):

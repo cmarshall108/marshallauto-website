@@ -4,7 +4,7 @@ import binascii
 import secrets
 from io import BytesIO
 from datetime import timedelta
-from decimal import InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import wraps
 
 from flask import (
@@ -23,13 +23,14 @@ from sqlalchemy.orm import selectinload
 from app import db
 from app.forms import (
     BlogPostForm, CarfaxReportForm, ChangePasswordForm, LoginForm, ReviewForm,
-    ServiceRecordForm, SiteSettingForm, TestDriveEditForm, TestDriveForm,
-    TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm, VehicleForm, VehicleSaleForm,
+    RebuildCostEntryForm, ServiceRecordForm, SiteSettingForm, TestDriveEditForm,
+    TestDriveForm, TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm,
+    VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
-    SiteSetting, TestDrive, User, Vehicle, VehicleImage, VehicleImageHighlight, VehicleSaleImage,
-    VideoUploadJob, utcnow,
+    RebuildCostEntry, SiteSetting, TestDrive, User, Vehicle, VehicleImage,
+    VehicleImageHighlight, VehicleSaleImage, VideoUploadJob, utcnow,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -46,8 +47,8 @@ from app.marketplace_import import (
 )
 from app.utils import (
     client_ip, delete_license_image, delete_local_video_file, is_safe_redirect,
-    rate_limit_exceeded, save_license_image_data_url, save_uploaded_image,
-    save_uploaded_license_image, save_uploaded_pdf,
+    rate_limit_exceeded, save_license_image_data_url,
+    save_uploaded_image, save_uploaded_license_image, save_uploaded_pdf,
 )
 from app.video_jobs import (
     VideoUploadError, cancel_video_jobs, discard_staged_video, stage_video_upload,
@@ -789,6 +790,124 @@ def vehicle_edit(id):
         marketplace_draft=draft,
         video_job=VideoUploadJob.query.filter_by(vehicle_id=id).order_by(VideoUploadJob.id.desc()).first(),
     )
+
+
+@admin_bp.route('/vehicles/<int:id>/rebuild', methods=['GET', 'POST'])
+@login_required
+def vehicle_rebuild_tracker(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    edit_id = request.args.get('edit', type=int)
+    edit_entry = None
+    if edit_id:
+        edit_entry = RebuildCostEntry.query.filter_by(
+            id=edit_id, vehicle_id=vehicle.id,
+        ).first_or_404()
+
+    acquisition_form = VehicleAcquisitionCostForm()
+    entry_form = RebuildCostEntryForm(obj=edit_entry)
+    if request.method == 'GET':
+        acquisition_form.acquisition_cost.data = vehicle.acquisition_cost
+        if edit_entry:
+            entry_form.entry_id.data = str(edit_entry.id)
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'save_acquisition':
+            if acquisition_form.validate_on_submit():
+                vehicle.acquisition_cost = acquisition_form.acquisition_cost.data
+                db.session.commit()
+                flash('Acquisition cost saved.', 'success')
+                return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
+        elif action == 'save_entry':
+            if entry_form.validate_on_submit():
+                entry_id = entry_form.entry_id.data
+                entry = None
+                if entry_id:
+                    entry = RebuildCostEntry.query.filter_by(
+                        id=entry_id, vehicle_id=vehicle.id,
+                    ).first_or_404()
+                else:
+                    entry = RebuildCostEntry(vehicle_id=vehicle.id)
+                    db.session.add(entry)
+                entry.category = entry_form.category.data
+                entry.description = entry_form.description.data.strip()
+                entry.vendor = (entry_form.vendor.data or '').strip() or None
+                entry.purchase_date = entry_form.purchase_date.data
+                entry.quantity = entry_form.quantity.data
+                entry.unit_cost = entry_form.unit_cost.data
+                entry.notes = (entry_form.notes.data or '').strip() or None
+                db.session.commit()
+                flash('Rebuild cost saved.', 'success')
+                return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
+        else:
+            abort(400)
+
+    entries = (
+        RebuildCostEntry.query
+        .filter_by(vehicle_id=vehicle.id)
+        .order_by(RebuildCostEntry.purchase_date.desc(), RebuildCostEntry.id.desc())
+        .all()
+    )
+    zero = Decimal('0.00')
+    expense_total = sum((entry.line_total for entry in entries), zero).quantize(
+        Decimal('0.01'), rounding=ROUND_HALF_UP,
+    )
+    acquisition_cost = vehicle.acquisition_cost or zero
+    total_cost = acquisition_cost + expense_total
+    service_total = sum(
+        (entry.line_total for entry in entries if entry.category == 'service'),
+        zero,
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    sale_price = vehicle.sold_price if vehicle.sold_price is not None else vehicle.display_price
+    profit = (sale_price - total_cost) if sale_price is not None else None
+    profit_margin = (
+        (profit / sale_price * 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        if profit is not None and sale_price else None
+    )
+    return_on_cost = (
+        (profit / total_cost * 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        if profit is not None and total_cost else None
+    )
+    return render_template(
+        'admin/rebuild_tracker.html',
+        vehicle=vehicle,
+        entries=entries,
+        acquisition_form=acquisition_form,
+        entry_form=entry_form,
+        category_labels=dict(entry_form.category.choices),
+        acquisition_cost=acquisition_cost,
+        expense_total=expense_total,
+        service_total=service_total,
+        total_cost=total_cost,
+        sale_price=sale_price,
+        sale_is_actual=vehicle.sold_price is not None,
+        profit=profit,
+        profit_margin=profit_margin,
+        return_on_cost=return_on_cost,
+    ), (422 if request.method == 'POST' and (
+        acquisition_form.errors or entry_form.errors
+    ) else 200)
+
+
+@admin_bp.post('/vehicles/<int:id>/rebuild/<int:entry_id>/delete')
+@login_required
+def vehicle_rebuild_cost_delete(id, entry_id):
+    entry = RebuildCostEntry.query.filter_by(
+        id=entry_id, vehicle_id=id,
+    ).first_or_404()
+    db.session.delete(entry)
+    db.session.commit()
+    flash('Rebuild cost deleted.', 'success')
+    return redirect(url_for('admin.vehicle_rebuild_tracker', id=id))
+
+
+@admin_bp.get('/vehicles/<int:id>/rebuild/edit/<int:entry_id>')
+@login_required
+def vehicle_rebuild_cost_edit(id, entry_id):
+    entry = RebuildCostEntry.query.filter_by(
+        id=entry_id, vehicle_id=id,
+    ).first_or_404()
+    return redirect(url_for('admin.vehicle_rebuild_tracker', id=id, edit=entry.id))
 
 
 def _deferred_vehicle_media():
