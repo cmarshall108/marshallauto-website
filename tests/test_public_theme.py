@@ -86,7 +86,14 @@ class PublicThemeTests(unittest.TestCase):
         home_badge = home.select_one(
             '.vehicle-card .card-img-wrapper .badge-low-miles',
         )
-        self.assertEqual(home_badge.get_text(strip=True), '42K Miles')
+        self.assertEqual(
+            home_badge.select_one('.badge-low-miles-label').get_text(strip=True),
+            'Low Mileage',
+        )
+        self.assertEqual(
+            home_badge.select_one('.badge-low-miles-value').get_text(strip=True),
+            '42K Miles',
+        )
 
         inventory = self.page('/inventory')
         self.assertTrue(any('Call' in link.get_text(' ', strip=True)
@@ -95,7 +102,10 @@ class PublicThemeTests(unittest.TestCase):
             '.vehicle-card .card-img-wrapper .badge-low-miles',
         )
         self.assertIsNotNone(low_mileage_banner)
-        self.assertEqual(low_mileage_banner.get_text(strip=True), '42K Miles')
+        self.assertEqual(
+            low_mileage_banner.select_one('.badge-low-miles-value').get_text(strip=True),
+            '42K Miles',
+        )
         self.assertIn('42,000 mi', low_mileage_banner['title'])
         summary = self.client.get(
             '/api/vehicles-summary?slugs=theme-car',
@@ -115,7 +125,14 @@ class PublicThemeTests(unittest.TestCase):
             '.inventory-grid .card-img-wrapper .badge-low-miles',
         )
         self.assertEqual(len(related_badges), 1)
-        self.assertEqual(related_badges[0].get_text(strip=True), '27.5K Miles')
+        self.assertEqual(
+            related_badges[0].select_one('.badge-low-miles-value').get_text(strip=True),
+            '27K Miles',
+        )
+        self.assertEqual(
+            related_badges[0].select_one('.badge-low-miles-label').get_text(strip=True),
+            'Low Mileage',
+        )
 
     def test_browser_theme_colors_match_manifest_and_tile_config(self):
         html = self.page('/')

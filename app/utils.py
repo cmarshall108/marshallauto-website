@@ -435,8 +435,7 @@ def format_mileage_badge(value):
         return format_mileage(value)
     if miles < 1000:
         return format_mileage(miles)
-    thousands = f'{miles / 1000:.1f}'.rstrip('0').rstrip('.')
-    return f'{thousands}K Miles'
+    return f'{miles // 1000}K Miles'
 
 
 # Used-car retail cue: under this odometer reading shows a "LOW MILES!" badge.
