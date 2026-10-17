@@ -167,7 +167,7 @@
                                 <span class="badge-condition">{{ vehicle.condition | title }}</span>
                                 <div class="vehicle-card-badges">
                                     {% if vehicle.is_low_mileage %}
-                                    <span class="badge-low-miles" title="Low mileage — under 75,000 miles">LOW MILES!</span>
+                                    <span class="badge-low-miles" title="Low mileage — {{ format_mileage(vehicle.mileage) }}">{{ ((vehicle.mileage / 1000) | round(1) | string | replace('.0', '')) ~ 'K Miles' if vehicle.mileage >= 1000 else format_mileage(vehicle.mileage) }}</span>
                                     {% endif %}
                                     {% if vehicle.title_status == 'rebuilt' %}
                                     <span class="badge badge-title-status bg-warning text-dark">Rebuilt Title</span>

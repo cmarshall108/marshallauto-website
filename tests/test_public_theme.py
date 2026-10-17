@@ -87,6 +87,12 @@ class PublicThemeTests(unittest.TestCase):
         inventory = self.page('/inventory')
         self.assertTrue(any('Call' in link.get_text(' ', strip=True)
                             for link in inventory.select('a[href^="tel:"]')))
+        low_mileage_banner = inventory.select_one(
+            '.vehicle-card .card-img-wrapper .badge-low-miles',
+        )
+        self.assertIsNotNone(low_mileage_banner)
+        self.assertEqual(low_mileage_banner.get_text(strip=True), '42K Miles')
+        self.assertIn('42,000 mi', low_mileage_banner['title'])
 
     def test_browser_theme_colors_match_manifest_and_tile_config(self):
         html = self.page('/')
