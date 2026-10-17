@@ -174,8 +174,20 @@ class PublicThemeTests(unittest.TestCase):
                          manifest['theme_color'])
         self.assertEqual(html.select_one('meta[name="msapplication-TileColor"]')['content'],
                          tiles.findtext('.//TileColor'))
-        self.assertEqual(manifest['theme_color'], '#25282c')
-        self.assertEqual(manifest['background_color'], '#faf8f4')
+        self.assertEqual(manifest['theme_color'], '#142238')
+        self.assertEqual(manifest['background_color'], '#f4f6f8')
+
+    def test_storefront_hero_and_mobile_actions_emphasize_shopping(self):
+        html = self.page('/')
+        self.assertIsNotNone(html.select_one('.hero-actions a[href="/inventory"]'))
+        self.assertIsNotNone(html.select_one('.hero-actions a[href^="tel:"]'))
+        self.assertIsNotNone(html.select_one('.search-box form'))
+        self.assertIsNotNone(html.select_one('.cookie-consent-banner'))
+
+        css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
+        self.assertIn('.hero-actions .btn-primary', css)
+        self.assertIn('mobile-cta-bar) .btn-primary', css)
+        self.assertIn('prefers-reduced-motion: reduce', css)
 
     def test_theme_contains_motion_and_focus_accessibility_rules(self):
         css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
