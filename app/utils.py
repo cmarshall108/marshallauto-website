@@ -440,15 +440,30 @@ def format_mileage_badge(value):
 
 # Used-car retail cue: under this odometer reading shows a "LOW MILES!" badge.
 LOW_MILEAGE_THRESHOLD = 75000
+OLDER_VEHICLE_AGE_YEARS = 8
+OLDER_VEHICLE_LOW_MILEAGE_THRESHOLD = 100000
 
 
-def is_low_mileage(value, threshold: int = LOW_MILEAGE_THRESHOLD) -> bool:
-    """True when mileage is a non-negative int strictly below the threshold."""
+def is_low_mileage(
+    value,
+    threshold: int = LOW_MILEAGE_THRESHOLD,
+    year: int | None = None,
+) -> bool:
+    """True for under-threshold mileage, or under 100k on vehicles over 8 years old."""
     try:
         miles = int(value)
     except (TypeError, ValueError):
         return False
-    return 0 <= miles < int(threshold)
+    if miles < 0:
+        return False
+    if miles < int(threshold):
+        return True
+    try:
+        vehicle_year = int(year)
+    except (TypeError, ValueError):
+        return False
+    is_older_vehicle = datetime.now(timezone.utc).year - vehicle_year > OLDER_VEHICLE_AGE_YEARS
+    return is_older_vehicle and miles < OLDER_VEHICLE_LOW_MILEAGE_THRESHOLD
 
 
 def parse_optional_int(value):

@@ -1,6 +1,7 @@
 import json
 import unittest
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -133,6 +134,35 @@ class PublicThemeTests(unittest.TestCase):
             related_badges[0].select_one('.badge-low-miles-label').get_text(strip=True),
             'Low Mileage',
         )
+
+    def test_older_vehicle_under_100k_is_badged_on_inventory(self):
+        older_vehicle = Vehicle(
+            slug='older-low-mileage-car',
+            year=datetime.now().year - 9,
+            make='Toyota',
+            model='Corolla',
+            price=10500,
+            mileage=99999,
+            status='available',
+        )
+        db.session.add(older_vehicle)
+        db.session.commit()
+
+        inventory = self.page('/inventory')
+        vehicle_link = inventory.select_one(
+            'a[href="/inventory/older-low-mileage-car"]',
+        )
+        card = vehicle_link.find_parent(class_='vehicle-card')
+        badge = card.select_one('.card-img-wrapper .badge-low-miles')
+        self.assertEqual(
+            badge.select_one('.badge-low-miles-value').get_text(strip=True),
+            '99K Miles',
+        )
+        summary = self.client.get(
+            '/api/vehicles-summary?slugs=older-low-mileage-car',
+        ).get_json()['vehicles'][0]
+        self.assertTrue(summary['is_low_mileage'])
+        self.assertEqual(summary['low_mileage_badge'], '99K Miles')
 
     def test_browser_theme_colors_match_manifest_and_tile_config(self):
         html = self.page('/')

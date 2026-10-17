@@ -1,3 +1,4 @@
+from datetime import datetime
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -5,7 +6,8 @@ from unittest import mock
 from flask import Flask
 
 from app.utils import (
-    _ffmpeg_path, format_mileage_badge, is_safe_redirect, notify_new_lead,
+    _ffmpeg_path, format_mileage_badge, is_low_mileage, is_safe_redirect,
+    notify_new_lead,
 )
 
 
@@ -17,6 +19,14 @@ class MileageBadgeTests(unittest.TestCase):
 
     def test_invalid_mileage_uses_existing_fallback(self):
         self.assertEqual(format_mileage_badge(None), '0 mi')
+
+    def test_older_vehicles_get_extended_low_mileage_threshold(self):
+        current_year = datetime.now().year
+        self.assertTrue(is_low_mileage(99999, year=current_year - 9))
+        self.assertFalse(is_low_mileage(100000, year=current_year - 9))
+        self.assertFalse(is_low_mileage(99999, year=current_year - 8))
+        self.assertTrue(is_low_mileage(74999, year=current_year))
+        self.assertFalse(is_low_mileage(75000, year=current_year))
 
 
 class FfmpegResolutionTests(unittest.TestCase):

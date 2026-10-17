@@ -238,7 +238,7 @@ class Vehicle(db.Model):
     def is_low_mileage(self):
         """Retail attention flag for low-odometer inventory cards."""
         from app.utils import is_low_mileage
-        return is_low_mileage(self.mileage)
+        return is_low_mileage(self.mileage, year=self.year)
 
     def generate_slug(self):
         base = re.sub(
