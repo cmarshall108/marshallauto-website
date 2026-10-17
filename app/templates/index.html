@@ -23,6 +23,9 @@
                     <a href="{{ url_for('main.inventory') }}" class="btn btn-primary btn-lg">
                         <i class="bi bi-search me-2"></i>Browse Inventory
                     </a>
+                    <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-outline-light btn-lg">
+                        <i class="bi bi-telephone-fill me-2"></i>Call Our Cell
+                    </a>
                     <a href="{{ url_for('main.financing') }}" class="btn btn-outline-light btn-lg">
                         <i class="bi bi-credit-card me-2"></i>Get Pre-Approved
                     </a>
@@ -298,6 +301,9 @@
         <p class="lead mb-4">Browse our inventory, get pre-approved, or visit us for a test drive today.</p>
         <div class="d-flex flex-wrap justify-content-center gap-3">
             <a href="{{ url_for('main.inventory') }}" class="btn btn-primary btn-lg">Shop Now</a>
+            <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-outline-light btn-lg">
+                <i class="bi bi-telephone-fill me-2"></i>Call Our Cell
+            </a>
             <a href="{{ url_for('main.contact') }}" class="btn btn-outline-light btn-lg">Contact Us</a>
         </div>
     </div>

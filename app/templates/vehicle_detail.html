@@ -310,15 +310,6 @@
                             <i class="bi bi-envelope-fill me-2"></i>Request More Info
                         </button>
                     </div>
-                    <div class="d-grid gap-2 mb-3 d-lg-none">
-                        <button class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#contactModal">
-                            <i class="bi bi-envelope-fill me-2"></i>Request More Info
-                        </button>
-                        <a href="sms:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}?&body=I'm interested in {{ vehicle.title if vehicle.status == 'available' else 'vehicles similar to ' ~ vehicle.title }} (Stock #{{ vehicle.stock_number or vehicle.id }})" class="btn btn-secondary btn-lg">
-                            <i class="bi bi-chat-dots-fill me-2"></i>{{ 'Text About This Car' if vehicle.status == 'available' else 'Text About Similar Vehicles' }}
-                        </a>
-                    </div>
-
                     <p class="text-muted small mb-0"><i class="bi bi-file-earmark-text me-1 text-primary"></i> CarFax history reports available on qualifying vehicles</p>
                 </div>
 

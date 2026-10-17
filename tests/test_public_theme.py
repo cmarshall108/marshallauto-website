@@ -79,6 +79,15 @@ class PublicThemeTests(unittest.TestCase):
         self.assertEqual(budget['min'], '0')
         self.assertEqual(budget['inputmode'], 'numeric')
 
+    def test_shopping_pages_make_call_actions_easy_to_find(self):
+        home = self.page('/')
+        self.assertTrue(any('Call Our Cell' in link.get_text(' ', strip=True)
+                            for link in home.select('a[href^="tel:"]')))
+
+        inventory = self.page('/inventory')
+        self.assertTrue(any('Call' in link.get_text(' ', strip=True)
+                            for link in inventory.select('a[href^="tel:"]')))
+
     def test_browser_theme_colors_match_manifest_and_tile_config(self):
         html = self.page('/')
         with self.client.get('/static/manifest.json') as response:
@@ -100,6 +109,9 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIsNotNone(html.select_one('.js-favorite-btn[data-slug="theme-car"]'))
         self.assertIsNotNone(html.select_one('button[data-bs-target="#contactModal"]'))
         self.assertIsNotNone(html.select_one('.mobile-cta-bar a[href^="tel:"]'))
+        vehicle_text = html.select_one('.mobile-cta-bar a[href^="sms:"]')
+        self.assertIn('Text About This Car', vehicle_text.get_text(' ', strip=True))
+        self.assertIn('Toyota%20Camry', vehicle_text['href'])
 
 
 if __name__ == '__main__':
