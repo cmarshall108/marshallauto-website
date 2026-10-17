@@ -1,9 +1,14 @@
 {% extends "base.html" %}
 
-{% block meta_title %}{{ site_setting.get('home_hero_title') }} | {{ business_name }}{% endblock %}
+{% block meta_title %}Used Cars for Sale in {{ business_city }}, {{ business_state }} | {{ business_name }}{% endblock %}
 {% block meta_description %}{{ site_setting.get('meta_description') }}{% endblock %}
-{% block og_title %}{{ site_setting.get('home_hero_title') }} | {{ business_name }}{% endblock %}
+{% block og_title %}Used Cars for Sale in {{ business_city }}, {{ business_state }} | {{ business_name }}{% endblock %}
 {% block og_description %}{{ site_setting.get('meta_description') }}{% endblock %}
+{% block twitter_title %}Used Cars for Sale in {{ business_city }}, {{ business_state }} | {{ business_name }}{% endblock %}
+
+{% block extra_head %}
+<link rel="preload" as="image" href="{{ url_for('static', filename='images/gallardo_cover.jpg') }}" fetchpriority="high">
+{% endblock %}
 
 {% block content %}
 <!-- Hero -->

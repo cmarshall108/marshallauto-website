@@ -37,6 +37,27 @@ class SeoTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return BeautifulSoup(response.data, 'html.parser')
 
+    def test_homepage_title_targets_local_used_car_search_without_repeating_brand(self):
+        html = self.page('/')
+        title = html.title.get_text(strip=True)
+        self.assertEqual(
+            title,
+            'Used Cars for Sale in Sanford, NC | Marshall Auto, LLC',
+        )
+        self.assertEqual(html.select_one('meta[property="og:title"]')['content'], title)
+        self.assertEqual(html.select_one('meta[name="twitter:title"]')['content'], title)
+
+    def test_homepage_preloads_hero_image_for_faster_paint(self):
+        html = self.page('/')
+        preload = html.select_one(
+            'link[rel="preload"][as="image"][fetchpriority="high"]',
+        )
+        self.assertIsNotNone(preload)
+        self.assertEqual(
+            preload['href'],
+            '/static/images/gallardo_cover.jpg',
+        )
+
     def test_inventory_pagination_canonical_keeps_page_not_tracking(self):
         html = self.page('/inventory?page=2&utm_source=test')
         self.assertEqual(html.select_one('link[rel="canonical"]')['href'],
@@ -242,6 +263,50 @@ class SeoTests(unittest.TestCase):
         self.assertIn('object-fit-contain', image['class'])
         related = html.select_one('aside[aria-label="Related buying guides"]')
         self.assertIsNone(related.select_one(f'a[href="/blog/{draft.slug}"]'))
+
+    def test_blog_meta_description_falls_back_to_plain_text_content(self):
+        post = BlogPost(
+            title='Local used-car buying tips',
+            slug='local-used-car-buying-tips',
+            content=(
+                '<p>Compare vehicle history reports and inspection notes.</p>'
+                '<p>Ask questions before you buy.</p>'
+            ),
+            is_published=True,
+        )
+        db.session.add(post)
+        db.session.commit()
+
+        html = self.page(f'/blog/{post.slug}')
+        description = html.select_one('meta[name="description"]')['content']
+        self.assertEqual(
+            description,
+            'Compare vehicle history reports and inspection notes. Ask questions before you buy.',
+        )
+        article = next(
+            json.loads(script.string)
+            for script in html.select('script[type="application/ld+json"]')
+            if json.loads(script.string).get('@type') == 'Article'
+        )
+        self.assertEqual(article['description'], description)
+
+    def test_blog_meta_description_prefers_editor_seo_description(self):
+        post = BlogPost(
+            title='Local used-car buying tips',
+            slug='local-used-car-buying-tips-custom',
+            excerpt='General excerpt.',
+            seo_description='Editor-written search description.',
+            content='<p>Article content.</p>',
+            is_published=True,
+        )
+        db.session.add(post)
+        db.session.commit()
+
+        html = self.page(f'/blog/{post.slug}')
+        self.assertEqual(
+            html.select_one('meta[name="description"]')['content'],
+            'Editor-written search description.',
+        )
 
     def test_local_visit_details_use_configuration_and_actual_location(self):
         self.app.config.update(

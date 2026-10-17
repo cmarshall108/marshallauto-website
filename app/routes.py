@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
+from bs4 import BeautifulSoup
 from flask import (
     Blueprint, current_app, flash, jsonify, make_response, redirect,
     render_template, request, send_from_directory, url_for as flask_url_for, abort
@@ -26,6 +27,22 @@ from app.utils import (
 )
 
 main = Blueprint('main', __name__)
+
+
+def _blog_post_description(post):
+    """Build a useful search/share description when the editor left it blank."""
+    for source, truncate in (
+        (post.seo_description, False),
+        (post.excerpt, False),
+        (post.content, True),
+    ):
+        text = BeautifulSoup(source or '', 'html.parser').get_text(' ', strip=True)
+        text = ' '.join(text.split())
+        if text:
+            if truncate and len(text) > 160:
+                text = text[:157].rsplit(' ', 1)[0].rstrip('.,;:') + '...'
+            return text
+    return ''
 
 
 def _utcnow():
@@ -1433,6 +1450,7 @@ def blog_list():
 @main.route('/blog/<slug>')
 def blog_post_detail(slug):
     post = BlogPost.query.filter_by(slug=slug, is_published=True).first_or_404()
+    post_description = _blog_post_description(post)
     breadcrumbs = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
         ("Blog", url_for('main.blog_list', _external=True)),
@@ -1443,7 +1461,7 @@ def blog_post_detail(slug):
         "@context": "https://schema.org",
         "@type": "Article",
         "headline": post.title,
-        "description": post.seo_description or post.excerpt or '',
+        "description": post_description,
         "author": {"@type": "Organization", "name": post.author_name or current_app.config['BUSINESS_NAME']},
         "publisher": {
             "@type": "Organization",
@@ -1470,7 +1488,7 @@ def blog_post_detail(slug):
         structured_website=structured_data_website(),
         structured_article=structured_article,
         meta_title=post.seo_title or f"{post.title} | {current_app.config['BUSINESS_NAME']}",
-        meta_description=post.seo_description or post.excerpt or '',
+        meta_description=post_description,
         og_image=post.cover_image_url,
         page_type='blog',
     )
