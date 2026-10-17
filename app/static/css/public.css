@@ -218,68 +218,98 @@
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.12rem;
-    background: linear-gradient(120deg, #b50924 0%, #ed1c24 48%, #ff6900 100%);
+    gap: 0.08rem;
+    background: repeating-linear-gradient(
+        135deg,
+        #b50924 0,
+        #b50924 9px,
+        #ed1c24 9px,
+        #ed1c24 18px,
+        #ff6900 18px,
+        #ff6900 27px
+    );
+    background-size: 190% 190%;
     color: #fff;
-    border: 2px solid #fff;
-    border-radius: 8px 18px 8px 18px;
-    padding: 0.42rem 0.75rem 0.48rem;
-    box-shadow: 0 0 0 2px #171717, 0 4px 12px rgba(0, 0, 0, 0.55);
-    animation: low-mileage-pop 1.8s ease-in-out infinite;
+    border: 3px solid #fff;
+    border-radius: 7px 19px 7px 19px;
+    padding: 1.05rem 0.9rem 0.58rem;
+    box-shadow:
+        0 0 0 2px #171717,
+        0 0 0 5px #ffdc00,
+        0 5px 14px rgba(0, 0, 0, 0.65),
+        0 0 18px rgba(255, 34, 0, 0.9);
+    animation: low-mileage-pop 1.5s ease-in-out infinite, low-mileage-colors 3s linear infinite;
     line-height: 1;
     text-align: center;
     white-space: nowrap;
-    transform: rotate(-4deg);
+    transform: rotate(-5deg);
 }
 .public-site .badge-low-miles::before {
-    content: "★";
+    content: "★  LOW MILES  ★";
     position: absolute;
-    top: 0.04rem;
-    right: 0.2rem;
-    color: #fff36a;
-    font-size: 0.72rem;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 0.16rem 0.28rem 0.13rem;
+    background: #ffdc00;
+    color: #171717;
+    font-size: 0.56rem;
+    font-style: italic;
+    font-weight: 1000;
+    letter-spacing: 0.13em;
     line-height: 1;
-    text-shadow: 0 1px 2px #64101a;
+    text-shadow: 0 1px 0 #fff;
 }
 .public-site .badge-low-miles::after {
     content: "";
     position: absolute;
-    inset: -40% auto -40% -35%;
-    width: 24%;
-    background: rgba(255, 255, 255, 0.6);
+    inset: -55% auto -55% -45%;
+    width: 32%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
     transform: skewX(-24deg);
-    animation: low-mileage-shine 2.8s ease-in-out infinite;
+    animation: low-mileage-shine 2.2s ease-in-out infinite;
 }
 .public-site .badge-low-miles-label {
     position: relative;
     z-index: 1;
-    font-size: 0.58rem;
-    font-weight: 900;
-    letter-spacing: 0.14em;
+    font-size: 0.59rem;
+    font-weight: 1000;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
 }
 .public-site .badge-low-miles-value {
     position: relative;
     z-index: 1;
     color: #fff36a;
-    font-size: 1.05rem;
+    font-size: 1.18rem;
     font-weight: 1000;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.025em;
     text-transform: uppercase;
-    text-shadow: 0 2px 2px #541019, 0 0 8px rgba(255, 243, 106, 0.55);
+    -webkit-text-stroke: 0.35px #171717;
+    text-shadow: 0 2px 2px #541019, 0 0 10px rgba(255, 243, 106, 0.85);
 }
 .public-site .badge-low-miles-inline {
     align-items: center;
     text-align: center;
+    transform: none;
+    animation: low-mileage-colors 3s linear infinite, low-mileage-inline-pop 1.5s ease-in-out infinite;
 }
 @keyframes low-mileage-pop {
-    0%, 100% { transform: rotate(-4deg) scale(1); }
-    50% { transform: rotate(-2deg) scale(1.07); }
+    0%, 100% { transform: rotate(-5deg) scale(1); }
+    50% { transform: rotate(-2deg) scale(1.1); }
+}
+@keyframes low-mileage-inline-pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+@keyframes low-mileage-colors {
+    from { background-position: 0% 50%; }
+    to { background-position: 190% 50%; }
 }
 @keyframes low-mileage-shine {
-    0%, 35% { left: -35%; }
-    75%, 100% { left: 125%; }
+    0%, 25% { left: -45%; }
+    65%, 100% { left: 145%; }
 }
 .public-site .savings-callout,
 .public-site .savings-banner {
@@ -378,7 +408,8 @@
     .public-site *,
     .public-site *::before,
     .public-site *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
-    .public-site .badge-low-miles { transform: none; }
+    .public-site .badge-low-miles,
+    .public-site .badge-low-miles-inline { transform: none; }
     .public-site .vehicle-card:hover,
     .public-site .vehicle-card:hover .card-img-top { transform: none; }
 }

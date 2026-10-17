@@ -152,6 +152,8 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('@media (prefers-reduced-motion: reduce)', css)
         self.assertIn(':focus-visible', css)
         self.assertIn('@keyframes low-mileage-pop', css)
+        self.assertIn('@keyframes low-mileage-inline-pop', css)
+        self.assertIn('@keyframes low-mileage-colors', css)
         self.assertIn('@keyframes low-mileage-shine', css)
         html = self.page('/inventory/theme-car')
         self.assertIsNotNone(html.select_one('.js-favorite-btn[data-slug="theme-car"]'))
