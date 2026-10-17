@@ -114,6 +114,7 @@
                     '<div class="card-img-wrapper">' +
                         '<img src="' + v.image + '" class="card-img-top" alt="' + escapeHtml(v.title) + '" width="600" height="400" loading="lazy" decoding="async">' +
                         badge +
+                        (v.is_low_mileage ? '<span class="badge-low-miles" title="Low mileage — ' + escapeHtml(v.mileage) + '">' + escapeHtml(v.low_mileage_badge) + '</span>' : '') +
                     '</div>' +
                     '<div class="card-body p-4">' +
                         '<h5 class="card-title">' + escapeHtml(v.title) + '</h5>' +

@@ -18,7 +18,7 @@ from app.buyer_guides import published_buyer_guides
 from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import is_valid_vin, normalize_vin
 from app.utils import (
-    aggregate_rating_data, client_ip, format_mileage, format_price,
+    aggregate_rating_data, client_ip, format_mileage, format_mileage_badge, format_price,
     notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
     send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
     structured_data_how_to, structured_data_item_list, structured_data_local_business,
@@ -1058,6 +1058,8 @@ def api_vehicles_summary():
             'price': format_price(v.display_price),
             'price_raw': float(v.display_price) if v.display_price is not None else None,
             'mileage': format_mileage(v.mileage),
+            'is_low_mileage': v.is_low_mileage,
+            'low_mileage_badge': format_mileage_badge(v.mileage) if v.is_low_mileage else '',
             'year': v.year,
             'make': v.make,
             'model': v.model,

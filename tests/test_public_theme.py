@@ -83,6 +83,10 @@ class PublicThemeTests(unittest.TestCase):
         home = self.page('/')
         self.assertTrue(any('Call Our Cell' in link.get_text(' ', strip=True)
                             for link in home.select('a[href^="tel:"]')))
+        home_badge = home.select_one(
+            '.vehicle-card .card-img-wrapper .badge-low-miles',
+        )
+        self.assertEqual(home_badge.get_text(strip=True), '42K Miles')
 
         inventory = self.page('/inventory')
         self.assertTrue(any('Call' in link.get_text(' ', strip=True)
@@ -93,6 +97,25 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIsNotNone(low_mileage_banner)
         self.assertEqual(low_mileage_banner.get_text(strip=True), '42K Miles')
         self.assertIn('42,000 mi', low_mileage_banner['title'])
+        summary = self.client.get(
+            '/api/vehicles-summary?slugs=theme-car',
+        ).get_json()['vehicles'][0]
+        self.assertTrue(summary['is_low_mileage'])
+        self.assertEqual(summary['low_mileage_badge'], '42K Miles')
+
+    def test_related_inventory_cards_show_actual_low_mileage(self):
+        db.session.add(Vehicle(
+            slug='related-low-mileage-car', year=2021, make='Toyota',
+            model='Corolla', price=20500, mileage=27500, status='available',
+        ))
+        db.session.commit()
+
+        detail = self.page('/inventory/theme-car')
+        related_badges = detail.select(
+            '.inventory-grid .card-img-wrapper .badge-low-miles',
+        )
+        self.assertEqual(len(related_badges), 1)
+        self.assertEqual(related_badges[0].get_text(strip=True), '27.5K Miles')
 
     def test_browser_theme_colors_match_manifest_and_tile_config(self):
         html = self.page('/')

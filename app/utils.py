@@ -428,6 +428,17 @@ def format_mileage(value):
         return '0 mi'
 
 
+def format_mileage_badge(value):
+    try:
+        miles = int(value)
+    except (TypeError, ValueError):
+        return format_mileage(value)
+    if miles < 1000:
+        return format_mileage(miles)
+    thousands = f'{miles / 1000:.1f}'.rstrip('0').rstrip('.')
+    return f'{thousands}K Miles'
+
+
 # Used-car retail cue: under this odometer reading shows a "LOW MILES!" badge.
 LOW_MILEAGE_THRESHOLD = 75000
 

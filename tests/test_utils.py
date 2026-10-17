@@ -4,7 +4,19 @@ from unittest import mock
 
 from flask import Flask
 
-from app.utils import _ffmpeg_path, is_safe_redirect, notify_new_lead
+from app.utils import (
+    _ffmpeg_path, format_mileage_badge, is_safe_redirect, notify_new_lead,
+)
+
+
+class MileageBadgeTests(unittest.TestCase):
+    def test_formats_low_mileage_for_vehicle_badges(self):
+        self.assertEqual(format_mileage_badge(27000), '27K Miles')
+        self.assertEqual(format_mileage_badge(27500), '27.5K Miles')
+        self.assertEqual(format_mileage_badge(850), '850 mi')
+
+    def test_invalid_mileage_uses_existing_fallback(self):
+        self.assertEqual(format_mileage_badge(None), '0 mi')
 
 
 class FfmpegResolutionTests(unittest.TestCase):

@@ -243,7 +243,7 @@
                             <span class="badge bg-success">Clean Title</span>
                             {% endif %}
                             {% if vehicle.is_low_mileage %}
-                            <span class="badge-low-miles badge-low-miles-inline" title="Low mileage — under 75,000 miles">LOW MILES!</span>
+                            <span class="badge-low-miles badge-low-miles-inline" title="Low mileage — {{ vehicle.mileage | format_mileage }}">{{ vehicle.mileage | format_mileage_badge }}</span>
                             {% endif %}
                         </div>
                         <span class="text-muted small">Stock #{{ vehicle.stock_number or vehicle.id }}</span>
@@ -512,7 +512,7 @@
                             <span class="badge-condition">{{ rv.condition | title }}</span>
                             <div class="vehicle-card-badges">
                                 {% if rv.is_low_mileage %}
-                                <span class="badge-low-miles" title="Low mileage — under 75,000 miles">LOW MILES!</span>
+                                <span class="badge-low-miles" title="Low mileage — {{ rv.mileage | format_mileage }}">{{ rv.mileage | format_mileage_badge }}</span>
                                 {% endif %}
                                 {% if rv.title_status == 'rebuilt' %}
                                 <span class="badge badge-title-status bg-warning text-dark">Rebuilt Title</span>
