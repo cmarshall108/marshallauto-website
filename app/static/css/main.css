@@ -2310,6 +2310,32 @@ body.gallery-lightbox-open {
     }
 }
 
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .mobile-cta-bar { display: block; }
+
+    body.has-mobile-cta {
+        padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    }
+
+    body.has-mobile-cta.has-compare-bar {
+        padding-bottom: calc(10.25rem + env(safe-area-inset-bottom));
+    }
+
+    body.has-mobile-cta .compare-bar,
+    body.has-mobile-cta .cookie-consent-banner {
+        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    }
+
+    body.has-mobile-cta .chat-widget {
+        bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    }
+
+    body.cookie-consent-visible .chat-widget,
+    body.has-compare-bar .chat-widget {
+        display: none;
+    }
+}
+
 @media (min-width: 576px) {
     .mobile-cta-bar .btn span.label-short {
         display: none;

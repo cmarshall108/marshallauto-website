@@ -65,6 +65,11 @@
     gap: 1rem;
 }
 .admin-theme .admin-mobile-nav { background: var(--dark) !important; border-bottom: 1px solid #454649; }
+.admin-theme .admin-mobile-nav .navbar-collapse {
+    max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
 .admin-theme .admin-mobile-nav .navbar-brand { letter-spacing: -0.035em; color: #f5eee2; }
 .admin-theme .admin-mobile-nav .nav-link { color: #e5e0d7 !important; border-radius: 8px; padding-inline: 0.75rem; }
 .admin-theme .admin-mobile-nav .nav-link:hover { background: #3c3933; color: #fff !important; }
@@ -229,6 +234,62 @@
     .admin-theme :is(.form-control, .form-select) { font-size: 16px; min-height: 44px; }
     .admin-theme .btn { min-height: 44px; }
     .admin-theme .login-card { padding: 1.5rem; }
+    .admin-theme .admin-vehicles-table,
+    .admin-theme .admin-vehicles-table tbody,
+    .admin-theme .admin-vehicles-table tr { display: block; width: 100%; }
+    .admin-theme .admin-vehicles-table thead { display: none; }
+    .admin-theme .admin-vehicles-table tr {
+        margin-bottom: 1rem;
+        padding: 0.65rem 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: var(--box-shadow);
+    }
+    .admin-theme .admin-vehicles-table td {
+        display: grid;
+        grid-template-columns: minmax(4.25rem, 0.35fr) minmax(0, 1fr);
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.45rem 0;
+        border: 0;
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+    .admin-theme .admin-vehicles-table td[colspan] {
+        display: block;
+        text-align: center;
+    }
+    .admin-theme .admin-vehicles-table td[colspan]::before { display: none; }
+    .admin-theme .admin-vehicles-table td::before {
+        content: attr(data-label);
+        color: var(--text-muted);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-align: left;
+        text-transform: uppercase;
+    }
+    .admin-theme .admin-vehicles-table td[data-label="Actions"] {
+        display: block;
+        border-top: 1px solid var(--line);
+        margin-top: 0.35rem;
+        padding-top: 0.75rem;
+        text-align: left;
+    }
+    .admin-theme .admin-vehicles-table td[data-label="Actions"]::before {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    .admin-theme .admin-vehicles-table td[data-label="Actions"] .btn {
+        margin-right: 0.25rem;
+    }
+    .admin-theme .admin-vehicles-table .vehicle-thumb {
+        width: 5rem;
+        height: 3.5rem;
+        object-fit: cover;
+        border-radius: 6px;
+    }
 }
 @media (prefers-reduced-motion: reduce) {
     .admin-theme *, .admin-theme *::before, .admin-theme *::after {

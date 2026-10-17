@@ -5,7 +5,7 @@ from unittest.mock import patch
 from bs4 import BeautifulSoup
 
 from app import create_app, db
-from app.models import User
+from app.models import User, Vehicle
 from config import TestingConfig
 
 
@@ -67,6 +67,19 @@ class AdminThemeTests(unittest.TestCase):
                 self.assertIsNotNone(html.select_one('#admin-chat-sounds'))
                 self.assertIsNotNone(html.select_one('a[href="/admin/live-chat"]'))
 
+        vehicle = Vehicle(
+            year=2022, make='Honda', model='Civic', price=18000,
+            mileage=32000, status='available', slug='mobile-admin-civic',
+        )
+        db.session.add(vehicle)
+        db.session.commit()
+        inventory = self.page('/admin/vehicles')
+        self.assertIsNotNone(inventory.select_one('.admin-vehicles-table'))
+        self.assertEqual(
+            {cell.get('data-label') for cell in inventory.select('.admin-vehicles-table tbody tr td')},
+            {'Photo', 'Vehicle', 'Price', 'Mileage', 'Status', 'Stock #', 'Added', 'Actions'},
+        )
+
     def test_theme_is_scoped_and_matches_public_palette_and_accessibility(self):
         folder = Path(self.app.static_folder) / 'css'
         admin = (folder / 'admin.css').read_text()
@@ -74,10 +87,14 @@ class AdminThemeTests(unittest.TestCase):
         for token in ('--dark: #25282c', '--light: #faf8f4', '--accent: #d6bc90',
                       '--surface: #fffefa', '--primary: #353b42'):
             self.assertIn(token, admin)
+        for token in ('--dark: #142238', '--light: #f4f6f8', '--accent: #f2bc58',
+                      '--surface: #fff', '--primary: #23354a'):
             self.assertIn(token, public)
         for rule in (':focus-visible', 'prefers-reduced-motion: reduce', 'min-height: 44px',
                      '.admin-theme .btn-secondary:hover', '.admin-theme .table-primary'):
             self.assertIn(rule, admin)
+        self.assertIn('max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom))', admin)
+        self.assertIn('@media (min-width: 768px) and (max-width: 991.98px)', (folder / 'main.css').read_text())
         html = self.page('/')
         self.assertNotIn('admin-theme', html.body['class'])
         self.assertIsNone(html.select_one('link[href*="/admin.css"]'))
