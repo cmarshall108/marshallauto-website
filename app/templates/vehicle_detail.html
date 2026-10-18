@@ -473,7 +473,11 @@ bi-check-circle
                     ] %}
                     <div class="tab-pane fade{% if loop.first %} show active{% endif %}" id="{{ category | lower }}" role="tabpanel" aria-labelledby="{{ category | lower }}-tab" tabindex="0">
                         <h3 class="h5 fw-bold mb-3">{{ category }}</h3>
+                        {% if category == 'Entertainment' %}
+                        {% set equipment = vehicle.entertainment_feature_list %}
+                        {% else %}
                         {% set equipment = (vehicle|attr(field) or '').splitlines() %}
+                        {% endif %}
                         {% if equipment | join | trim %}
                         <ul class="vehicle-feature-list">
                             {% for item in equipment if item.strip() %}

@@ -70,7 +70,7 @@ class InventoryVINSEOTests(unittest.TestCase):
             '17-inch alloy wheels\nHeated side mirrors\nPhoto-observed (verify): Alloy Wheels'
         )
         self.available.interior_features = 'Heated front seats'
-        self.available.entertainment_features = 'Apple CarPlay\nAndroid Auto'
+        self.available.entertainment_features = 'Apple CarPlay'
         self.available.mechanical_features = 'Six-speed automatic transmission'
         self.available.safety_features = 'Blind spot collision warning'
         self.available.additional_specifications = (
@@ -135,6 +135,7 @@ class InventoryVINSEOTests(unittest.TestCase):
             ('#exterior', '17-inch alloy wheels'),
             ('#interior', 'Heated front seats'),
             ('#entertainment', 'Apple CarPlay'),
+            ('#entertainment', 'Android Auto'),
             ('#mechanical', 'Six-speed automatic transmission'),
             ('#safety', 'Blind spot collision warning'),
             ('#details', 'VIN'),
@@ -143,11 +144,11 @@ class InventoryVINSEOTests(unittest.TestCase):
                 self.assertIn(expected_text, html.select_one(panel_id).get_text(' ', strip=True))
         self.assertEqual(
             [feature.get_text(' ', strip=True) for feature in html.select('.vehicle-key-features .feature-tag')],
-            ['Blind Spot Monitor', 'Backup Camera'],
+            ['Blind Spot Monitor', 'Backup Camera', 'Android Auto'],
         )
         self.assertEqual(
             len(html.select('.vehicle-key-features .feature-tag i.bi[aria-hidden="true"]')),
-            2,
+            3,
         )
         self.assertIn('Service History', html.select_one('#details').get_text())
         self.assertIn('CarFax History Report', html.select_one('#details').get_text())
@@ -164,7 +165,14 @@ class InventoryVINSEOTests(unittest.TestCase):
         self.assertEqual(summary['mpg_combined'], 27)
         self.assertEqual(summary['doors'], 4)
         self.assertEqual(summary['passenger_capacity'], 5)
-        self.assertEqual(summary['features'], 'Blind Spot Monitor, Backup Camera')
+        self.assertEqual(
+            summary['features'],
+            'Blind Spot Monitor, Backup Camera, Android Auto',
+        )
+        self.assertEqual(
+            summary['entertainment_features'],
+            'Apple CarPlay\nAndroid Auto',
+        )
         self.assertEqual(summary['exterior_features'], self.available.exterior_features)
         self.assertEqual(summary['safety_features'], self.available.safety_features)
         self.assertEqual(summary['additional_specifications'], self.available.additional_specifications)

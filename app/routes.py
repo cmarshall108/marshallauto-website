@@ -1098,7 +1098,7 @@ def api_vehicles_summary():
             'features': ', '.join(v.feature_list),
             'exterior_features': v.exterior_features or '',
             'interior_features': v.interior_features or '',
-            'entertainment_features': v.entertainment_features or '',
+            'entertainment_features': '\n'.join(v.entertainment_feature_list),
             'mechanical_features': v.mechanical_features or '',
             'safety_features': v.safety_features or '',
             'additional_specifications': v.additional_specifications or '',

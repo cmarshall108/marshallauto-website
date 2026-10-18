@@ -17,6 +17,19 @@ def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _feature_values(raw: str | None) -> list[str]:
+    return [feature.strip() for feature in (raw or '').split(',') if feature.strip()]
+
+
+def _include_android_auto(features: list[str], related_features: list[str]) -> list[str]:
+    all_features = features + related_features
+    has_carplay = any('apple carplay' in feature.casefold() for feature in all_features)
+    has_android_auto = any('android auto' in feature.casefold() for feature in features)
+    if has_carplay and not has_android_auto:
+        features.append('Android Auto')
+    return features
+
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
@@ -215,9 +228,19 @@ class Vehicle(db.Model):
 
     @property
     def feature_list(self):
-        if not self.features:
-            return []
-        return [f.strip() for f in self.features.split(',') if f.strip()]
+        return _include_android_auto(
+            _feature_values(self.features),
+            _feature_values(self.entertainment_features),
+        )
+
+    @property
+    def entertainment_feature_list(self):
+        features = [
+            item.strip()
+            for item in (self.entertainment_features or '').splitlines()
+            if item.strip()
+        ]
+        return _include_android_auto(features, _feature_values(self.features))
 
     def savings_info(self):
         """Savings vs. retail clean-title market value, or None if not applicable.
