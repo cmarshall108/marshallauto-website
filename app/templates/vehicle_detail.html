@@ -532,8 +532,9 @@ bi-check-circle
                                 <span class="badge text-bg-light">{{ vin_decode_field_count }} fields</span>
                             </summary>
                             <p class="small text-muted mt-3 mb-3">
-                                Manufacturer-reported values returned by the NHTSA VIN decoder. Blank and not-applicable
-                                values are omitted; verify equipment against the actual vehicle.
+                                NHTSA manufacturer data and EPA records are shown as returned; blank and not-applicable
+                                values are omitted. Any Grok estimates appear separately below, are not verified,
+                                and never replace NHTSA or EPA values. Verify equipment against the actual vehicle.
                             </p>
                             <div class="row g-3">
                                 {% for group in vin_decode_groups %}

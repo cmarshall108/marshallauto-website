@@ -1,3 +1,4 @@
+import io
 import json
 import unittest
 from unittest.mock import patch
@@ -7,7 +8,8 @@ from werkzeug.datastructures import MultiDict
 
 from app.forms import VehicleForm
 from app.vin_decode import (
-    decode_vin, derive_vehicle_details, group_vin_decode_data, map_vehicle_fields,
+    decode_vin, derive_vehicle_details, enrich_vin_decode_data_with_grok,
+    group_vin_decode_data, map_vehicle_fields,
 )
 
 
@@ -99,6 +101,7 @@ class VinDecodeDetailTests(unittest.TestCase):
         with (
             patch('app.vin_decode.fetch_nhtsa_decode', return_value=nhtsa),
             patch('app.vin_decode.lookup_epa_mpg', return_value=epa),
+            patch('app.vin_decode._xai_api_key', return_value=''),
         ):
             result = decode_vin(REFERENCE_VIN, use_cache=False)
 
@@ -208,6 +211,102 @@ class VinDecodeDetailTests(unittest.TestCase):
         self.assertNotIn('Trailer Type', displayed)
         self.assertNotIn('Error Code', displayed)
         self.assertNotIn('Error Text', displayed)
+
+    def test_grok_estimates_are_separate_and_never_replace_nhtsa_or_epa(self):
+        raw = {
+            'NHTSA': self.reference_decode(),
+            'EPA': {'city08': '25', 'make': 'Hyundai'},
+            'Grok': {
+                'estimates': {
+                    'engine_torque_lb_ft': '132 lb-ft',
+                    'engine_horsepower_hp': '999 hp',
+                    'safety_features': 'Automatic Emergency Braking',
+                },
+            },
+        }
+
+        groups = group_vin_decode_data(raw)
+        by_label = {group['label']: group['fields'] for group in groups}
+        displayed = {
+            item['label']: item['value']
+            for fields in by_label.values()
+            for item in fields
+        }
+
+        self.assertEqual(displayed['Engine Horsepower'], '147')
+        self.assertEqual(displayed['EPA City MPG'], '25')
+        self.assertEqual(
+            by_label['Grok Estimates (not manufacturer-verified)'],
+            [{'label': 'Engine torque', 'value': '132 lb-ft'}],
+        )
+        self.assertEqual(
+            groups[-1]['label'],
+            'Grok Estimates (not manufacturer-verified)',
+        )
+
+    def test_grok_request_is_small_and_only_validates_missing_allowlisted_specs(self):
+        nhtsa = self.reference_decode()
+        original = json.loads(json.dumps(nhtsa))
+        response_content = {
+            'engine_horsepower_hp': 999,
+            'engine_torque_lb_ft': 132,
+            'city_mpg': 99,
+            'curb_weight_lb': 'not sure',
+            'safety_features': 'Airbags',
+            'drivetrain': 'sedan',
+        }
+
+        def mock_urlopen(request, timeout):
+            request_body = json.loads(request.data)
+            self.assertEqual(request_body['model'], 'grok-4.20-0309-non-reasoning')
+            self.assertEqual(request_body['max_tokens'], 128)
+            self.assertEqual(request_body['temperature'], 0)
+            self.assertNotIn(REFERENCE_VIN, request_body['messages'][1]['content'])
+            prompt = request_body['messages'][1]['content']
+            self.assertNotIn('"city_mpg"', prompt)
+            self.assertNotIn('"engine_horsepower_hp"', prompt)
+            return io.BytesIO(json.dumps({
+                'choices': [{
+                    'message': {'content': json.dumps(response_content)},
+                }],
+            }).encode())
+
+        with (
+            patch('app.vin_decode._xai_api_key', return_value='test-key'),
+            patch('app.vin_decode.urllib.request.urlopen', side_effect=mock_urlopen),
+        ):
+            result = enrich_vin_decode_data_with_grok({
+                'NHTSA': nhtsa,
+                'EPA': {'city08': '25'},
+            })
+
+        self.assertEqual(result, {
+            'estimates': {
+                'engine_torque_lb_ft': '132 lb-ft',
+            },
+        })
+        self.assertEqual(nhtsa, original)
+
+    def test_decode_keeps_grok_failures_nonfatal_and_preserves_nhtsa_payload(self):
+        nhtsa = self.reference_decode()
+        with (
+            patch('app.vin_decode.fetch_nhtsa_decode', return_value=nhtsa),
+            patch('app.vin_decode.lookup_epa_mpg', return_value=None),
+            patch('app.vin_decode._xai_api_key', return_value='test-key'),
+            patch(
+                'app.vin_decode.enrich_vin_decode_data_with_grok',
+                side_effect=RuntimeError('provider unavailable'),
+            ),
+        ):
+            result = decode_vin(REFERENCE_VIN, use_cache=False)
+
+        self.assertTrue(result['ok'])
+        self.assertIn('NHTSA', result['vehicle']['vin_decode_data'])
+        self.assertNotIn('Grok', result['vehicle']['vin_decode_data'])
+        self.assertTrue(any(
+            'Grok estimates are temporarily unavailable' in warning
+            for warning in result['warnings']
+        ))
 
 
 class VehicleVINDataFormTests(unittest.TestCase):

@@ -26,7 +26,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
-  - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle; resumable bulk backfill for existing inventory
+  - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle; optional, conservative Grok estimates for missing specifications; resumable bulk backfill for existing inventory
   - Cascading typeahead suggestions for make/model/trim, colors, and features
   - “LOW MILES!” badge on inventory cards under 75,000 miles
   - Manage service records per vehicle
@@ -414,7 +414,8 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `5`) |
 | `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` fallback-only |
 | `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.5`) |
-| `XAI_API_KEY` | xAI API key for Grok vision highlights (required for Grok engine) |
+| `XAI_API_KEY` | xAI API key for Grok vision highlights and optional VIN-spec estimates |
+| `VIN_GROK_MODEL` | Text model for conservative missing-spec estimates (default `grok-4.20-0309-non-reasoning`) |
 | `LICENSE_GROK_MODEL` | xAI vision model for license extraction and visual screening (default `grok-4.5`) |
 | `LICENSE_GROK_TIMEOUT` | License-analysis request timeout in seconds (default `45`) |
 | `PHOTO_HIGHLIGHTS_GROK_REQUIRED` | If `true`, fail the job instead of OpenCV fallback when Grok errors |
@@ -488,13 +489,17 @@ the complete NHTSA/EPA decode for existing vehicles:
 venv/bin/python -m flask --app run:app backfill-vin-data
 ```
 
-The command processes vehicles with a VIN that have no saved decode data. It
+The command processes vehicles with a VIN that lack saved decode data or a
+Grok-enrichment attempt. If `XAI_API_KEY` is set, it makes one short Grok request
+only when eligible specifications are missing; each response is capped at 128
+generated tokens. Equipment, colors, and condition are never guessed. It
 preserves existing vehicle fields and staff-entered features, adding only missing
-values. Failed decodes are reported and can be retried by running the command
-again. Use `--force` to refresh all decoded VINs, `--limit N` to cap one run, or
-`--delay SECONDS` to adjust request spacing. The Ubuntu auto-deployer runs this
-resumable backfill after a successful deploy; other deployment methods should
-run it once after `flask db upgrade`.
+NHTSA-derived values. Grok estimates are stored separately, labeled unverified,
+and never replace NHTSA or EPA values. Failed requests are reported and can be
+retried by running the command again. Use `--force` to refresh all decoded VINs,
+`--limit N` to cap one run, or `--delay SECONDS` to adjust request spacing. The
+Ubuntu auto-deployer runs this resumable backfill after a successful deploy;
+other deployment methods should run it once after `flask db upgrade`.
 
 ## Photo Highlights (Carvana-style bubbles)
 

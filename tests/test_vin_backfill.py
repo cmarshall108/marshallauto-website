@@ -70,10 +70,13 @@ class VINBackfillTests(unittest.TestCase):
         }
 
     def test_backfill_updates_missing_values_and_preserves_existing_content(self):
-        with patch(
-            'app.vin_backfill.decode_vin',
-            side_effect=lambda vin, use_cache: self.decoded_result(vin),
-        ) as decoder:
+        with (
+            patch('app.vin_backfill.is_vin_grok_enrichment_enabled', return_value=False),
+            patch(
+                'app.vin_backfill.decode_vin',
+                side_effect=lambda vin, use_cache: self.decoded_result(vin),
+            ) as decoder,
+        ):
             result = self.runner.invoke(args=['backfill-vin-data', '--delay', '0'])
 
         self.assertEqual(result.exit_code, 0, result.output)
@@ -111,10 +114,13 @@ class VINBackfillTests(unittest.TestCase):
         })
         db.session.commit()
 
-        with patch(
-            'app.vin_backfill.decode_vin',
-            side_effect=lambda vin, use_cache: self.decoded_result(vin),
-        ) as decoder:
+        with (
+            patch('app.vin_backfill.is_vin_grok_enrichment_enabled', return_value=False),
+            patch(
+                'app.vin_backfill.decode_vin',
+                side_effect=lambda vin, use_cache: self.decoded_result(vin),
+            ) as decoder,
+        ):
             skipped = self.runner.invoke(args=['backfill-vin-data', '--delay', '0'])
             decoder.assert_not_called()
             refreshed = self.runner.invoke(
@@ -146,6 +152,42 @@ class VINBackfillTests(unittest.TestCase):
         self.assertEqual(decoder.call_count, 2)
         db.session.expire_all()
         self.assertTrue(db.session.get(Vehicle, self.vehicle.id).vin_decode_data)
+
+    def test_backfill_adds_grok_data_to_existing_nhtsa_payload_without_redecoding(self):
+        self.vehicle.vin_decode_data = json.dumps({
+            'NHTSA': {
+                'VIN': self.vehicle.vin,
+                'ModelYear': '2018',
+                'Make': 'Honda',
+                'Model': 'Accord',
+                'EngineHP': '192',
+            },
+            'EPA': {'city08': '30'},
+        })
+        db.session.commit()
+
+        with (
+            patch('app.vin_backfill.is_vin_grok_enrichment_enabled', return_value=True),
+            patch(
+                'app.vin_backfill.enrich_vin_decode_data_with_grok',
+                return_value={'estimates': {'engine_torque_lb_ft': '192 lb-ft'}},
+            ) as enrich,
+            patch('app.vin_backfill.decode_vin') as decoder,
+        ):
+            result = self.runner.invoke(args=['backfill-vin-data', '--delay', '0'])
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn('added 1 Grok estimate(s)', result.output)
+        enrich.assert_called_once()
+        decoder.assert_not_called()
+        db.session.expire_all()
+        saved = json.loads(db.session.get(Vehicle, self.vehicle.id).vin_decode_data)
+        self.assertEqual(saved['NHTSA']['EngineHP'], '192')
+        self.assertEqual(saved['EPA']['city08'], '30')
+        self.assertEqual(
+            saved['Grok']['estimates']['engine_torque_lb_ft'],
+            '192 lb-ft',
+        )
 
     def test_failed_decode_is_reported_and_exits_unsuccessfully(self):
         with patch(

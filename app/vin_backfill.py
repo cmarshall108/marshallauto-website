@@ -3,11 +3,13 @@ import time
 
 import click
 from flask import current_app
-from sqlalchemy import or_
 
 from app import db
 from app.models import Vehicle
-from app.vin_decode import decode_vin, normalize_vin
+from app.vin_decode import (
+    decode_vin, enrich_vin_decode_data_with_grok,
+    is_vin_grok_enrichment_enabled, normalize_vin,
+)
 
 
 _VIN_FIELDS = (
@@ -90,6 +92,19 @@ def _apply_vin_decode(vehicle: Vehicle, result: dict) -> bool:
     return True
 
 
+def _stored_vin_decode_data(vehicle: Vehicle) -> dict | None:
+    try:
+        raw_data = json.loads(vehicle.vin_decode_data or '')
+    except (json.JSONDecodeError, TypeError):
+        return None
+    nhtsa_data = raw_data.get('NHTSA') if isinstance(raw_data, dict) else None
+    if not isinstance(nhtsa_data, dict) or normalize_vin(
+        nhtsa_data.get('VIN'),
+    ) != normalize_vin(vehicle.vin):
+        return None
+    return raw_data
+
+
 def register_commands(app):
     @app.cli.command('backfill-vin-data')
     @click.option(
@@ -115,22 +130,56 @@ def register_commands(app):
     def backfill_vin_data(force, limit, delay, retries):
         """Fill missing VIN-derived information for existing inventory."""
         query = Vehicle.query.filter(Vehicle.vin.isnot(None), Vehicle.vin != '')
-        if not force:
-            query = query.filter(or_(
-                Vehicle.vin_decode_data.is_(None),
-                Vehicle.vin_decode_data == '',
-            ))
         query = query.order_by(Vehicle.id)
-        if limit:
-            query = query.limit(limit)
-        vehicles = query.all()
+        inventory = query.all()
+        if force:
+            vehicles = inventory[:limit] if limit else inventory
+        else:
+            grok_enabled = is_vin_grok_enrichment_enabled()
+            vehicles = []
+            for vehicle in inventory:
+                raw_data = _stored_vin_decode_data(vehicle)
+                if raw_data is None or (
+                    grok_enabled and 'Grok' not in raw_data
+                ):
+                    vehicles.append(vehicle)
+            if limit:
+                vehicles = vehicles[:limit]
 
-        click.echo(f'VIN backfill: {len(vehicles)} vehicle(s) queued.')
+        click.echo(
+            f'VIN backfill: {len(vehicles)} vehicle(s) queued.'
+            + (' Grok estimates enabled.' if is_vin_grok_enrichment_enabled() else '')
+        )
         updated = 0
         failed = 0
         for index, vehicle in enumerate(vehicles):
             for attempt in range(1, retries + 1):
                 try:
+                    raw_data = (
+                        _stored_vin_decode_data(vehicle)
+                        if not force else None
+                    )
+                    if raw_data is not None and 'Grok' not in raw_data:
+                        grok_data = enrich_vin_decode_data_with_grok(raw_data)
+                        if grok_data is None:
+                            failed += 1
+                            click.echo(
+                                f'  Vehicle {vehicle.id}: Grok enrichment is not configured.',
+                                err=True,
+                            )
+                            break
+                        raw_data['Grok'] = grok_data
+                        vehicle.vin_decode_data = json.dumps(
+                            raw_data,
+                            separators=(',', ':'),
+                        )
+                        db.session.commit()
+                        updated += 1
+                        click.echo(
+                            f'  Vehicle {vehicle.id}: added '
+                            f'{len(grok_data["estimates"])} Grok estimate(s).'
+                        )
+                        break
                     result = decode_vin(vehicle.vin, use_cache=False)
                     if _apply_vin_decode(vehicle, result):
                         db.session.commit()

@@ -12,6 +12,8 @@ provides values.
 from __future__ import annotations
 
 import json
+import math
+import os
 import re
 import ssl
 import subprocess
@@ -578,6 +580,88 @@ _VIN_DECODE_OMIT_VALUES = {
 
 _VIN_DECODE_OMIT_FIELDS = {'ErrorCode', 'ErrorText'}
 
+_GROK_ENUM_ESTIMATES = {
+    'drivetrain': {
+        'fwd': 'Front-wheel drive',
+        'front-wheel drive': 'Front-wheel drive',
+        'rwd': 'Rear-wheel drive',
+        'rear-wheel drive': 'Rear-wheel drive',
+        'awd': 'All-wheel drive',
+        'all-wheel drive': 'All-wheel drive',
+        '4wd': 'Four-wheel drive',
+        'four-wheel drive': 'Four-wheel drive',
+        '4x4': 'Four-wheel drive',
+    },
+    'transmission': {
+        'automatic': 'Automatic',
+        'manual': 'Manual',
+        'cvt': 'Continuously variable (CVT)',
+        'continuously variable (cvt)': 'Continuously variable (CVT)',
+        'dual-clutch automatic': 'Dual-clutch automatic',
+    },
+    'body_style': {
+        'sedan': 'Sedan',
+        'suv': 'SUV',
+        'hatchback': 'Hatchback',
+        'coupe': 'Coupe',
+        'wagon': 'Wagon',
+        'pickup': 'Pickup',
+        'pickup truck': 'Pickup',
+        'van': 'Van',
+        'minivan': 'Minivan',
+        'convertible': 'Convertible',
+    },
+    'fuel_type': {
+        'gasoline': 'Gasoline',
+        'diesel': 'Diesel',
+        'electric': 'Electric',
+        'hybrid': 'Hybrid',
+        'plug-in hybrid': 'Plug-in hybrid',
+        'flex fuel': 'Flex fuel',
+        'cng': 'CNG',
+        'lpg': 'LPG',
+    },
+}
+
+_GROK_ENUM_FIELDS = {
+    'drivetrain': ('DriveType', 'drivetrain'),
+    'transmission': ('TransmissionStyle', 'transmission'),
+    'body_style': ('BodyClass', 'body_style'),
+    'fuel_type': ('FuelTypePrimary', 'fuel_type'),
+}
+
+_GROK_NUMERIC_FIELDS = {
+    'engine_horsepower_hp': ('EngineHP', None, 30, 2000, 'hp', 0),
+    'engine_torque_lb_ft': ('EngineTorque', None, 25, 2000, 'lb-ft', 0),
+    'curb_weight_lb': ('CurbWeightLB', None, 500, 30000, 'lb', 0),
+    'wheelbase_in': ('WheelBaseShort', 'WheelBaseLong', 50, 300, 'in', 1),
+    'overall_length_in': ('OverallLength', None, 80, 400, 'in', 1),
+    'overall_width_in': ('OverallWidth', None, 40, 120, 'in', 1),
+    'overall_height_in': ('OverallHeight', None, 40, 160, 'in', 1),
+    'passenger_capacity': ('Seats', 'NumberOfSeats', 1, 20, 'passengers', 0),
+    'city_mpg': (None, None, 1, 200, 'MPG', 0),
+    'highway_mpg': (None, None, 1, 200, 'MPG', 0),
+    'combined_mpg': (None, None, 1, 200, 'MPG', 0),
+}
+
+_GROK_ESTIMATE_LABELS = {
+    'engine_horsepower_hp': 'Engine horsepower',
+    'engine_torque_lb_ft': 'Engine torque',
+    'curb_weight_lb': 'Curb weight',
+    'wheelbase_in': 'Wheelbase',
+    'overall_length_in': 'Overall length',
+    'overall_width_in': 'Overall width',
+    'overall_height_in': 'Overall height',
+    'passenger_capacity': 'Passenger capacity',
+    'city_mpg': 'City MPG',
+    'highway_mpg': 'Highway MPG',
+    'combined_mpg': 'Combined MPG',
+    'drivetrain': 'Drivetrain',
+    'transmission': 'Transmission',
+    'body_style': 'Body style',
+    'fuel_type': 'Fuel type',
+}
+
 
 def _humanize_vin_field(field: str) -> str:
     if field.startswith('EPA '):
@@ -635,7 +719,7 @@ def _vin_decode_group(field: str) -> str:
 
 
 def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[str, Any]]:
-    """Group all useful NHTSA VIN fields for readable public display."""
+    """Group manufacturer/EPA data and separately label unverified Grok estimates."""
     if isinstance(raw_data, str):
         try:
             decoded = json.loads(raw_data)
@@ -649,8 +733,11 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
     grouped: dict[str, list[dict[str, str]]] = {
         key: [] for _, key in _VIN_DECODE_GROUPS
     }
+    grok_data = decoded.get('Grok')
     fields = []
     for source, source_data in decoded.items():
+        if source == 'Grok':
+            continue
         if isinstance(source_data, dict):
             prefix = 'EPA ' if source == 'EPA' else ''
             fields.extend(
@@ -672,11 +759,186 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
             'value': value,
         })
 
-    return [
+    groups = [
         {'label': label, 'fields': grouped[key]}
         for label, key in _VIN_DECODE_GROUPS
         if grouped[key]
     ]
+    nhtsa_data = decoded.get('NHTSA')
+    epa_data = decoded.get('EPA')
+    estimates = grok_data.get('estimates') if isinstance(grok_data, dict) else None
+    grok_fields = []
+    if isinstance(nhtsa_data, dict) and isinstance(estimates, dict):
+        eligible_fields = set(_missing_grok_estimate_fields(
+            nhtsa_data,
+            epa_data if isinstance(epa_data, dict) else {},
+        ))
+        grok_fields = [
+            {
+                'label': _GROK_ESTIMATE_LABELS[field],
+                'value': str(value).strip(),
+            }
+            for field, value in estimates.items()
+            if field in eligible_fields
+            and field in _GROK_ESTIMATE_LABELS
+            and value is not None
+            and str(value).strip()
+        ]
+    if grok_fields:
+        groups.append({
+            'label': 'Grok Estimates (not manufacturer-verified)',
+            'fields': grok_fields,
+        })
+    return groups
+
+
+def _xai_api_key() -> str:
+    return (
+        os.environ.get('XAI_API_KEY')
+        or os.environ.get('GROK_API_KEY')
+        or ''
+    ).strip()
+
+
+def is_vin_grok_enrichment_enabled() -> bool:
+    return bool(_xai_api_key())
+
+
+def _missing_grok_estimate_fields(
+    nhtsa: dict[str, Any],
+    epa: dict[str, Any],
+) -> list[str]:
+    missing = []
+    for key, definition in _GROK_NUMERIC_FIELDS.items():
+        nhtsa_field, alternate_field = definition[:2]
+        if key in {'city_mpg', 'highway_mpg', 'combined_mpg'}:
+            epa_field = {
+                'city_mpg': 'city08',
+                'highway_mpg': 'highway08',
+                'combined_mpg': 'comb08',
+            }[key]
+            present = _nhtsa_value(epa, epa_field)
+        else:
+            present = _nhtsa_value(
+                nhtsa,
+                *(field for field in (nhtsa_field, alternate_field) if field),
+            )
+        if not present:
+            missing.append(key)
+
+    for key, (nhtsa_field, _) in _GROK_ENUM_FIELDS.items():
+        if not _nhtsa_value(nhtsa, nhtsa_field):
+            missing.append(key)
+    return missing
+
+
+def _validate_grok_estimate(field: str, value: Any) -> str | None:
+    if field in _GROK_ENUM_FIELDS:
+        if not isinstance(value, str):
+            return None
+        allowed_values = _GROK_ENUM_ESTIMATES.get(field)
+        return allowed_values.get(value.strip().casefold()) if allowed_values else None
+
+    definition = _GROK_NUMERIC_FIELDS.get(field)
+    if not definition or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    _, _, minimum, maximum, unit, decimals = definition
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        return None
+    if decimals == 0 and not number.is_integer():
+        return None
+    formatted = f'{number:.{decimals}f}' if decimals else f'{int(number)}'
+    return f'{formatted} {unit}'
+
+
+def enrich_vin_decode_data_with_grok(
+    vin_decode_data: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return low-token, validated estimates only for missing VIN specs."""
+    api_key = _xai_api_key()
+    nhtsa = vin_decode_data.get('NHTSA')
+    if not api_key or not isinstance(nhtsa, dict):
+        return None
+
+    epa = vin_decode_data.get('EPA')
+    if not isinstance(epa, dict):
+        epa = {}
+    missing = _missing_grok_estimate_fields(nhtsa, epa)
+    year = _nhtsa_value(nhtsa, 'ModelYear')
+    make = _nhtsa_value(nhtsa, 'Make')
+    model = _nhtsa_value(nhtsa, 'Model')
+    if not missing or not year or not make or not model:
+        return {'estimates': {}}
+
+    context = {
+        'year': year,
+        'make': make,
+        'model': model,
+        'trim': _nhtsa_value(nhtsa, 'Trim', 'Series'),
+        'engine_displacement_l': _nhtsa_value(nhtsa, 'DisplacementL'),
+        'engine_cylinders': _nhtsa_value(nhtsa, 'EngineCylinders'),
+        'fuel_type': _nhtsa_value(nhtsa, 'FuelTypePrimary'),
+        'missing_fields': missing,
+    }
+    prompt = (
+        'Return a JSON object mapping requested field names to values. '
+        'Estimate only factory specifications you know confidently for this exact '
+        'year/make/model/trim; omit uncertain values. Never guess optional equipment, '
+        'colors, condition, or safety features. These are supplemental estimates; '
+        'manufacturer and EPA data take precedence.\n'
+        + json.dumps(context, separators=(',', ':'))
+    )
+    model_name = (
+        os.environ.get('VIN_GROK_MODEL')
+        or 'grok-4.20-0309-non-reasoning'
+    ).strip()
+    request_body = {
+        'model': model_name,
+        'temperature': 0,
+        'max_tokens': 128,
+        'response_format': {'type': 'json_object'},
+        'messages': [
+            {
+                'role': 'system',
+                'content': 'Conservative vehicle-spec estimator. Never invent missing facts.',
+            },
+            {'role': 'user', 'content': prompt},
+        ],
+    }
+    request = urllib.request.Request(
+        'https://api.x.ai/v1/chat/completions',
+        data=json.dumps(request_body).encode('utf-8'),
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}',
+            'User-Agent': 'marshallauto-vin-enrichment/1',
+        },
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+        content = response_data['choices'][0]['message']['content']
+        estimates = json.loads(content)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f'Grok VIN enrichment HTTP {exc.code}') from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise RuntimeError(f'Grok VIN enrichment request failed: {exc}') from exc
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise RuntimeError('Grok VIN enrichment returned an invalid response') from exc
+
+    if not isinstance(estimates, dict):
+        raise RuntimeError('Grok VIN enrichment did not return a JSON object')
+    validated = {}
+    for field in missing:
+        value = _validate_grok_estimate(field, estimates.get(field))
+        if value:
+            validated[field] = value
+    return {'estimates': validated}
 
 
 def derive_vehicle_details(result: dict[str, Any]) -> dict[str, str]:
@@ -1441,6 +1703,17 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
         sources.append('epa')
     else:
         warnings.append('Fuel economy not found in EPA database for this configuration.')
+
+    if is_vin_grok_enrichment_enabled():
+        try:
+            grok_data = enrich_vin_decode_data_with_grok(vehicle['vin_decode_data'])
+            if grok_data is not None:
+                vehicle['vin_decode_data']['Grok'] = grok_data
+                sources.append('grok-supplemental')
+        except RuntimeError:
+            warnings.append(
+                'Grok estimates are temporarily unavailable; NHTSA and EPA data are unchanged.'
+            )
 
     # Paint color is not part of the VIN — tell the admin clearly when empty.
     if not vehicle.get('exterior_color') and not vehicle.get('interior_color'):
