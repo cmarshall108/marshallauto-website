@@ -639,10 +639,10 @@ bi-check-circle
             <div class="col-lg-4">
                 <div class="card border-0 shadow p-4 mb-4 sticky-lg-top" style="top: 5.5rem;">
                     <h5 class="fw-bold mb-3">Have Questions?</h5>
-                    <p class="text-muted">Our team is ready to help you with financing, trade-ins, and test drives.</p>
+                    <p class="text-muted">Ask our team about dealership-arranged financing through Westlake Financial, or review the independent LightStream option.</p>
                     <p class="text-break"><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
                     <p class="text-break"><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
-                    <a href="{{ url_for('main.financing') }}" class="btn btn-primary w-100 mb-2">Get Pre-Approved</a>
+                    <a href="{{ url_for('main.financing') }}" class="btn btn-primary w-100 mb-2">View Financing Options</a>
                     <a href="{{ url_for('main.inventory', make=vehicle.make) }}" class="btn btn-outline-primary w-100 mb-2">More {{ vehicle.make }} Vehicles</a>
                     {% if vehicle.body_style %}
                     <a href="{{ url_for('main.inventory', body_style=vehicle.body_style) }}" class="btn btn-outline-primary w-100">Browse {{ vehicle.body_style }}s</a>

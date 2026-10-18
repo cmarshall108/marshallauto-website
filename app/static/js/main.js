@@ -1473,6 +1473,11 @@
                 const rate = parseFloat(document.getElementById('calc-rate').value) || 0;
                 const term = parseInt(document.getElementById('calc-term').value) || 60;
 
+                if (down > price) {
+                    showAlert('Down payment cannot exceed the vehicle price.', 'warning');
+                    return;
+                }
+
                 const principal = price - down;
                 const monthlyRate = rate / 100 / 12;
                 const payment = monthlyRate === 0

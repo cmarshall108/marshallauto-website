@@ -21,7 +21,7 @@
         <div class="row g-5">
             <div class="col-lg-8">
                 <h2 class="section-title">Quality Used Cars Near You</h2>
-                <p class="lead text-muted">{{ business_name }} is located in {{ business_city }}, {{ business_state }} and proudly serves drivers across central North Carolina. We offer clean title and rebuilt title vehicles, flexible financing, trade-ins, and CarFax reports.</p>
+                <p class="lead text-muted">{{ business_name }} is located in {{ business_city }}, {{ business_state }} and proudly serves drivers across central North Carolina. We offer clean title and rebuilt title vehicles, dealership-arranged financing through Westlake Financial, and trade-ins. Buyers may also apply independently to LightStream by Truist.</p>
                 <p class="text-muted">Whether you are shopping for a fuel-efficient commuter, a family SUV, or a rugged truck, our inventory is updated regularly. Browse by city below to find vehicles near you.</p>
 
                 <div class="row g-4 mt-2">
@@ -53,7 +53,7 @@
                     <p class="mb-1"><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
                     <p class="mb-3"><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
                     <a href="{{ url_for('main.inventory') }}" class="btn btn-primary w-100 mb-2">View All Inventory</a>
-                    <a href="{{ url_for('main.financing') }}" class="btn btn-outline-primary w-100">Apply for Financing</a>
+                    <a href="{{ url_for('main.financing') }}" class="btn btn-outline-primary w-100">Review Financing Options</a>
                 </div>
 
                 <div class="card border-0 shadow p-4">
@@ -61,7 +61,7 @@
                     <ul class="list-unstyled mb-0">
                         <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Huge discounts on rebuilt titles</li>
                         <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Clean and rebuilt title inventory</li>
-                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Financing for all credit</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Dealership-arranged financing through Westlake Financial</li>
                         <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Trade-ins welcome</li>
                         <li class="mb-0"><i class="bi bi-check-circle-fill text-success me-2"></i> CarFax reports available</li>
                     </ul>

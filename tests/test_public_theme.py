@@ -67,6 +67,34 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('active', inventory['class'])
         self.assertNotIn('aria-current', inventory.attrs)
 
+    def test_financing_page_distinguishes_lenders_and_qualifies_terms(self):
+        html = self.page('/financing')
+        page_text = html.get_text(' ', strip=True)
+        self.assertIn('Westlake Financial', page_text)
+        self.assertIn('LightStream by Truist', page_text)
+        self.assertIn('not guaranteed', page_text)
+        self.assertIn('final signed credit agreement', page_text)
+        self.assertIn('Do not send account numbers', page_text)
+
+        lightstream_link = html.select_one('a[href="https://www.lightstream.com/auto-loans"]')
+        self.assertIsNotNone(lightstream_link)
+        self.assertEqual(lightstream_link.get('target'), '_blank')
+        self.assertIn('noopener', lightstream_link.get('rel', []))
+        self.assertIn('noreferrer', lightstream_link.get('rel', []))
+        lightstream_cta = html.select_one(
+            'a.btn[href="https://www.lightstream.com/auto-loans"]',
+        )
+        self.assertIsNotNone(lightstream_cta)
+        self.assertIn('Apply Directly with LightStream', lightstream_cta.get_text(' ', strip=True))
+        self.assertEqual(lightstream_cta.get('target'), '_blank')
+
+        apr = html.select_one('#calc-rate')
+        self.assertIsNotNone(apr)
+        self.assertEqual(apr.get('required'), '')
+        self.assertNotIn('value', apr.attrs)
+        self.assertIn('Illustration only', page_text)
+        self.assertIn('Total Loan Payments (excl. down payment)', page_text)
+
     def test_home_search_keeps_get_fields_and_has_accessible_labels(self):
         html = self.page('/')
         form = html.select_one('.search-box form')

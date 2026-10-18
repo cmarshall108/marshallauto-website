@@ -231,7 +231,7 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
     else:
         meta_description = (
             f"Browse {pagination.total}+ quality used cars, trucks, and SUVs for sale at {biz} "
-            f"in {city}. Financing, CarFax reports, trade-ins, and huge discounts on rebuilt title vehicles available."
+            f"in {city}. Ask about dealership-arranged financing through Westlake Financial or apply independently to LightStream by Truist. Eligibility and terms vary."
         )
 
     if landing_breadcrumb:
@@ -455,7 +455,7 @@ def index():
     ])
     home_faqs = [
         ("Do you offer financing for used cars?",
-         f"Yes, {current_app.config['BUSINESS_NAME']} works with multiple lenders to offer competitive financing options for all credit situations."),
+         f"{current_app.config['BUSINESS_NAME']} works with Westlake Financial for dealership-arranged financing. You may also apply independently to LightStream by Truist. Each lender separately determines eligibility, approval, and loan terms; approval is not guaranteed."),
         ("Does every vehicle come with a CarFax report?",
          "CarFax history reports are available on qualifying vehicles. Contact us for details on a specific car."),
         ("Can I trade in my current vehicle?",
@@ -558,8 +558,8 @@ def _city_landing_faqs(city_name, state_name):
          f"{biz} in {home_city} serves {city_name} shoppers with inspected used cars, trucks, and SUVs. "
          f"Call {phone} to schedule a visit, test drive, or delivery options."),
         (f"Does {biz} offer financing for buyers in {city_name}?",
-         f"Yes. We work with multiple lenders and can pre-approve {city_name}-area buyers for our "
-         f"clean and rebuilt title inventory. Apply online or call {phone}."),
+         f"We work with Westlake Financial for dealership-arranged financing. Buyers may also apply independently to LightStream by Truist. "
+         f"Eligibility, approval, and terms are determined by each lender and may depend on the applicant and vehicle. Call {phone} to ask about the dealership application process."),
         (f"Can I get a rebuilt title car delivered near {city_name}?",
          f"Many customers from {city_name} purchase rebuilt title vehicles at a discount. Contact us to "
          f"confirm availability, inspection details, and pickup or delivery arrangements."),
@@ -583,14 +583,14 @@ def inventory_by_city(city, state):
     h1 = f"Used Cars, Trucks & SUVs for Sale in {city_name}, {state_name}"
     intro = (
         f"Looking for used cars for sale in {city_name}, {state_name}? {biz} in nearby {home_city} "
-        f"helps {city_name} drivers find reliable pre-owned vehicles with transparent pricing, financing, "
-        f"trade-ins, CarFax reports, and deep discounts on rebuilt title inventory. Browse online or visit "
+        f"helps {city_name} drivers find reliable pre-owned vehicles with transparent pricing, trade-ins, "
+        f"CarFax reports, and rebuilt title inventory. Ask about dealership-arranged financing through Westlake Financial or apply independently to LightStream by Truist. Browse online or visit "
         f"our lot — we regularly work with customers throughout the {city_name} area."
     )
     meta_title = f"Used Cars for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
         f"Shop used cars, trucks, and SUVs for sale near {city_name}, {state_name}. "
-        f"Financing, trade-ins, and rebuilt title discounts at {biz} in {home_city}. Browse inventory online."
+        f"Ask about dealership-arranged financing through Westlake Financial or apply independently to LightStream by Truist. Eligibility, approval, and terms vary."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
@@ -691,13 +691,13 @@ def inventory_by_make_or_body_city(slug, city, state):
         h1 = f"Used {display_plural} for Sale in {city_name}, {state_name}"
         intro = (
             f"Browse used {display_plural.lower()} for sale near {city_name}, {state_name}. "
-            f"{biz} offers inspected pre-owned {display_plural.lower()} with financing options, trade-ins, "
-            f"and CarFax reports — plus rebuilt title deals when available."
+            f"{biz} offers inspected pre-owned {display_plural.lower()}, trade-ins, CarFax reports, and rebuilt title deals when available. "
+            f"Ask about dealership-arranged financing through Westlake Financial or apply independently to LightStream by Truist."
         )
         meta_title = f"Used {display_plural} for Sale in {city_name}, {state_name} | {biz}"
         meta_description = (
             f"Shop used {display_plural.lower()} for sale near {city_name}, {state_name}. "
-            f"Financing available at {biz}. View photos, prices, and apply online today."
+            f"Ask {biz} about dealership-arranged financing through Westlake Financial, or apply independently to LightStream by Truist. View photos and prices."
         )
         breadcrumb = structured_data_breadcrumb([
             ("Home", current_app.config['SITE_URL']),
@@ -732,13 +732,13 @@ def inventory_by_make_or_body_city(slug, city, state):
     h1 = f"Used {make_name} for Sale in {city_name}, {state_name}"
     intro = (
         f"Shop used {make_name} vehicles for sale near {city_name}, {state_name}. "
-        f"{biz} stocks inspected {make_name} cars, trucks, and SUVs with financing, trade-in options, "
-        f"and competitive pricing — including rebuilt title {make_name} models at a discount when available."
+        f"{biz} stocks inspected {make_name} cars, trucks, and SUVs with competitive pricing, including rebuilt title {make_name} models at a discount when available. "
+        f"Ask about dealership-arranged financing through Westlake Financial or apply independently to LightStream by Truist."
     )
     meta_title = f"Used {make_name} for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
         f"Shop used {make_name} cars, trucks, and SUVs for sale near {city_name}, {state_name}. "
-        f"Huge discounts on rebuilt title {make_name} vehicles. Apply for financing online at {biz}."
+        f"Huge discounts on rebuilt title {make_name} vehicles. Ask lenders about eligibility for a specific vehicle; approval and terms vary."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
@@ -750,7 +750,7 @@ def inventory_by_make_or_body_city(slug, city, state):
          f"Yes. Browse our current {make_name} listings online or call {current_app.config['BUSINESS_PHONE']} "
          f"and we will help {city_name} shoppers find the right match."),
         (f"Can I finance a used {make_name} from {biz}?",
-         "Absolutely. We work with multiple lenders for a range of credit situations. Start online or in person."),
+         "Ask us about applying for dealership-arranged financing through Westlake Financial, or apply independently to LightStream by Truist. The lender determines vehicle eligibility, approval, and loan terms; approval is not guaranteed."),
     ]
     return _render_inventory(
         page=page, make=make_name, sort=sort,
@@ -783,7 +783,7 @@ def inventory_rebuilt_by_city(city, state):
     meta_title = f"Rebuilt Title Cars for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
         f"Huge discounts on rebuilt title cars for sale near {city_name}, {state_name}. "
-        f"Browse inspected rebuilt title vehicles with financing available at {biz}."
+        f"Ask Westlake Financial or LightStream directly about financing eligibility for a specific vehicle; approval and terms vary."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
@@ -826,7 +826,7 @@ def service_area():
         (f"Does {current_app.config['BUSINESS_NAME']} deliver vehicles?",
          f"Yes, we regularly serve customers throughout central North Carolina and can arrange delivery or meeting options for many areas. Call {current_app.config['BUSINESS_PHONE']} for details."),
         ("Do you offer financing for out-of-town buyers?",
-         "Yes, our lenders work with buyers across North Carolina. You can apply online and complete most of the process remotely."),
+         "Marshall Auto works with Westlake Financial for dealership-arranged financing; buyers may also apply independently to LightStream by Truist. Ask each lender about its application process and requirements. Eligibility, approval, and terms are determined by the lender."),
         ("Can I buy a rebuilt title car in another city?",
          "Absolutely. Browse our rebuilt title inventory online and contact us to arrange a test drive or delivery near you.")
     ]
@@ -969,7 +969,7 @@ def vehicle_detail(slug):
     )
     meta_description = vehicle.seo_description or (
         f"Shop this {vehicle.title} with {vehicle.mileage:,} miles at {current_app.config['BUSINESS_NAME']}. "
-        f"{vehicle.condition.title()} condition, {title_phrase}, financing available."
+        f"{vehicle.condition.title()} condition, {title_phrase}. Ask about Westlake Financial or apply independently to LightStream by Truist; vehicle eligibility varies."
     )
     if vehicle.status != 'available':
         meta_description = (
@@ -1356,7 +1356,7 @@ def about():
         meta_description=(
             f"Learn about {current_app.config['BUSINESS_NAME']}, a trusted used car dealership in "
             f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} offering quality "
-            f"pre-owned vehicles, financing, and transparent pricing."
+            f"pre-owned vehicles, dealership-arranged financing through Westlake Financial, and transparent pricing."
         ),
         page_type='about',
     )
@@ -1370,17 +1370,17 @@ def financing():
     ])
     faqs = [
         (f"Can I get financing at {current_app.config['BUSINESS_NAME']} with bad credit?",
-         "Yes. We work with a network of lenders that offer programs for good credit, bad credit, no credit, and first-time buyers."),
+         "Marshall Auto works with Westlake Financial for dealership-arranged financing. You may contact us to ask about its application process. The lender reviews each application under its underwriting criteria; approval is not guaranteed, and we cannot promise a particular APR, down payment, term, or payment."),
         ("What do I need to bring to apply for financing?",
-         "You will need a valid driver's license, proof of income, proof of residence, and insurance information."),
-        ("Can I get pre-approved before choosing a vehicle?",
-         "Absolutely. You can contact us to start the pre-approval process, then shop our inventory with confidence.")
+         "Requirements vary by lender and application. Ask us or the lender which information and documents are required. Review any credit-report authorization and application disclosures before submitting information, and do not send sensitive financial documents through our general contact form or email."),
+        ("Can I start a financing application before choosing a vehicle?",
+         "Contact us to ask about starting an application for dealership-arranged financing through Westlake Financial. Any preliminary indication is subject to lender review and is not a final approval or commitment to lend. You may also apply independently to LightStream by Truist; that is a separate application decided by LightStream.")
     ]
     steps = [
-        {"name": "Apply Online or In-Person", "text": "Fill out our secure credit application with your basic information and employment details."},
-        {"name": "Get Approved", "text": "Our finance team submits your application to multiple lenders to find the best rate and terms."},
-        {"name": "Choose Your Vehicle", "text": "Browse our inventory and select the car, truck, or SUV that fits your budget and lifestyle."},
-        {"name": "Drive Away", "text": "Sign the paperwork, arrange insurance, and take delivery of your next vehicle."}
+        {"name": "Ask About Dealership Financing", "text": "Contact Marshall Auto to ask about the application process for dealership-arranged financing through Westlake Financial. Do not send sensitive financial information through the general contact form."},
+        {"name": "Submit an Application to the Lender", "text": "Review the lender's application and credit-report disclosures and use its authorized application process. Westlake Financial makes its own credit decision."},
+        {"name": "Review the Vehicle and Written Terms", "text": "Confirm that the lender will consider the specific vehicle and review the APR, amount financed, finance charge, payment schedule, fees, and total of payments in the written disclosures."},
+        {"name": "Proceed Only If the Terms Work for You", "text": "Approval and final terms are subject to lender underwriting and the signed agreement. Arrange required insurance and review all purchase and credit documents before signing."}
     ]
     return render_template(
         'financing.html',
@@ -1392,16 +1392,15 @@ def financing():
             f"How to Finance a Used Car at {current_app.config['BUSINESS_NAME']}",
             steps,
             description=(
-                f"A step-by-step guide to getting approved for used car financing at "
+                f"An overview of applying for dealership-arranged financing through Westlake Financial at "
                 f"{current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']}, "
-                f"{current_app.config['BUSINESS_STATE']}."
+                f"{current_app.config['BUSINESS_STATE']}, including the option to apply independently to LightStream by Truist."
             ),
-            total_time="P1D"
         ),
         meta_title=f"Used Car Financing in {current_app.config['BUSINESS_CITY']} | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
-            f"Get approved for used car financing at {current_app.config['BUSINESS_NAME']} in "
-            f"{current_app.config['BUSINESS_CITY']}. Bad credit, no credit, and first-time buyer programs available. Apply today."
+            f"Ask about dealership-arranged financing through Westlake Financial at {current_app.config['BUSINESS_NAME']} in "
+            f"{current_app.config['BUSINESS_CITY']}, or apply independently to LightStream by Truist. Approval and terms are determined by each lender."
         ),
         page_type='financing',
     )
