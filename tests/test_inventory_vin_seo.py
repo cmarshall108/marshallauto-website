@@ -65,6 +65,12 @@ class InventoryVINSEOTests(unittest.TestCase):
         self.available.doors = 4
         self.available.passenger_capacity = 5
         self.available.gvwr = '4,189 lbs'
+        self.available.features = 'Blind Spot Monitor, Backup Camera'
+        self.available.exterior_features = '17-inch alloy wheels\nHeated side mirrors'
+        self.available.interior_features = 'Heated front seats'
+        self.available.entertainment_features = 'Apple CarPlay\nAndroid Auto'
+        self.available.mechanical_features = 'Six-speed automatic transmission'
+        self.available.safety_features = 'Blind spot collision warning'
         self.available.additional_specifications = (
             'Engine displacement: 2.0 L / 122 cu in\nHorsepower: 147 hp'
         )
@@ -89,13 +95,45 @@ class InventoryVINSEOTests(unittest.TestCase):
             additional.get_text('\n', strip=True),
             'Engine displacement: 2.0 L / 122 cu in\nHorsepower: 147 hp',
         )
+        self.assertEqual(
+            [button.get_text(' ', strip=True) for button in html.select('#vehicleTabs .nav-link')],
+            [
+                'Exterior', 'Interior', 'Entertainment', 'Mechanical', 'Safety',
+                'Tech Specs', 'Details',
+            ],
+        )
+        for panel_id, expected_text in (
+            ('#exterior', '17-inch alloy wheels'),
+            ('#interior', 'Heated front seats'),
+            ('#entertainment', 'Apple CarPlay'),
+            ('#mechanical', 'Six-speed automatic transmission'),
+            ('#safety', 'Blind spot collision warning'),
+            ('#details', 'VIN'),
+        ):
+            with self.subTest(panel=panel_id):
+                self.assertIn(expected_text, html.select_one(panel_id).get_text(' ', strip=True))
+        self.assertEqual(
+            [feature.get_text(' ', strip=True) for feature in html.select('.vehicle-key-features .feature-tag')],
+            ['Blind Spot Monitor', 'Backup Camera'],
+        )
+        self.assertIn('Service History', html.select_one('#details').get_text())
+        self.assertIn('CarFax History Report', html.select_one('#details').get_text())
+        basic_info = {
+            item.select_one('.vehicle-basic-info-label').get_text(' ', strip=True):
+            item.select_one('.vehicle-basic-info-value').get_text(' ', strip=True)
+            for item in html.select('.vehicle-basic-info-item')
+        }
+        self.assertEqual(basic_info['Exterior'], self.available.exterior_color or 'Not provided')
+        self.assertEqual(basic_info['Mileage'], '65,000 mi')
         summary = self.client.get(
             '/api/vehicles-summary?slugs=available-accord',
         ).get_json()['vehicles'][0]
         self.assertEqual(summary['mpg_combined'], 27)
         self.assertEqual(summary['doors'], 4)
         self.assertEqual(summary['passenger_capacity'], 5)
-        self.assertEqual(summary['features'], '')
+        self.assertEqual(summary['features'], 'Blind Spot Monitor, Backup Camera')
+        self.assertEqual(summary['exterior_features'], self.available.exterior_features)
+        self.assertEqual(summary['safety_features'], self.available.safety_features)
         self.assertEqual(summary['additional_specifications'], self.available.additional_specifications)
 
     def test_real_vins_have_indexable_vin_record_pages(self):

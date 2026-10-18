@@ -134,6 +134,11 @@ class Vehicle(db.Model):
     # Content
     description = db.Column(db.Text, nullable=True)
     features = db.Column(db.Text, nullable=True)  # comma-separated
+    exterior_features = db.Column(db.Text, nullable=True)
+    interior_features = db.Column(db.Text, nullable=True)
+    entertainment_features = db.Column(db.Text, nullable=True)
+    mechanical_features = db.Column(db.Text, nullable=True)
+    safety_features = db.Column(db.Text, nullable=True)
     additional_specifications = db.Column(db.Text, nullable=True)
 
     # SEO

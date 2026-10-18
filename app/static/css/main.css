@@ -1413,6 +1413,52 @@ body.gallery-lightbox-open {
     overflow-wrap: anywhere;
 }
 
+.vehicle-basic-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 175px), 1fr));
+    gap: 1rem;
+}
+
+.vehicle-basic-info-item {
+    min-width: 0;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-light);
+}
+
+.vehicle-basic-info-label {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.vehicle-basic-info-value {
+    display: block;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.vehicle-key-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.vehicle-feature-list {
+    margin: 0;
+    padding-left: 1.2rem;
+    columns: 2 260px;
+    column-gap: 2rem;
+}
+
+.vehicle-feature-list li {
+    break-inside: avoid;
+    padding: 0.35rem 0;
+}
+
 .feature-tag {
     display: inline-block;
     background-color: #e9ecef;

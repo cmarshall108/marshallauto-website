@@ -358,49 +358,111 @@
             </div>
         </div>
 
-        <!-- Details + sidebar -->
+        <section class="card border-0 shadow-sm p-4 mb-4" aria-labelledby="basic-info-heading">
+            <h2 class="h4 fw-bold mb-3" id="basic-info-heading">Basic Info</h2>
+            <div class="vehicle-basic-info-grid">
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Exterior</span>
+                    <span class="vehicle-basic-info-value">{{ vehicle.exterior_color or 'Not provided' }}</span>
+                </div>
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Drivetrain</span>
+                    <span class="vehicle-basic-info-value">{{ vehicle.drivetrain or 'Not provided' }}</span>
+                </div>
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Interior</span>
+                    <span class="vehicle-basic-info-value">{{ vehicle.interior_color or 'Not provided' }}</span>
+                </div>
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Transmission</span>
+                    <span class="vehicle-basic-info-value">{{ vehicle.transmission or 'Not provided' }}</span>
+                </div>
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Engine</span>
+                    <span class="vehicle-basic-info-value">{{ vehicle.engine or 'Not provided' }}</span>
+                </div>
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Fuel Efficiency</span>
+                    <span class="vehicle-basic-info-value">
+                        {% if vehicle.mpg_city or vehicle.mpg_highway %}
+                        {{ vehicle.mpg_city or '--' }} City / {{ vehicle.mpg_highway or '--' }} Hwy MPG
+                        {% else %}Not provided{% endif %}
+                    </span>
+                </div>
+                <div class="vehicle-basic-info-item">
+                    <span class="vehicle-basic-info-label">Mileage</span>
+                    <span class="vehicle-basic-info-value">{{ vehicle.mileage | format_mileage }}</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm p-4 mb-4" aria-labelledby="key-features-heading">
+            <h2 class="h4 fw-bold mb-3" id="key-features-heading">Key Features</h2>
+            {% if vehicle.feature_list %}
+            <div class="vehicle-key-features">
+                {% for feature in vehicle.feature_list %}
+                <span class="feature-tag">{{ feature }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Vehicle-specific key features have not been provided.</p>
+            {% endif %}
+        </section>
+
+        <!-- Vehicle details + sidebar -->
         <div class="row g-4 mt-1">
             <div class="col-lg-8">
+                <h2 class="h3 fw-bold mb-3">Vehicle Details</h2>
                 <ul class="nav nav-tabs nav-tabs-scroll" id="vehicleTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
+                        <button class="nav-link active" id="exterior-tab" data-bs-toggle="tab" data-bs-target="#exterior" type="button" role="tab" aria-controls="exterior" aria-selected="true">Exterior</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="features-tab" data-bs-toggle="tab" data-bs-target="#features" type="button" role="tab" aria-controls="features" aria-selected="false">Features</button>
+                        <button class="nav-link" id="interior-tab" data-bs-toggle="tab" data-bs-target="#interior" type="button" role="tab" aria-controls="interior" aria-selected="false">Interior</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service" type="button" role="tab" aria-controls="service" aria-selected="false">Service History</button>
+                        <button class="nav-link" id="entertainment-tab" data-bs-toggle="tab" data-bs-target="#entertainment" type="button" role="tab" aria-controls="entertainment" aria-selected="false">Entertainment</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="carfax-tab" data-bs-toggle="tab" data-bs-target="#carfax" type="button" role="tab" aria-controls="carfax" aria-selected="false">CarFax</button>
+                        <button class="nav-link" id="mechanical-tab" data-bs-toggle="tab" data-bs-target="#mechanical" type="button" role="tab" aria-controls="mechanical" aria-selected="false">Mechanical</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="safety-tab" data-bs-toggle="tab" data-bs-target="#safety" type="button" role="tab" aria-controls="safety" aria-selected="false">Safety</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tech-specs-tab" data-bs-toggle="tab" data-bs-target="#tech-specs" type="button" role="tab" aria-controls="tech-specs" aria-selected="false">Tech Specs</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab" aria-controls="details" aria-selected="false">Details</button>
                     </li>
                 </ul>
                 <div class="tab-content p-4 border border-top-0 bg-white mb-4" id="vehicleTabsContent">
-                    <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
-                        <h4 class="fw-bold mb-3">Vehicle Description</h4>
-                        <p>{{ vehicle.description or 'No description available.' }}</p>
-                        <h5 class="fw-bold mt-4 mb-3">Specifications</h5>
+                    {% for category, field in [
+                        ('Exterior', 'exterior_features'),
+                        ('Interior', 'interior_features'),
+                        ('Entertainment', 'entertainment_features'),
+                        ('Mechanical', 'mechanical_features'),
+                        ('Safety', 'safety_features')
+                    ] %}
+                    <div class="tab-pane fade{% if loop.first %} show active{% endif %}" id="{{ category | lower }}" role="tabpanel" aria-labelledby="{{ category | lower }}-tab" tabindex="0">
+                        <h3 class="h5 fw-bold mb-3">{{ category }}</h3>
+                        {% set equipment = (vehicle|attr(field) or '').splitlines() %}
+                        {% if equipment | join | trim %}
+                        <ul class="vehicle-feature-list">
+                            {% for item in equipment if item.strip() %}
+                            <li>{{ item.strip() }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted mb-0">No {{ category | lower }} equipment details have been provided for this vehicle.</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <div class="tab-pane fade" id="tech-specs" role="tabpanel" aria-labelledby="tech-specs-tab" tabindex="0">
+                        <h3 class="h5 fw-bold mb-3">Technical Specifications</h3>
                         <dl class="row specs-table">
-                            <dt class="col-sm-4">VIN</dt>
-                            <dd class="col-sm-8">{{ vehicle.vin or 'N/A' }}</dd>
-                            <dt class="col-sm-4">Stock #</dt>
-                            <dd class="col-sm-8">{{ vehicle.stock_number or 'N/A' }}</dd>
-                            <dt class="col-sm-4">Year</dt>
-                            <dd class="col-sm-8">{{ vehicle.year }}</dd>
-                            <dt class="col-sm-4">Make</dt>
-                            <dd class="col-sm-8">{{ vehicle.make }}</dd>
-                            <dt class="col-sm-4">Model</dt>
-                            <dd class="col-sm-8">{{ vehicle.model }}</dd>
-                            <dt class="col-sm-4">Trim</dt>
-                            <dd class="col-sm-8">{{ vehicle.trim or 'N/A' }}</dd>
                             <dt class="col-sm-4">Body Style</dt>
                             <dd class="col-sm-8">{{ vehicle.body_style or 'N/A' }}</dd>
-                            <dt class="col-sm-4">Title Status</dt>
-                            <dd class="col-sm-8">{{ (vehicle.title_status or 'clean').replace('_', ' ') | title }}</dd>
-                            <dt class="col-sm-4">Exterior Color</dt>
-                            <dd class="col-sm-8">{{ vehicle.exterior_color or 'N/A' }}</dd>
-                            <dt class="col-sm-4">Interior Color</dt>
-                            <dd class="col-sm-8">{{ vehicle.interior_color or 'N/A' }}</dd>
                             <dt class="col-sm-4">Engine</dt>
                             <dd class="col-sm-8">{{ vehicle.engine or 'N/A' }}</dd>
                             <dt class="col-sm-4">Transmission</dt>
@@ -421,24 +483,31 @@
                             <dd class="col-sm-8">{{ vehicle.gvwr or 'N/A' }}</dd>
                         </dl>
                         {% if vehicle.additional_specifications %}
-                        <h5 class="fw-bold mt-4 mb-3">Additional Specifications</h5>
+                        <h4 class="h6 fw-bold mt-4 mb-3">Additional Specifications</h4>
                         <div class="vehicle-additional-specifications">{{ vehicle.additional_specifications }}</div>
                         {% endif %}
                     </div>
-                    <div class="tab-pane fade" id="features" role="tabpanel" aria-labelledby="features-tab">
-                        <h4 class="fw-bold mb-3">Features &amp; Options</h4>
-                        {% if vehicle.feature_list %}
-                        <div>
-                            {% for feature in vehicle.feature_list %}
-                            <span class="feature-tag">{{ feature }}</span>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <p class="text-muted">No features listed for this vehicle.</p>
-                        {% endif %}
-                    </div>
-                    <div class="tab-pane fade" id="service" role="tabpanel" aria-labelledby="service-tab">
-                        <h4 class="fw-bold mb-3">Service History</h4>
+                    <div class="tab-pane fade" id="details" role="tabpanel" aria-labelledby="details-tab" tabindex="0">
+                        <h3 class="h5 fw-bold mb-3">Vehicle Details</h3>
+                        <p class="vehicle-additional-specifications">{{ vehicle.description or 'No vehicle description has been provided.' }}</p>
+                        <dl class="row specs-table mt-4">
+                            <dt class="col-sm-4">VIN</dt>
+                            <dd class="col-sm-8 text-break">{{ vehicle.vin or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Stock #</dt>
+                            <dd class="col-sm-8">{{ vehicle.stock_number or vehicle.id }}</dd>
+                            <dt class="col-sm-4">Year / Make / Model</dt>
+                            <dd class="col-sm-8">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</dd>
+                            <dt class="col-sm-4">Trim</dt>
+                            <dd class="col-sm-8">{{ vehicle.trim or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Title Status</dt>
+                            <dd class="col-sm-8">{{ (vehicle.title_status or 'clean').replace('_', ' ') | title }}</dd>
+                            <dt class="col-sm-4">Condition</dt>
+                            <dd class="col-sm-8">{{ vehicle.condition | title }}</dd>
+                            <dt class="col-sm-4">Listing Status</dt>
+                            <dd class="col-sm-8">{{ vehicle.status | title }}</dd>
+                        </dl>
+                        <hr class="my-4">
+                        <h4 class="h5 fw-bold mb-3">Service History</h4>
                         {% if vehicle.service_records %}
                         <div class="table-responsive">
                             <table class="table table-striped">
@@ -465,9 +534,8 @@
                         {% else %}
                         <p class="text-muted">Service records coming soon.</p>
                         {% endif %}
-                    </div>
-                    <div class="tab-pane fade" id="carfax" role="tabpanel" aria-labelledby="carfax-tab">
-                        <h4 class="fw-bold mb-3">CarFax History Report</h4>
+                        <hr class="my-4">
+                        <h4 class="h5 fw-bold mb-3">CarFax History Report</h4>
                         {% if vehicle.carfax_reports %}
                             {% for report in vehicle.carfax_reports %}
                             <div class="card mb-3">

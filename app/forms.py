@@ -104,6 +104,11 @@ class VehicleForm(FlaskForm):
 
     description = TextAreaField('Description')
     features = TextAreaField('Features (comma-separated)')
+    exterior_features = TextAreaField('Exterior Features')
+    interior_features = TextAreaField('Interior Features')
+    entertainment_features = TextAreaField('Entertainment Features')
+    mechanical_features = TextAreaField('Mechanical Features')
+    safety_features = TextAreaField('Safety Features')
     additional_specifications = TextAreaField('Additional Specifications')
 
     video_url = StringField(

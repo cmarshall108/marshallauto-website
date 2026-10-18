@@ -565,7 +565,9 @@ CSV_IMPORT_FIELDS = [
     'mileage', 'condition', 'title_status', 'status', 'is_coming_soon', 'body_style', 'exterior_color',
     'interior_color', 'engine', 'transmission', 'drivetrain', 'fuel_type',
     'mpg_city', 'mpg_highway', 'mpg_combined', 'doors', 'passenger_capacity', 'gvwr',
-    'description', 'features', 'additional_specifications',
+    'description', 'features', 'exterior_features', 'interior_features',
+    'entertainment_features', 'mechanical_features', 'safety_features',
+    'additional_specifications',
 ]
 CSV_REQUIRED_FIELDS = ['year', 'make', 'model', 'price', 'mileage']
 
@@ -631,6 +633,11 @@ def vehicle_import():
                     gvwr=row.get('gvwr')[:64] or None if row.get('gvwr') else None,
                     description=row.get('description') or None,
                     features=row.get('features') or None,
+                    exterior_features=row.get('exterior_features') or None,
+                    interior_features=row.get('interior_features') or None,
+                    entertainment_features=row.get('entertainment_features') or None,
+                    mechanical_features=row.get('mechanical_features') or None,
+                    safety_features=row.get('safety_features') or None,
                     additional_specifications=row.get('additional_specifications') or None,
                 )
             except (ValueError, TypeError, InvalidOperation) as exc:
@@ -2105,6 +2112,11 @@ def _vehicle_from_form(form):
         gvwr=form.gvwr.data.strip() if form.gvwr.data else None,
         description=form.description.data,
         features=form.features.data,
+        exterior_features=form.exterior_features.data,
+        interior_features=form.interior_features.data,
+        entertainment_features=form.entertainment_features.data,
+        mechanical_features=form.mechanical_features.data,
+        safety_features=form.safety_features.data,
         additional_specifications=form.additional_specifications.data,
         seo_title=form.seo_title.data,
         seo_description=form.seo_description.data,
@@ -2142,6 +2154,11 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.gvwr = form.gvwr.data.strip() if form.gvwr.data else None
     vehicle.description = form.description.data
     vehicle.features = form.features.data
+    vehicle.exterior_features = form.exterior_features.data
+    vehicle.interior_features = form.interior_features.data
+    vehicle.entertainment_features = form.entertainment_features.data
+    vehicle.mechanical_features = form.mechanical_features.data
+    vehicle.safety_features = form.safety_features.data
     vehicle.additional_specifications = form.additional_specifications.data
     vehicle.seo_title = form.seo_title.data
     vehicle.seo_description = form.seo_description.data

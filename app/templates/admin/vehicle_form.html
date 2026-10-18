@@ -218,8 +218,32 @@
             {{ form.description(class="form-control", id="description", rows="4") }}
         </div>
         <div class="col-12">
-            <label class="form-label" for="features">Features (comma-separated)</label>
+            <label class="form-label" for="features">Key Features (comma-separated)</label>
             {{ form.features(class="form-control", id="features", rows="3", placeholder="e.g. Leather Seats, Sunroof, Backup Camera", autocomplete="off") }}
+            <div class="form-text">Highlights displayed near the top of the vehicle detail page.</div>
+        </div>
+        <div class="col-12"><hr class="my-2"><h5 class="fw-bold mb-0">Vehicle Details Equipment</h5>
+            <p class="form-text mb-0">Add verified equipment one item per line. These appear in their matching Vehicle Details tab.</p>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="exterior_features">Exterior</label>
+            {{ form.exterior_features(class="form-control", id="exterior_features", rows="4", placeholder="17-inch alloy wheels&#10;Power heated side mirrors") }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="interior_features">Interior</label>
+            {{ form.interior_features(class="form-control", id="interior_features", rows="4", placeholder="Heated front seats&#10;Leather-wrapped steering wheel") }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="entertainment_features">Entertainment</label>
+            {{ form.entertainment_features(class="form-control", id="entertainment_features", rows="4", placeholder="Apple CarPlay&#10;Six-speaker audio system") }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="mechanical_features">Mechanical</label>
+            {{ form.mechanical_features(class="form-control", id="mechanical_features", rows="4", placeholder="Six-speed automatic transmission&#10;Four-wheel disc brakes") }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="safety_features">Safety</label>
+            {{ form.safety_features(class="form-control", id="safety_features", rows="4", placeholder="Blind spot monitor&#10;Rear-view camera") }}
         </div>
         <div class="col-12">
             <label class="form-label" for="additional_specifications">Additional Specifications</label>
