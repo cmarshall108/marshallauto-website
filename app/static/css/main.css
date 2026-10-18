@@ -1409,8 +1409,78 @@ body.gallery-lightbox-open {
 }
 
 .vehicle-additional-specifications {
-    white-space: pre-line;
     overflow-wrap: anywhere;
+}
+
+.vehicle-additional-specifications,
+.vehicle-vin-data-list {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+}
+
+.vehicle-decoded-spec,
+.vehicle-vin-data-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.8fr) minmax(0, 1.2fr);
+    gap: 0.25rem 0.75rem;
+    align-items: baseline;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.vehicle-decoded-spec:last-child,
+.vehicle-vin-data-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.vehicle-decoded-spec dt,
+.vehicle-vin-data-row dt {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.vehicle-decoded-spec dd,
+.vehicle-vin-data-row dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.vehicle-decoded-spec-full {
+    grid-column: 1 / -1;
+}
+
+.vehicle-vin-decoded-data {
+    padding: 1rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-light);
+}
+
+.vehicle-vin-decoded-data > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.vehicle-vin-data-group {
+    padding: 1rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.65rem;
+    background: #fff;
+}
+
+@media (max-width: 575.98px) {
+    .vehicle-decoded-spec,
+    .vehicle-vin-data-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.15rem;
+    }
 }
 
 .vehicle-basic-info-grid {

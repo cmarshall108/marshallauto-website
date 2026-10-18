@@ -74,6 +74,19 @@ class InventoryVINSEOTests(unittest.TestCase):
         self.available.additional_specifications = (
             'Engine displacement: 2.0 L / 122 cu in\nHorsepower: 147 hp'
         )
+        self.available.vin_decode_data = json.dumps({
+            'NHTSA': {
+                'VIN': self.available.vin,
+                'EngineHP': '147',
+                'EngineManufacturer': 'HMC',
+                'PlantCountry': 'SOUTH KOREA',
+                'AirBagLocCurtain': '1st and 2nd Rows',
+                'TrailerType': 'Not Applicable',
+                'ErrorCode': '0',
+                'ErrorText': '0 - VIN decoded clean.',
+            },
+            'EPA': {'id': '12345', 'year': '2018', 'city08': '25'},
+        })
         db.session.commit()
 
         html = self.page('/inventory/available-accord')
@@ -91,10 +104,22 @@ class InventoryVINSEOTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(spec_rows[label], value)
         additional = html.select_one('.vehicle-additional-specifications')
-        self.assertEqual(
-            additional.get_text('\n', strip=True),
-            'Engine displacement: 2.0 L / 122 cu in\nHorsepower: 147 hp',
-        )
+        additional_specs = {
+            row.select_one('dt').get_text(' ', strip=True):
+            row.select_one('dd').get_text(' ', strip=True)
+            for row in additional.select('.vehicle-decoded-spec')
+        }
+        self.assertEqual(additional_specs['Engine displacement'], '2.0 L / 122 cu in')
+        self.assertEqual(additional_specs['Horsepower'], '147 hp')
+        vin_data = html.select_one('.vehicle-vin-decoded-data')
+        self.assertIn('Full VIN decode data', vin_data.get_text(' ', strip=True))
+        self.assertIn('Engine Manufacturer', vin_data.get_text(' ', strip=True))
+        self.assertIn('HMC', vin_data.get_text(' ', strip=True))
+        self.assertIn('SOUTH KOREA', vin_data.get_text(' ', strip=True))
+        self.assertIn('EPA Fuel Economy', vin_data.get_text(' ', strip=True))
+        self.assertIn('12345', vin_data.get_text(' ', strip=True))
+        self.assertNotIn('Not Applicable', vin_data.get_text(' ', strip=True))
+        self.assertEqual(len(vin_data.select('.vehicle-vin-data-row')), 8)
         self.assertEqual(
             [button.get_text(' ', strip=True) for button in html.select('#vehicleTabs .nav-link')],
             [

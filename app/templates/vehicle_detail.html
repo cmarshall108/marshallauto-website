@@ -511,7 +511,48 @@ bi-check-circle
                         </dl>
                         {% if vehicle.additional_specifications %}
                         <h4 class="h6 fw-bold mt-4 mb-3">Additional Specifications</h4>
-                        <div class="vehicle-additional-specifications">{{ vehicle.additional_specifications }}</div>
+                        <dl class="vehicle-additional-specifications">
+                            {% for line in vehicle.additional_specifications.splitlines() if line.strip() %}
+                            {% set specification = line.split(':', 1) %}
+                            <div class="vehicle-decoded-spec">
+                                {% if specification|length > 1 %}
+                                <dt>{{ specification[0] }}</dt>
+                                <dd>{{ specification[1]|trim }}</dd>
+                                {% else %}
+                                <dd class="vehicle-decoded-spec-full">{{ line.strip() }}</dd>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </dl>
+                        {% endif %}
+                        {% if vin_decode_groups %}
+                        <details class="vehicle-vin-decoded-data mt-4">
+                            <summary>
+                                <span>Full VIN decode data</span>
+                                <span class="badge text-bg-light">{{ vin_decode_field_count }} fields</span>
+                            </summary>
+                            <p class="small text-muted mt-3 mb-3">
+                                Manufacturer-reported values returned by the NHTSA VIN decoder. Blank and not-applicable
+                                values are omitted; verify equipment against the actual vehicle.
+                            </p>
+                            <div class="row g-3">
+                                {% for group in vin_decode_groups %}
+                                <section class="col-md-6">
+                                    <div class="vehicle-vin-data-group h-100">
+                                        <h4 class="h6 fw-bold">{{ group.label }}</h4>
+                                        <dl class="vehicle-vin-data-list mb-0">
+                                            {% for field in group.fields %}
+                                            <div class="vehicle-vin-data-row">
+                                                <dt>{{ field.label }}</dt>
+                                                <dd>{{ field.value }}</dd>
+                                            </div>
+                                            {% endfor %}
+                                        </dl>
+                                    </div>
+                                </section>
+                                {% endfor %}
+                            </div>
+                        </details>
                         {% endif %}
                     </div>
                     <div class="tab-pane fade" id="details" role="tabpanel" aria-labelledby="details-tab" tabindex="0">

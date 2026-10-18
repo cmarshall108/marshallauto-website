@@ -140,6 +140,7 @@ class Vehicle(db.Model):
     mechanical_features = db.Column(db.Text, nullable=True)
     safety_features = db.Column(db.Text, nullable=True)
     additional_specifications = db.Column(db.Text, nullable=True)
+    vin_decode_data = db.Column(db.Text, nullable=True)
 
     # SEO
     seo_title = db.Column(db.String(160), nullable=True)

@@ -1,3 +1,5 @@
+import json
+
 from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField, DateField, DecimalField, FileField, HiddenField,
@@ -49,6 +51,7 @@ class VehicleForm(FlaskForm):
     model = StringField('Model *', validators=[DataRequired(), Length(max=64)])
     trim = StringField('Trim', validators=[Optional(), Length(max=128)])
     vin = StringField('VIN', validators=[Optional(), Length(max=17)])
+    vin_decode_data = HiddenField(validators=[Optional(), Length(max=32768)])
     stock_number = StringField('Stock Number', validators=[Optional(), Length(max=32)])
 
     price = DecimalField('Price *', validators=[DataRequired(), NumberRange(min=0)])
@@ -125,6 +128,18 @@ class VehicleForm(FlaskForm):
     seo_title = StringField('SEO Title', validators=[Optional(), Length(max=160)])
     seo_description = TextAreaField('SEO Description', validators=[Optional(), Length(max=320)])
     meta_keywords = StringField('Meta Keywords', validators=[Optional(), Length(max=255)])
+
+    def validate_vin_decode_data(self, field):
+        if not field.data:
+            return
+        try:
+            decoded = json.loads(field.data)
+        except json.JSONDecodeError as exc:
+            raise ValidationError('VIN decoder data is invalid. Decode the VIN again.') from exc
+        nhtsa_data = decoded.get('NHTSA') if isinstance(decoded, dict) else None
+        decoded_vin = nhtsa_data.get('VIN') if isinstance(nhtsa_data, dict) else None
+        if str(decoded_vin or '').upper() != str(self.vin.data or '').strip().upper():
+            raise ValidationError('VIN decoder data must match the vehicle VIN.')
 
     images = FileField('Vehicle Images', render_kw={'multiple': True})
 

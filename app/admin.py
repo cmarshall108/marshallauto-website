@@ -2088,6 +2088,9 @@ def _vehicle_from_form(form):
         model=form.model.data.strip(),
         trim=form.trim.data.strip() if form.trim.data else None,
         vin=form.vin.data.strip().upper() if form.vin.data else None,
+        vin_decode_data=(
+            form.vin_decode_data.data.strip() if form.vin_decode_data.data else None
+        ),
         stock_number=form.stock_number.data.strip().upper() if form.stock_number.data else None,
         price=form.price.data,
         sale_price=form.sale_price.data,
@@ -2130,6 +2133,9 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.model = form.model.data.strip()
     vehicle.trim = form.trim.data.strip() if form.trim.data else None
     vehicle.vin = form.vin.data.strip().upper() if form.vin.data else None
+    vehicle.vin_decode_data = (
+        form.vin_decode_data.data.strip() if form.vin_decode_data.data else None
+    )
     vehicle.stock_number = form.stock_number.data.strip().upper() if form.stock_number.data else None
     vehicle.price = form.price.data
     vehicle.sale_price = form.sale_price.data

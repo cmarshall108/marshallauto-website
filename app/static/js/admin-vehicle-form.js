@@ -26,7 +26,6 @@
             photoPreview.replaceChildren();
             importStatus.textContent = '';
         }
-
         urlInput.addEventListener('input', clearPreview);
         clearButton.addEventListener('click', () => {
             urlInput.value = '';
@@ -123,6 +122,7 @@
         mechanical_features: form.querySelector('#mechanical_features'),
         safety_features: form.querySelector('#safety_features'),
         additional_specifications: form.querySelector('#additional_specifications'),
+        vin_decode_data: form.querySelector('#vin_decode_data'),
         vin: form.querySelector('#vin'),
     };
 
@@ -424,6 +424,7 @@
             || name === 'mechanical_features'
             || name === 'safety_features'
             || name === 'additional_specifications'
+            || name === 'vin_decode_data'
         ) return;
         bindField(fields[name], name);
     });
@@ -516,8 +517,18 @@
 
     function applyVinDecode(data, { force } = { force: false }) {
         if (!data || !data.ok) return;
+        if (fields.vin && normalizeVinClient(fields.vin.value) !== data.vin) return;
         const vehicle = data.vehicle || {};
         const filled = [];
+
+        if (fields.vin_decode_data && vehicle.vin_decode_data) {
+            const decodedData = JSON.stringify(vehicle.vin_decode_data);
+            if (fields.vin_decode_data.value !== decodedData) {
+                fields.vin_decode_data.value = decodedData;
+                fields.vin_decode_data.dispatchEvent(new Event('input', { bubbles: true }));
+                filled.push('full VIN decoder data');
+            }
+        }
 
         const fieldMap = [
             ['year', vehicle.year],
@@ -689,7 +700,17 @@
                 }
             }
             if (cleaned !== lastDecodedVin) {
-                // Allow re-decode after VIN edits
+                if (fields.vin_decode_data) {
+                    try {
+                        const stored = JSON.parse(fields.vin_decode_data.value || '{}');
+                        const storedVin = stored.NHTSA?.VIN || stored.VIN || '';
+                        if (String(storedVin).toUpperCase() !== cleaned) {
+                            fields.vin_decode_data.value = '';
+                        }
+                    } catch {
+                        fields.vin_decode_data.value = '';
+                    }
+                }
             }
         });
         fields.vin.addEventListener('blur', () => {
@@ -712,6 +733,14 @@
             e.preventDefault();
             decodeVin({ interactive: true, force: true });
         });
+    }
+    if (
+        fields.vin
+        && fields.vin_decode_data
+        && !fields.vin_decode_data.value
+        && normalizeVinClient(fields.vin.value).length === 17
+    ) {
+        decodeVin({ interactive: false, force: false });
     }
 
     // Load catalog

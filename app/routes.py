@@ -17,7 +17,7 @@ from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, Vehicle
 from app.models import BlogPost
 from app.buyer_guides import published_buyer_guides
 from app.spam_filter import check_lead_spam_for_request
-from app.vin_decode import is_valid_vin, normalize_vin
+from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_mileage_badge, format_price,
     notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
@@ -1002,9 +1002,12 @@ def vehicle_detail(slug):
         'slug': vehicle.slug,
     }
 
+    vin_decode_groups = group_vin_decode_data(vehicle.vin_decode_data)
     return render_template(
         'vehicle_detail.html',
         vehicle=vehicle,
+        vin_decode_groups=vin_decode_groups,
+        vin_decode_field_count=sum(len(group['fields']) for group in vin_decode_groups),
         buyer_guides=published_buyer_guides(),
         related=related,
         form=form,

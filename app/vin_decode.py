@@ -34,7 +34,7 @@ def _ssl_context() -> ssl.SSLContext | None:
         return None
 
 NHTSA_DECODE_URL = (
-    'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{vin}?format=json'
+    'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/{vin}?format=json'
 )
 EPA_BASE_URL = 'https://www.fueleconomy.gov/ws/rest/vehicle'
 
@@ -516,6 +516,169 @@ def _append_unique(lines: list[str], value: str) -> None:
         lines.append(value)
 
 
+_VIN_DECODE_GROUPS = (
+    ('Vehicle Identity', 'identity'),
+    ('Powertrain', 'powertrain'),
+    ('Dimensions & Chassis', 'chassis'),
+    ('Safety & Equipment', 'safety'),
+    ('Occupants & Restraints', 'occupants'),
+    ('Manufacturer & Assembly', 'manufacturing'),
+    ('EPA Fuel Economy', 'epa'),
+    ('Other Decoded Data', 'other'),
+)
+
+_VIN_DECODE_LABELS = {
+    'ABS': 'Anti-lock Braking System',
+    'AirBagLocCurtain': 'Curtain Airbag Location',
+    'AirBagLocFront': 'Front Airbag Location',
+    'AirBagLocKnee': 'Knee Airbag Location',
+    'AirBagLocSeatCushion': 'Seat Cushion Airbag Location',
+    'AirBagLocSide': 'Side Airbag Location',
+    'CIB': 'Crash Imminent Braking',
+    'CurbWeightLB': 'Curb Weight (lb)',
+    'DisplacementL': 'Engine Displacement (L)',
+    'ESC': 'Electronic Stability Control',
+    'EngineHP': 'Engine Horsepower',
+    'EngineKW': 'Engine Power (kW)',
+    'GVWR': 'Gross Vehicle Weight Rating',
+    'MakeID': 'Make ID',
+    'ManufacturerId': 'Manufacturer ID',
+    'ModelID': 'Model ID',
+    'ModelYear': 'Model Year',
+    'NCSABodyType': 'NCSA Body Type',
+    'NCSAMake': 'NCSA Make',
+    'NCSAModel': 'NCSA Model',
+    'SeatBeltsAll': 'Seat Belts - All Positions',
+    'TPMS': 'Tire Pressure Monitoring System',
+    'VIN': 'VIN',
+    'VINDescriptor': 'Vehicle Descriptor',
+    'VehicleDescriptor': 'Vehicle Descriptor',
+    'WheelBaseLong': 'Wheelbase (Long)',
+    'WheelBaseShort': 'Wheelbase (Short)',
+    'atvType': 'ATV Type',
+    'city08': 'City MPG',
+    'comb08': 'Combined MPG',
+    'cylinders': 'Engine Cylinders',
+    'displ': 'Engine Displacement (L)',
+    'drive': 'Drivetrain',
+    'fuelType1': 'Fuel Type',
+    'highway08': 'Highway MPG',
+    'id': 'ID',
+    'trany': 'Transmission',
+}
+
+_VIN_DECODE_OMIT_VALUES = {
+    '',
+    'n/a',
+    'na',
+    'not applicable',
+    'not available',
+    'unknown',
+}
+
+_VIN_DECODE_OMIT_FIELDS = {'ErrorCode', 'ErrorText'}
+
+
+def _humanize_vin_field(field: str) -> str:
+    if field.startswith('EPA '):
+        if field[4:] == 'id':
+            return 'EPA Vehicle ID'
+        return f'EPA {_humanize_vin_field(field[4:])}'
+    if field in _VIN_DECODE_LABELS:
+        return _VIN_DECODE_LABELS[field]
+    words = re.findall(r'[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+', field)
+    return ' '.join(
+        word.upper() if word.casefold() == 'id'
+        else word if word.isupper()
+        else word[0].upper() + word[1:]
+        for word in words
+    )
+
+
+def _vin_decode_group(field: str) -> str:
+    if field.startswith('EPA '):
+        return 'epa'
+    name = field.casefold()
+    if field in {
+        'VIN', 'ModelYear', 'Make', 'MakeID', 'Model', 'ModelID', 'Trim',
+        'Trim2', 'Series', 'Series2', 'BodyClass', 'VehicleType',
+        'VehicleDescriptor', 'NCSABodyType', 'NCSAMake', 'NCSAModel',
+    }:
+        return 'identity'
+    if name.startswith((
+        'engine', 'transmission', 'fuel', 'electrification', 'battery',
+        'evdrive', 'charger', 'charge', 'plug',
+    )) or name in {'drivetype', 'otherengineinfo', 'turbo'}:
+        return 'powertrain'
+    if any(token in name for token in (
+        'wheel', 'axle', 'gvwr', 'curbweight', 'length', 'width', 'height',
+        'track', 'tire', 'brake', 'steering', 'suspension', 'spring',
+        'wheeldrive',
+    )):
+        return 'chassis'
+    if any(token in name for token in (
+        'airbag', 'abs', 'esc', 'traction', 'blindspot', 'collision', 'lane',
+        'brake', 'crash', 'parkassist', 'reverse', 'visibility', 'tpms',
+        'daytimerunning', 'adaptivecruise', 'adaptivebraking', 'keylessignition',
+        'child', 'seatbelt',
+    )):
+        return 'safety'
+    if any(token in name for token in (
+        'seat', 'row', 'door', 'occupant', 'passenger', 'restraint',
+    )):
+        return 'occupants'
+    if name.startswith(('plant', 'manufacturer')) or field in {
+        'MakeID', 'ManufacturerId',
+    }:
+        return 'manufacturing'
+    return 'other'
+
+
+def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Group all useful NHTSA VIN fields for readable public display."""
+    if isinstance(raw_data, str):
+        try:
+            decoded = json.loads(raw_data)
+        except json.JSONDecodeError:
+            return []
+    else:
+        decoded = raw_data
+    if not isinstance(decoded, dict):
+        return []
+
+    grouped: dict[str, list[dict[str, str]]] = {
+        key: [] for _, key in _VIN_DECODE_GROUPS
+    }
+    fields = []
+    for source, source_data in decoded.items():
+        if isinstance(source_data, dict):
+            prefix = 'EPA ' if source == 'EPA' else ''
+            fields.extend(
+                (f'{prefix}{field}', value)
+                for field, value in source_data.items()
+            )
+        else:
+            fields.append((source, source_data))
+
+    for field, raw_value in fields:
+        if field in _VIN_DECODE_OMIT_FIELDS or raw_value is None:
+            continue
+        value = str(raw_value).strip()
+        if value.casefold() in _VIN_DECODE_OMIT_VALUES:
+            continue
+        group = _vin_decode_group(str(field))
+        grouped[group].append({
+            'label': _humanize_vin_field(str(field)),
+            'value': value,
+        })
+
+    return [
+        {'label': label, 'fields': grouped[key]}
+        for label, key in _VIN_DECODE_GROUPS
+        if grouped[key]
+    ]
+
+
 def derive_vehicle_details(result: dict[str, Any]) -> dict[str, str]:
     """Format only VIN-decoded equipment and specifications for editable form fields."""
     details = {
@@ -990,6 +1153,7 @@ def lookup_epa_mpg(
         'epa_model': best[2],
         'epa_option': best[3],
         'epa_vehicle_id': vehicle.get('id'),
+        'epa_details': vehicle,
         'score': best[0],
     }
     _epa_cache_set(cache_key, payload)
@@ -1094,7 +1258,7 @@ def _fetch_nhtsa_curl(url: str, timeout: float = 8.0) -> dict[str, Any]:
 
 
 def fetch_nhtsa_decode(vin: str, timeout: float = 8.0) -> dict[str, Any]:
-    """Call NHTSA DecodeVinValues and return the first result row."""
+    """Call NHTSA DecodeVinValuesExtended and return the full first result row."""
     url = NHTSA_DECODE_URL.format(vin=urllib.parse.quote(vin, safe=''))
     req = urllib.request.Request(
         url,
@@ -1214,6 +1378,7 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
         return dict(payload)
 
     vehicle = map_vehicle_fields(result)
+    vehicle['vin_decode_data'] = {'NHTSA': result}
     features = derive_features(result)
     vehicle.update(derive_vehicle_details(result))
     existing_features = {feature.casefold() for feature in features}
@@ -1267,6 +1432,12 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
         vehicle['mpg_combined'] = epa.get('mpg_combined')
         vehicle['epa_model'] = epa.get('epa_model')
         vehicle['epa_option'] = epa.get('epa_option')
+        epa_details = dict(epa.get('epa_details') or {})
+        epa_details.update({
+            'Matched model': epa.get('epa_model') or '',
+            'Matched configuration': epa.get('epa_option') or '',
+        })
+        vehicle['vin_decode_data']['EPA'] = epa_details
         sources.append('epa')
     else:
         warnings.append('Fuel economy not found in EPA database for this configuration.')
