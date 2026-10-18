@@ -126,6 +126,27 @@ class VINBackfillTests(unittest.TestCase):
         self.assertEqual(refreshed.exit_code, 0, refreshed.output)
         decoder.assert_called_once_with(self.vehicle.vin, use_cache=False)
 
+    def test_transient_decoder_failure_is_retried_and_vehicle_updated(self):
+        failure = {'ok': False, 'error': 'NHTSA temporarily unavailable'}
+        with patch(
+            'app.vin_backfill.decode_vin',
+            side_effect=[failure, self.decoded_result(self.vehicle.vin)],
+        ) as decoder:
+            result = self.runner.invoke(args=[
+                'backfill-vin-data',
+                '--delay',
+                '0',
+                '--retries',
+                '2',
+            ])
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn('retrying', result.output)
+        self.assertIn('1 updated, 0 failed', result.output)
+        self.assertEqual(decoder.call_count, 2)
+        db.session.expire_all()
+        self.assertTrue(db.session.get(Vehicle, self.vehicle.id).vin_decode_data)
+
     def test_failed_decode_is_reported_and_exits_unsuccessfully(self):
         with patch(
             'app.vin_backfill.decode_vin',

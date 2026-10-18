@@ -67,6 +67,13 @@ def _apply_vin_decode(vehicle: Vehicle, result: dict) -> bool:
         return False
 
     decoded = result.get('vehicle') or {}
+    raw_data = decoded.get('vin_decode_data')
+    nhtsa_data = raw_data.get('NHTSA') if isinstance(raw_data, dict) else None
+    if not isinstance(nhtsa_data, dict) or normalize_vin(
+        nhtsa_data.get('VIN'),
+    ) != normalize_vin(vehicle.vin):
+        return False
+
     for field in _VIN_FIELDS:
         value = decoded.get(field)
         if getattr(vehicle, field) in (None, '') and value not in (None, ''):
@@ -79,10 +86,8 @@ def _apply_vin_decode(vehicle: Vehicle, result: dict) -> bool:
             decoded.get(field),
         ))
 
-    raw_data = decoded.get('vin_decode_data')
-    if raw_data:
-        vehicle.vin_decode_data = json.dumps(raw_data, separators=(',', ':'))
-    return bool(raw_data)
+    vehicle.vin_decode_data = json.dumps(raw_data, separators=(',', ':'))
+    return True
 
 
 def register_commands(app):
@@ -100,7 +105,14 @@ def register_commands(app):
         show_default=True,
         help='Seconds to wait between VIN decoder requests.',
     )
-    def backfill_vin_data(force, limit, delay):
+    @click.option(
+        '--retries',
+        type=click.IntRange(min=1, max=5),
+        default=3,
+        show_default=True,
+        help='Attempts per vehicle when the decoder fails or returns an unusable result.',
+    )
+    def backfill_vin_data(force, limit, delay, retries):
         """Fill missing VIN-derived information for existing inventory."""
         query = Vehicle.query.filter(Vehicle.vin.isnot(None), Vehicle.vin != '')
         if not force:
@@ -117,24 +129,41 @@ def register_commands(app):
         updated = 0
         failed = 0
         for index, vehicle in enumerate(vehicles):
-            try:
-                result = decode_vin(vehicle.vin, use_cache=False)
-                if not _apply_vin_decode(vehicle, result):
+            for attempt in range(1, retries + 1):
+                try:
+                    result = decode_vin(vehicle.vin, use_cache=False)
+                    if _apply_vin_decode(vehicle, result):
+                        db.session.commit()
+                        updated += 1
+                        click.echo(f'  Vehicle {vehicle.id}: updated.')
+                        break
+                    reason = result.get('error') or (
+                        'decoder response did not include full data for this VIN'
+                    )
+                except Exception as exc:
+                    db.session.rollback()
+                    current_app.logger.exception(
+                        'VIN data backfill attempt %s/%s failed for vehicle %s',
+                        attempt,
+                        retries,
+                        vehicle.id,
+                    )
+                    reason = str(exc)
+
+                if attempt == retries:
                     failed += 1
-                    reason = result.get('error') or 'decoder response did not match this vehicle VIN'
-                    click.echo(f'  Vehicle {vehicle.id}: skipped — {reason}', err=True)
+                    click.echo(
+                        f'  Vehicle {vehicle.id}: failed after {retries} attempts — {reason}',
+                        err=True,
+                    )
                 else:
-                    db.session.commit()
-                    updated += 1
-                    click.echo(f'  Vehicle {vehicle.id}: updated.')
-            except Exception as exc:
-                db.session.rollback()
-                failed += 1
-                current_app.logger.exception(
-                    'VIN data backfill failed for vehicle %s',
-                    vehicle.id,
-                )
-                click.echo(f'  Vehicle {vehicle.id}: failed — {exc}', err=True)
+                    click.echo(
+                        f'  Vehicle {vehicle.id}: attempt {attempt}/{retries} failed — '
+                        f'{reason}; retrying.',
+                        err=True,
+                    )
+                    if delay:
+                        time.sleep(delay)
             if delay and index + 1 < len(vehicles):
                 time.sleep(delay)
 
