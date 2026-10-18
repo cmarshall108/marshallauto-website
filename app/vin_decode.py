@@ -59,15 +59,44 @@ _EQUIPMENT_FEATURE_MAP: dict[str, str] = {
     'CIB': 'Automatic Emergency Braking',
     'ForwardCollisionWarning': 'Forward Collision Warning',
     'KeylessIgnition': 'Push Button Start',
-    'LaneCenteringAssistance': 'Lane Keep Assist',
-    'LaneDepartureWarning': 'Lane Keep Assist',
+    'LaneCenteringAssistance': 'Lane Centering Assist',
+    'LaneDepartureWarning': 'Lane Departure Warning',
     'LaneKeepSystem': 'Lane Keep Assist',
     'ParkAssist': 'Parking Sensors',
     'PedestrianAutomaticEmergencyBraking': 'Automatic Emergency Braking',
     'RearAutomaticEmergencyBraking': 'Automatic Emergency Braking',
-    'RearCrossTrafficAlert': 'Blind Spot Monitor',
+    'RearCrossTrafficAlert': 'Rear Cross-Traffic Alert',
     'RearVisibilitySystem': 'Backup Camera',
-    'AdaptiveDrivingBeam': 'LED Headlights',
+    'AdaptiveDrivingBeam': 'Adaptive Headlights',
+}
+
+_SAFETY_EQUIPMENT_MAP: dict[str, str] = {
+    'ABS': 'Anti-lock Braking System',
+    'ESC': 'Electronic Stability Control',
+    'TractionControl': 'Traction Control',
+    'DynamicBrakeSupport': 'Dynamic Brake Support',
+    'BlindSpotMon': 'Blind Spot Monitor',
+    'BlindSpotIntervention': 'Blind Spot Intervention',
+    'CIB': 'Automatic Emergency Braking',
+    'ForwardCollisionWarning': 'Forward Collision Warning',
+    'LaneCenteringAssistance': 'Lane Centering Assist',
+    'LaneDepartureWarning': 'Lane Departure Warning',
+    'LaneKeepSystem': 'Lane Keep Assist',
+    'ParkAssist': 'Parking Assist',
+    'PedestrianAutomaticEmergencyBraking': 'Pedestrian Detection',
+    'RearAutomaticEmergencyBraking': 'Rear Automatic Emergency Braking',
+    'RearCrossTrafficAlert': 'Rear Cross-Traffic Alert',
+    'RearVisibilitySystem': 'Backup Camera',
+    'AdaptiveCruiseControl': 'Adaptive Cruise Control',
+    'AutoReverseSystem': 'Automatic Reverse Braking',
+}
+
+_AIRBAG_LOCATION_MAP: dict[str, str] = {
+    'AirBagLocFront': 'Front Airbags',
+    'AirBagLocSide': 'Side-Impact Airbags',
+    'AirBagLocCurtain': 'Side Curtain Airbags',
+    'AirBagLocKnee': 'Knee Airbags',
+    'AirBagLocSeatCushion': 'Seat Cushion Airbags',
 }
 
 # Values that mean the equipment is on the vehicle (standard or optional).
@@ -140,6 +169,12 @@ def _nhtsa_get(field: dict[str, Any] | None, *keys: str) -> str:
         if text:
             return text
     return ''
+
+
+def _nhtsa_value(field: dict[str, Any] | None, *keys: str) -> str:
+    """Return a decoded field only when it contains usable information."""
+    value = _nhtsa_get(field, *keys)
+    return '' if value.casefold() in _ABSENT_VALUES else value
 
 
 def _is_present(value: str | None) -> bool:
@@ -256,16 +291,16 @@ def map_fuel_type(raw: str | None) -> str:
 
 def build_engine_description(result: dict[str, Any]) -> str:
     """Compose a short engine string like '2.5L I4' or 'Electric'."""
-    fuel = map_fuel_type(_nhtsa_get(result, 'FuelTypePrimary'))
+    fuel = map_fuel_type(_nhtsa_value(result, 'FuelTypePrimary'))
     if fuel == 'Electric':
         # Prefer battery / motor info when present
-        motor = _nhtsa_get(result, 'ElectrificationLevel', 'EngineModel')
+        motor = _nhtsa_value(result, 'ElectrificationLevel', 'EngineModel')
         return motor or 'Electric'
 
-    displacement = _nhtsa_get(result, 'DisplacementL')
-    cylinders = _nhtsa_get(result, 'EngineCylinders')
-    config = _nhtsa_get(result, 'EngineConfiguration')
-    model = _nhtsa_get(result, 'EngineModel')
+    displacement = _nhtsa_value(result, 'DisplacementL')
+    cylinders = _nhtsa_value(result, 'EngineCylinders')
+    config = _nhtsa_value(result, 'EngineConfiguration')
+    model = _nhtsa_value(result, 'EngineModel')
 
     parts: list[str] = []
     if displacement:
@@ -420,16 +455,23 @@ def derive_features(result: dict[str, Any]) -> list[str]:
     if 'led' in lamp:
         add('LED Headlights')
     elif 'hid' in lamp or 'xenon' in lamp:
-        add('LED Headlights')
+        add('HID Headlights')
 
-    # Alloy wheels: NHTSA wheel size is common; 17"+ is a reasonable retail cue.
+    # Wheel diameter is decoded; wheel material is not, so do not claim alloy.
     wheel = _nhtsa_get(result, 'WheelSizeFront', 'WheelSizeRear')
     try:
         wheel_n = float(wheel) if wheel else 0
     except ValueError:
         wheel_n = 0
     if wheel_n >= 17:
-        add('Alloy Wheels')
+        add(f'{wheel_n:g}-Inch Wheels')
+
+    if _is_present(_nhtsa_get(result, 'DaytimeRunningLight')):
+        add('Daytime Running Lights')
+
+    entertainment = _nhtsa_get(result, 'EntertainmentSystem')
+    if entertainment and entertainment.casefold() not in _ABSENT_VALUES:
+        add(entertainment)
 
     # Seating cues from NHTSA counts only (no guessy package adds).
     seats = _nhtsa_get(result, 'Seats')
@@ -467,6 +509,124 @@ def derive_features(result: dict[str, Any]) -> list[str]:
         seen_out.add(key)
         normalized.append(canon)
     return normalized
+
+
+def _append_unique(lines: list[str], value: str) -> None:
+    if value and value.casefold() not in {line.casefold() for line in lines}:
+        lines.append(value)
+
+
+def derive_vehicle_details(result: dict[str, Any]) -> dict[str, str]:
+    """Format only VIN-decoded equipment and specifications for editable form fields."""
+    details = {
+        'exterior_features': [],
+        'interior_features': [],
+        'entertainment_features': [],
+        'mechanical_features': [],
+        'safety_features': [],
+        'additional_specifications': [],
+    }
+
+    front_wheel = _nhtsa_value(result, 'WheelSizeFront')
+    rear_wheel = _nhtsa_value(result, 'WheelSizeRear')
+    if front_wheel:
+        _append_unique(details['exterior_features'], f'{front_wheel}-inch front wheels')
+    if rear_wheel:
+        _append_unique(details['exterior_features'], f'{rear_wheel}-inch rear wheels')
+    headlamp = _nhtsa_value(result, 'LowerBeamHeadlampLightSource', 'HeadlampLightSource')
+    if headlamp:
+        _append_unique(details['exterior_features'], f'{headlamp} headlights')
+    if _is_present(_nhtsa_get(result, 'DaytimeRunningLight')):
+        _append_unique(details['exterior_features'], 'Daytime running lights')
+
+    seats = _nhtsa_value(result, 'Seats', 'NumberOfSeats', 'PassengerCapacity')
+    seat_rows = _nhtsa_value(result, 'SeatRows')
+    if seats:
+        _append_unique(details['interior_features'], f'{seats}-passenger seating')
+    if seat_rows:
+        _append_unique(details['interior_features'], f'{seat_rows} seating rows')
+
+    entertainment = _nhtsa_value(result, 'EntertainmentSystem')
+    if entertainment:
+        _append_unique(details['entertainment_features'], entertainment)
+
+    drivetrain = _nhtsa_value(result, 'DriveType')
+    if drivetrain:
+        _append_unique(details['mechanical_features'], drivetrain)
+    transmission_speeds = _nhtsa_value(result, 'TransmissionSpeeds')
+    transmission_style = _nhtsa_value(result, 'TransmissionStyle')
+    if transmission_speeds and transmission_style:
+        _append_unique(
+            details['mechanical_features'],
+            f'{transmission_speeds}-speed {transmission_style.lower()} transmission',
+        )
+    displacement = _nhtsa_value(result, 'DisplacementL')
+    cylinders = _nhtsa_value(result, 'EngineCylinders')
+    if displacement and cylinders:
+        _append_unique(
+            details['mechanical_features'],
+            f'{displacement}L {cylinders}-cylinder engine',
+        )
+
+    for field, label in _SAFETY_EQUIPMENT_MAP.items():
+        if _is_present(_nhtsa_get(result, field)):
+            _append_unique(details['safety_features'], label)
+    tpms = _nhtsa_value(result, 'TPMS')
+    if tpms:
+        _append_unique(details['safety_features'], 'Tire Pressure Monitoring System')
+    for field, label in _AIRBAG_LOCATION_MAP.items():
+        location = _nhtsa_value(result, field)
+        if location:
+            _append_unique(details['safety_features'], label)
+
+    engine_model = _nhtsa_value(result, 'EngineModel')
+    engine_hp = _nhtsa_value(result, 'EngineHP')
+    engine_kw = _nhtsa_value(result, 'EngineKW')
+    engine_configuration = _nhtsa_value(result, 'EngineConfiguration')
+    valve_train = _nhtsa_value(result, 'ValveTrainDesign')
+    fuel_injection = _nhtsa_value(result, 'FuelInjectionType')
+    fuel_type = _nhtsa_value(result, 'FuelTypePrimary')
+    wheelbase = _nhtsa_value(result, 'WheelBaseShort', 'WheelBaseLong')
+    gvwr = _nhtsa_value(result, 'GVWR')
+    curb_weight = _nhtsa_value(result, 'CurbWeightLB')
+    axles = _nhtsa_value(result, 'Axles')
+    for label, value in (
+        ('Engine model', engine_model),
+        ('Engine type', _nhtsa_value(result, 'EngineType')),
+        ('Engine configuration', engine_configuration),
+        ('Engine displacement', ' / '.join(
+            part for part in (
+                f'{displacement} L' if displacement else '',
+                f'{_nhtsa_value(result, "DisplacementCI")} cu in'
+                if _nhtsa_value(result, 'DisplacementCI') else '',
+            ) if part
+        )),
+        ('Engine cylinders', cylinders),
+        ('Engine output', ' / '.join(
+            part for part in (
+                f'{engine_hp} hp' if engine_hp else '',
+                f'{engine_kw} kW' if engine_kw else '',
+            ) if part
+        )),
+        ('Engine torque', _nhtsa_value(result, 'EngineTorque')),
+        ('Valve train', valve_train),
+        ('Fuel system', fuel_injection),
+        ('Fuel type', fuel_type),
+        ('Wheelbase', f'{wheelbase} in' if wheelbase else ''),
+        ('Overall length', f'{_nhtsa_value(result, "OverallLength")} in'
+         if _nhtsa_value(result, 'OverallLength') else ''),
+        ('Overall width', f'{_nhtsa_value(result, "OverallWidth")} in'
+         if _nhtsa_value(result, 'OverallWidth') else ''),
+        ('Overall height', f'{_nhtsa_value(result, "OverallHeight")} in'
+         if _nhtsa_value(result, 'OverallHeight') else ''),
+        ('Number of axles', axles),
+        ('Gross vehicle weight rating', gvwr),
+        ('Curb weight', f'{curb_weight} lb' if curb_weight else ''),
+    ):
+        if value:
+            _append_unique(details['additional_specifications'], f'{label}: {value}')
+
+    return {name: '\n'.join(lines) for name, lines in details.items()}
 
 
 def _http_get_bytes(url: str, timeout: float = 8.0, accept: str = '*/*') -> bytes:
@@ -846,9 +1006,9 @@ def map_vehicle_fields(result: dict[str, Any]) -> dict[str, Any]:
         except ValueError:
             year = None
 
-    trim = _nhtsa_get(result, 'Trim', 'Series', 'Trim2', 'Series2')
-    make = _title_case_make(_nhtsa_get(result, 'Make'))
-    model = _nhtsa_get(result, 'Model')
+    trim = _nhtsa_value(result, 'Trim', 'Series', 'Trim2', 'Series2')
+    make = _title_case_make(_nhtsa_value(result, 'Make'))
+    model = _nhtsa_value(result, 'Model')
     # Light title-case for multi-word models when NHTSA returns ALL CAPS
     if model and model.isupper() and len(model) > 3:
         model = model.title()
@@ -860,27 +1020,27 @@ def map_vehicle_fields(result: dict[str, Any]) -> dict[str, Any]:
         'make': make,
         'model': model,
         'trim': trim,
-        'body_style': map_body_style(_nhtsa_get(result, 'BodyClass')),
-        'drivetrain': map_drivetrain(_nhtsa_get(result, 'DriveType')),
-        'fuel_type': map_fuel_type(_nhtsa_get(result, 'FuelTypePrimary')),
+        'body_style': map_body_style(_nhtsa_value(result, 'BodyClass')),
+        'drivetrain': map_drivetrain(_nhtsa_value(result, 'DriveType')),
+        'fuel_type': map_fuel_type(_nhtsa_value(result, 'FuelTypePrimary')),
         'engine': build_engine_description(result),
         'transmission': map_transmission(
-            _nhtsa_get(result, 'TransmissionStyle'),
-            _nhtsa_get(result, 'TransmissionSpeeds'),
+            _nhtsa_value(result, 'TransmissionStyle'),
+            _nhtsa_value(result, 'TransmissionSpeeds'),
         ),
         'exterior_color': colors.get('exterior_color') or '',
         'interior_color': colors.get('interior_color') or '',
         'mpg_city': None,
         'mpg_highway': None,
         'mpg_combined': None,
-        'doors': _nhtsa_get(result, 'Doors') or None,
-        'passenger_capacity': _nhtsa_get(
+        'doors': _nhtsa_value(result, 'Doors') or None,
+        'passenger_capacity': _nhtsa_value(
             result, 'Seats', 'NumberOfSeats', 'PassengerCapacity',
         ) or None,
         'plant_city': _nhtsa_get(result, 'PlantCity') or None,
         'plant_country': _nhtsa_get(result, 'PlantCountry') or None,
         'vehicle_type': _nhtsa_get(result, 'VehicleType') or None,
-        'gvwr': _nhtsa_get(result, 'GVWR') or None,
+        'gvwr': _nhtsa_value(result, 'GVWR') or None,
         # retained for EPA matching
         '_displacement_l': _nhtsa_get(result, 'DisplacementL') or None,
         '_cylinders': _nhtsa_get(result, 'EngineCylinders') or None,
@@ -1055,6 +1215,12 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
 
     vehicle = map_vehicle_fields(result)
     features = derive_features(result)
+    vehicle.update(derive_vehicle_details(result))
+    existing_features = {feature.casefold() for feature in features}
+    for feature in vehicle['safety_features'].splitlines():
+        if feature.casefold() not in existing_features:
+            features.append(feature)
+            existing_features.add(feature.casefold())
     warnings: list[str] = []
     sources = ['nhtsa']
     if codes and codes != ['0']:

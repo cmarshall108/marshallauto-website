@@ -20,6 +20,33 @@
       fetchpriority="high">
 {% endblock %}
 
+{% macro feature_icon(feature) -%}
+{% set label = feature | lower %}
+{% if 'blind spot' in label or 'lane ' in label or 'collision' in label or 'airbag' in label or 'brak' in label or 'safety' in label or 'traction' in label or 'stability' in label %}
+bi-shield-check
+{% elif 'camera' in label or 'parking' in label %}
+bi-camera
+{% elif 'apple carplay' in label or 'android auto' in label or 'bluetooth' in label or 'keyless' in label or 'push button' in label %}
+bi-phone
+{% elif 'heated' in label %}
+bi-thermometer-half
+{% elif 'leather' in label or 'seat' in label or 'interior' in label %}
+bi-person-check
+{% elif 'wheel' in label or 'headlight' in label or 'spoiler' in label or 'exterior' in label %}
+bi-car-front
+{% elif 'sunroof' in label or 'moonroof' in label %}
+bi-sun
+{% elif 'cruise' in label or 'mpg' in label or 'fuel' in label %}
+bi-speedometer2
+{% elif 'radio' in label or 'speaker' in label or 'audio' in label or 'entertainment' in label %}
+bi-speaker
+{% elif 'awd' in label or '4wd' in label or 'drive' in label or 'transmission' in label or 'engine' in label %}
+bi-gear
+{% else %}
+bi-check-circle
+{% endif %}
+{%- endmacro %}
+
 {% block content %}
 <section class="bg-light-brand py-4">
     <div class="container">
@@ -401,7 +428,7 @@
             {% if vehicle.feature_list %}
             <div class="vehicle-key-features">
                 {% for feature in vehicle.feature_list %}
-                <span class="feature-tag">{{ feature }}</span>
+                <span class="feature-tag"><i class="bi {{ feature_icon(feature) }}" aria-hidden="true"></i><span>{{ feature }}</span></span>
                 {% endfor %}
             </div>
             {% else %}

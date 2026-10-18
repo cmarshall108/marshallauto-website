@@ -1447,6 +1447,17 @@ body.gallery-lightbox-open {
     gap: 0.55rem;
 }
 
+.vehicle-key-features .feature-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+}
+
+.vehicle-key-features .feature-tag .bi {
+    flex: 0 0 auto;
+}
+
 .vehicle-feature-list {
     margin: 0;
     padding-left: 1.2rem;

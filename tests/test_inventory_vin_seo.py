@@ -116,6 +116,10 @@ class InventoryVINSEOTests(unittest.TestCase):
             [feature.get_text(' ', strip=True) for feature in html.select('.vehicle-key-features .feature-tag')],
             ['Blind Spot Monitor', 'Backup Camera'],
         )
+        self.assertEqual(
+            len(html.select('.vehicle-key-features .feature-tag i.bi[aria-hidden="true"]')),
+            2,
+        )
         self.assertIn('Service History', html.select_one('#details').get_text())
         self.assertIn('CarFax History Report', html.select_one('#details').get_text())
         basic_info = {

@@ -117,6 +117,12 @@
         passenger_capacity: form.querySelector('#passenger_capacity'),
         gvwr: form.querySelector('#gvwr'),
         features: form.querySelector('#features'),
+        exterior_features: form.querySelector('#exterior_features'),
+        interior_features: form.querySelector('#interior_features'),
+        entertainment_features: form.querySelector('#entertainment_features'),
+        mechanical_features: form.querySelector('#mechanical_features'),
+        safety_features: form.querySelector('#safety_features'),
+        additional_specifications: form.querySelector('#additional_specifications'),
         vin: form.querySelector('#vin'),
     };
 
@@ -408,7 +414,17 @@
     }
 
     Object.keys(fields).forEach((name) => {
-        if (name === 'drivetrain' || name === 'year' || name === 'vin') return;
+        if (
+            name === 'drivetrain'
+            || name === 'year'
+            || name === 'vin'
+            || name === 'exterior_features'
+            || name === 'interior_features'
+            || name === 'entertainment_features'
+            || name === 'mechanical_features'
+            || name === 'safety_features'
+            || name === 'additional_specifications'
+        ) return;
         bindField(fields[name], name);
     });
     enhanceDrivetrainSelect();
@@ -484,6 +500,20 @@
         return merged.join(', ');
     }
 
+    function mergeLines(existingRaw, incomingRaw) {
+        const lines = String(existingRaw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        const seen = new Set(lines.map((line) => line.toLocaleLowerCase()));
+        String(incomingRaw || '').split(/\r?\n/).forEach((line) => {
+            const value = line.trim();
+            const key = value.toLocaleLowerCase();
+            if (value && !seen.has(key)) {
+                seen.add(key);
+                lines.push(value);
+            }
+        });
+        return lines.join('\n');
+    }
+
     function applyVinDecode(data, { force } = { force: false }) {
         if (!data || !data.ok) return;
         const vehicle = data.vehicle || {};
@@ -514,6 +544,26 @@
             if (!el) return;
             // Never overwrite non-empty user values (force still respects this).
             if (setIfEmpty(el, value)) filled.push(name);
+        });
+
+        [
+            'exterior_features',
+            'interior_features',
+            'entertainment_features',
+            'mechanical_features',
+            'safety_features',
+            'additional_specifications',
+        ].forEach((name) => {
+            const el = fields[name];
+            const existing = el && String(el.value || '');
+            const next = el && mergeLines(existing, vehicle[name]);
+            if (el && next !== existing.trim()) {
+                const existingCount = existing.split(/\r?\n/).filter((line) => line.trim()).length;
+                el.value = next;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.classList.add('vin-prefilled');
+                filled.push(`${name} (+${next.split('\n').length - existingCount})`);
+            }
         });
 
         // Features: always merge (never wipe existing chips/text)
