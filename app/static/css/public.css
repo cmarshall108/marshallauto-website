@@ -121,8 +121,17 @@
     --bs-btn-hover-color: #142238;
     --bs-btn-hover-bg: #ffd27e;
     --bs-btn-hover-border-color: #ffd27e;
-    color: #142238;
+    color: #142238 !important;
+    background-color: var(--accent);
+    border-color: var(--accent);
     box-shadow: 0 4px 14px rgba(242, 188, 88, 0.22);
+}
+.public-site .navbar .btn-primary:hover,
+.public-site .navbar .btn-primary:focus-visible,
+.public-site .navbar .btn-primary:active {
+    color: #142238 !important;
+    background-color: #ffd27e;
+    border-color: #ffd27e;
 }
 .public-site .btn-outline-primary:hover { background: var(--primary); color: #fff; }
 .public-site :is(a, button, input, select, textarea, [tabindex]):focus-visible {

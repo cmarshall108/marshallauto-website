@@ -67,6 +67,20 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('active', inventory['class'])
         self.assertNotIn('aria-current', inventory.attrs)
 
+    def test_header_call_button_uses_high_contrast_accent_styles(self):
+        html = self.page('/')
+        call_button = html.select_one('.navbar a.btn-primary[href^="tel:"]')
+        self.assertIsNotNone(call_button)
+        self.assertIn('Call Now', call_button.get_text(' ', strip=True))
+
+        with self.client.get('/static/css/public.css') as response:
+            css = response.get_data(as_text=True)
+        self.assertIn('.public-site .navbar .btn-primary {', css)
+        self.assertIn('background-color: var(--accent);', css)
+        self.assertIn('color: #142238 !important;', css)
+        self.assertIn('.public-site .navbar .btn-primary:hover,', css)
+        self.assertIn('background-color: #ffd27e;', css)
+
     def test_financing_page_distinguishes_lenders_and_qualifies_terms(self):
         html = self.page('/financing')
         page_text = html.get_text(' ', strip=True)
