@@ -442,7 +442,7 @@ bi-check-circle
                 <h2 class="h3 fw-bold mb-3">Vehicle Details</h2>
                 <ul class="nav nav-tabs nav-tabs-scroll" id="vehicleTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="exterior-tab" data-bs-toggle="tab" data-bs-target="#exterior" type="button" role="tab" aria-controls="exterior" aria-selected="true">Exterior</button>
+                        <button class="nav-link" id="exterior-tab" data-bs-toggle="tab" data-bs-target="#exterior" type="button" role="tab" aria-controls="exterior" aria-selected="false">Exterior</button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="interior-tab" data-bs-toggle="tab" data-bs-target="#interior" type="button" role="tab" aria-controls="interior" aria-selected="false">Interior</button>
@@ -460,7 +460,7 @@ bi-check-circle
                         <button class="nav-link" id="tech-specs-tab" data-bs-toggle="tab" data-bs-target="#tech-specs" type="button" role="tab" aria-controls="tech-specs" aria-selected="false">Tech Specs</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab" aria-controls="details" aria-selected="false">Details</button>
+                        <button class="nav-link active" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab" aria-controls="details" aria-selected="true">Details</button>
                     </li>
                 </ul>
                 <div class="tab-content p-4 border border-top-0 bg-white mb-4" id="vehicleTabsContent">
@@ -471,7 +471,7 @@ bi-check-circle
                         ('Mechanical', 'mechanical_features'),
                         ('Safety', 'safety_features')
                     ] %}
-                    <div class="tab-pane fade{% if loop.first %} show active{% endif %}" id="{{ category | lower }}" role="tabpanel" aria-labelledby="{{ category | lower }}-tab" tabindex="0">
+                    <div class="tab-pane fade" id="{{ category | lower }}" role="tabpanel" aria-labelledby="{{ category | lower }}-tab" tabindex="0">
                         <h3 class="h5 fw-bold mb-3">{{ category }}</h3>
                         {% if category == 'Entertainment' %}
                         {% set equipment = vehicle.entertainment_feature_list %}
@@ -560,7 +560,7 @@ bi-check-circle
                         </details>
                         {% endif %}
                     </div>
-                    <div class="tab-pane fade" id="details" role="tabpanel" aria-labelledby="details-tab" tabindex="0">
+                    <div class="tab-pane fade show active" id="details" role="tabpanel" aria-labelledby="details-tab" tabindex="0">
                         <h3 class="h5 fw-bold mb-3">Vehicle Details</h3>
                         <p class="vehicle-additional-specifications">{{ vehicle.description or 'No vehicle description has been provided.' }}</p>
                         <dl class="row specs-table mt-4">

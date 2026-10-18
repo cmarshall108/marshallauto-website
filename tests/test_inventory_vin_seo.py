@@ -131,6 +131,14 @@ class InventoryVINSEOTests(unittest.TestCase):
                 'Tech Specs', 'Details',
             ],
         )
+        self.assertEqual(
+            [button.get_text(' ', strip=True) for button in html.select('#vehicleTabs .nav-link.active')],
+            ['Details'],
+        )
+        self.assertEqual(
+            [panel.get('id') for panel in html.select('#vehicleTabsContent .tab-pane.active')],
+            ['details'],
+        )
         for panel_id, expected_text in (
             ('#exterior', '17-inch alloy wheels'),
             ('#interior', 'Heated front seats'),
