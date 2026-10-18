@@ -477,7 +477,7 @@ bi-check-circle
                         {% if equipment | join | trim %}
                         <ul class="vehicle-feature-list">
                             {% for item in equipment if item.strip() %}
-                            <li>{{ item.strip() }}</li>
+                            <li>{{ item.strip()|replace('Photo-observed (verify): ', '') }}</li>
                             {% endfor %}
                         </ul>
                         {% else %}

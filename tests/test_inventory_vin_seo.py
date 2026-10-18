@@ -66,7 +66,9 @@ class InventoryVINSEOTests(unittest.TestCase):
         self.available.passenger_capacity = 5
         self.available.gvwr = '4,189 lbs'
         self.available.features = 'Blind Spot Monitor, Backup Camera'
-        self.available.exterior_features = '17-inch alloy wheels\nHeated side mirrors'
+        self.available.exterior_features = (
+            '17-inch alloy wheels\nHeated side mirrors\nPhoto-observed (verify): Alloy Wheels'
+        )
         self.available.interior_features = 'Heated front seats'
         self.available.entertainment_features = 'Apple CarPlay\nAndroid Auto'
         self.available.mechanical_features = 'Six-speed automatic transmission'
@@ -90,6 +92,8 @@ class InventoryVINSEOTests(unittest.TestCase):
         db.session.commit()
 
         html = self.page('/inventory/available-accord')
+        self.assertNotIn('Photo-observed', html.get_text())
+        self.assertIn('Alloy Wheels', html.select_one('#exterior').get_text(' ', strip=True))
         spec_rows = {
             dt.get_text(' ', strip=True): dt.find_next_sibling('dd').get_text(' ', strip=True)
             for dt in html.select('.specs-table dt')
