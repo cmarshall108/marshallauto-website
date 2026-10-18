@@ -342,9 +342,9 @@ class VinDecodeDetailTests(unittest.TestCase):
             'Grok Estimates (not manufacturer-verified)',
         ))
         self.assertLess(labels.index('Vehicle Identity'), labels.index(
-            'Grok Photo Observations (visual; verify)',
+            'Grok Visual Details (verify)',
         ))
-        self.assertIn('Grok Photo Observations', labels[-1])
+        self.assertIn('Grok Visual Details', labels[-1])
         photo_values = groups[-1]['fields']
         self.assertEqual(len(photo_values), 2)
 

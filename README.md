@@ -495,9 +495,9 @@ only when eligible specifications are missing; each response is capped at 128
 generated tokens. A failed or empty estimate is recorded to prevent repeat
 charges; use `--force` to explicitly retry. Existing completed Grok photo
 annotations are reused at no extra model cost to add high-confidence, scene-
-matched exterior, interior, and entertainment observations. OpenCV results,
+matched exterior, interior, and entertainment details. OpenCV results,
 low-confidence annotations, and inferred safety equipment are excluded.
-Photo-derived details are labeled as observations to verify; NHTSA/EPA values
+Visual details are marked for verification; NHTSA/EPA values
 remain first and authoritative. Existing vehicle fields and staff-entered
 features are preserved. Use `--limit N` to cap one run or `--delay SECONDS` to
 adjust request spacing. The Ubuntu auto-deployer runs this resumable backfill

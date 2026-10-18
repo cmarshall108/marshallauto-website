@@ -62,7 +62,10 @@ def _replace_photo_observation_lines(
         line.strip()
         for line in (existing or '').splitlines()
         if line.strip()
-        and not line.strip().casefold().startswith('photo-observed (verify):')
+        and not line.strip().casefold().startswith((
+            'photo-observed (verify):',
+            'verify on vehicle:',
+        ))
     ]
     return _merge_lines('\n'.join(retained), '\n'.join(incoming))
 
@@ -250,7 +253,7 @@ def register_commands(app):
                     click.echo(
                         f'  Vehicle {vehicle.id}: updated; '
                         f'{estimates_added} Grok estimate(s), '
-                        f'{observations_added} photo observation(s).'
+                        f'{observations_added} visual detail(s).'
                     )
                     break
                 except Exception as exc:

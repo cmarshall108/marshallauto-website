@@ -876,7 +876,7 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
                 })
         if photo_fields:
             groups.append({
-                'label': 'Grok Photo Observations (visual; verify)',
+                'label': 'Grok Visual Details (verify)',
                 'fields': photo_fields,
             })
     return groups
@@ -1029,7 +1029,7 @@ def merge_grok_photo_annotations(
         for item in annotations.get(category, []):
             if isinstance(item, dict) and item.get('label'):
                 details[field].append(
-                    f"Photo-observed (verify): {str(item['label']).strip()}"
+                    f"Verify on vehicle: {str(item['label']).strip()}"
                 )
     return details
 

@@ -204,7 +204,7 @@ class VINBackfillTests(unittest.TestCase):
 
     def test_backfill_reuses_completed_grok_photo_annotations_without_model_calls(self):
         self.vehicle.exterior_features = (
-            'Staff checked exterior\nPhoto-observed (verify): Outdated Wheels'
+            'Staff checked exterior\nVerify on vehicle: Outdated Wheels'
         )
         self.vehicle.vin_decode_data = json.dumps({
             'NHTSA': {'VIN': self.vehicle.vin, 'ModelYear': '2018'},
@@ -285,15 +285,15 @@ class VINBackfillTests(unittest.TestCase):
             [item['label'] for item in saved['Grok']['photo_annotations']['interior']],
             ['Seat Surface'],
         )
-        self.assertIn('Photo-observed (verify): Alloy Wheels', updated.exterior_features)
+        self.assertIn('Verify on vehicle: Alloy Wheels', updated.exterior_features)
         self.assertIn('Staff checked exterior', updated.exterior_features)
         self.assertNotIn('Outdated Wheels', updated.exterior_features)
         self.assertIn(
-            'Photo-observed (verify): Apple CarPlay',
+            'Verify on vehicle: Apple CarPlay',
             updated.entertainment_features,
         )
         self.assertIn(
-            'Photo-observed (verify): Seat Surface',
+            'Verify on vehicle: Seat Surface',
             updated.interior_features,
         )
         self.assertNotIn('Leather Seats', updated.interior_features or '')
