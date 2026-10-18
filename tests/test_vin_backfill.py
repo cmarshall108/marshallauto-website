@@ -222,19 +222,27 @@ class VINBackfillTests(unittest.TestCase):
             highlight_status='ready',
             highlight_scene='interior_dash',
         )
+        cabin = VehicleImage(
+            vehicle_id=self.vehicle.id,
+            filename='cabin.jpg',
+            highlight_status='ready',
+            highlight_scene='interior_cabin',
+        )
         opencv = VehicleImage(
             vehicle_id=self.vehicle.id,
             filename='opencv.jpg',
             highlight_status='ready',
             highlight_scene='interior_cabin',
         )
-        db.session.add_all([exterior, interior, opencv])
+        db.session.add_all([exterior, interior, cabin, opencv])
         db.session.flush()
         for image, engine, label, confidence in (
             (exterior, 'grok', 'Alloy Wheels', 0.92),
             (interior, 'grok', 'Apple CarPlay', 0.9),
+            (cabin, 'grok', 'Seat Surface', 0.9),
             (opencv, 'opencv', 'Leather Seats', 0.99),
         ):
+            category = 'detail' if label == 'Seat Surface' else 'feature'
             db.session.add(PhotoHighlightJob(
                 vehicle_image_id=image.id,
                 vehicle_id=self.vehicle.id,
@@ -245,7 +253,7 @@ class VINBackfillTests(unittest.TestCase):
             db.session.add(VehicleImageHighlight(
                 vehicle_image_id=image.id,
                 label=label,
-                category='feature',
+                category=category,
                 confidence=confidence,
                 source='auto',
                 is_visible=True,
@@ -273,13 +281,20 @@ class VINBackfillTests(unittest.TestCase):
             [item['label'] for item in saved['Grok']['photo_annotations']['entertainment']],
             ['Apple CarPlay'],
         )
-        self.assertEqual(saved['Grok']['photo_annotations']['interior'], [])
+        self.assertEqual(
+            [item['label'] for item in saved['Grok']['photo_annotations']['interior']],
+            ['Seat Surface'],
+        )
         self.assertIn('Photo-observed (verify): Alloy Wheels', updated.exterior_features)
         self.assertIn('Staff checked exterior', updated.exterior_features)
         self.assertNotIn('Outdated Wheels', updated.exterior_features)
         self.assertIn(
             'Photo-observed (verify): Apple CarPlay',
             updated.entertainment_features,
+        )
+        self.assertIn(
+            'Photo-observed (verify): Seat Surface',
+            updated.interior_features,
         )
         self.assertNotIn('Leather Seats', updated.interior_features or '')
 

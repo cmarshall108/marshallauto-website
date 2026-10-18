@@ -687,6 +687,12 @@ _GROK_PHOTO_FEATURE_CATEGORIES = {
     'infotainment screen': ('entertainment', {'interior_dash', 'interior_cabin'}),
 }
 
+_GROK_PHOTO_DETAIL_CATEGORIES = {
+    'wheel detail': ('exterior', {'exterior_front', 'exterior_side', 'exterior_rear', 'wheel_closeup'}),
+    'infotainment screen': ('entertainment', {'interior_dash', 'interior_cabin'}),
+    'seat surface': ('interior', {'interior_cabin'}),
+}
+
 _GROK_PHOTO_CATEGORIES = ('exterior', 'interior', 'entertainment')
 _GROK_PHOTO_ANNOTATION_VERSION = 1
 _GROK_PHOTO_MIN_CONFIDENCE = 0.85
@@ -852,7 +858,10 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
                     confidence = float(item.get('confidence'))
                 except (TypeError, ValueError):
                     continue
-                feature_info = _GROK_PHOTO_FEATURE_CATEGORIES.get(label.casefold())
+                feature_info = (
+                    _GROK_PHOTO_FEATURE_CATEGORIES.get(label.casefold())
+                    or _GROK_PHOTO_DETAIL_CATEGORIES.get(label.casefold())
+                )
                 if (
                     not feature_info
                     or feature_info[0] != category
@@ -883,13 +892,18 @@ def classify_grok_photo_annotations(
     for image in images:
         scene = str(image.get('scene') or '').strip().casefold()
         for highlight in image.get('highlights') or []:
-            if not isinstance(highlight, dict) or highlight.get('category') != 'feature':
+            if not isinstance(highlight, dict):
                 continue
             label = str(highlight.get('label') or '').strip()
-            feature_info = _GROK_PHOTO_FEATURE_CATEGORIES.get(label.casefold())
-            if not feature_info:
+            if highlight.get('category') == 'feature':
+                category_info = _GROK_PHOTO_FEATURE_CATEGORIES.get(label.casefold())
+            elif highlight.get('category') == 'detail':
+                category_info = _GROK_PHOTO_DETAIL_CATEGORIES.get(label.casefold())
+            else:
+                category_info = None
+            if not category_info:
                 continue
-            category, allowed_scenes = feature_info
+            category, allowed_scenes = category_info
             if scene not in allowed_scenes:
                 continue
             try:
@@ -969,7 +983,7 @@ def collect_grok_photo_annotations(vehicle_id: int) -> dict[str, Any] | None:
         VehicleImageHighlight.vehicle_image_id.in_(grok_image_ids),
         VehicleImageHighlight.source == 'auto',
         VehicleImageHighlight.is_visible.is_(True),
-        VehicleImageHighlight.category == 'feature',
+        VehicleImageHighlight.category.in_(('feature', 'detail')),
         VehicleImageHighlight.confidence >= _GROK_PHOTO_MIN_CONFIDENCE,
     ).all()
     by_image: dict[int, list[dict[str, Any]]] = {}

@@ -287,6 +287,14 @@ class VinDecodeDetailTests(unittest.TestCase):
                     'label': 'Leather Seats',
                     'category': 'feature',
                     'confidence': 0.88,
+                }, {
+                    'label': 'Seat Surface',
+                    'category': 'detail',
+                    'confidence': 0.9,
+                }, {
+                    'label': 'Infotainment Screen',
+                    'category': 'detail',
+                    'confidence': 0.89,
                 }],
             },
         ])
@@ -297,11 +305,11 @@ class VinDecodeDetailTests(unittest.TestCase):
         )
         self.assertEqual(
             [item['label'] for item in annotations['interior']],
-            ['Leather Seats'],
+            ['Leather Seats', 'Seat Surface'],
         )
         self.assertEqual(
             [item['label'] for item in annotations['entertainment']],
-            ['Apple CarPlay'],
+            ['Apple CarPlay', 'Infotainment Screen'],
         )
 
     def test_grok_photo_observations_render_after_authoritative_nhtsa_fields(self):
