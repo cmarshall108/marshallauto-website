@@ -7,8 +7,9 @@ from flask import current_app
 from app import db
 from app.models import Vehicle
 from app.vin_decode import (
-    decode_vin, enrich_vin_decode_data_with_grok,
-    is_vin_grok_enrichment_enabled, normalize_vin,
+    collect_grok_photo_annotations, decode_vin,
+    enrich_vin_decode_data_with_grok, is_vin_grok_enrichment_enabled,
+    grok_photo_annotation_signature, merge_grok_photo_annotations, normalize_vin,
 )
 
 
@@ -51,6 +52,19 @@ def _merge_lines(existing: str | None, incoming: str | None) -> str | None:
             lines.append(value)
             seen.add(value.casefold())
     return '\n'.join(lines) or None
+
+
+def _replace_photo_observation_lines(
+    existing: str | None,
+    incoming: list[str],
+) -> str | None:
+    retained = [
+        line.strip()
+        for line in (existing or '').splitlines()
+        if line.strip()
+        and not line.strip().casefold().startswith('photo-observed (verify):')
+    ]
+    return _merge_lines('\n'.join(retained), '\n'.join(incoming))
 
 
 def _merge_features(existing: str | None, incoming: list[str]) -> str | None:
@@ -132,19 +146,33 @@ def register_commands(app):
         query = Vehicle.query.filter(Vehicle.vin.isnot(None), Vehicle.vin != '')
         query = query.order_by(Vehicle.id)
         inventory = query.all()
-        if force:
-            vehicles = inventory[:limit] if limit else inventory
-        else:
-            grok_enabled = is_vin_grok_enrichment_enabled()
-            vehicles = []
-            for vehicle in inventory:
-                raw_data = _stored_vin_decode_data(vehicle)
-                if raw_data is None or (
-                    grok_enabled and 'Grok' not in raw_data
-                ):
-                    vehicles.append(vehicle)
-            if limit:
-                vehicles = vehicles[:limit]
+        grok_enabled = is_vin_grok_enrichment_enabled()
+        vehicles = []
+        for vehicle in inventory:
+            raw_data = _stored_vin_decode_data(vehicle)
+            grok_data = raw_data.get('Grok') if raw_data else None
+            annotations = (
+                grok_data.get('photo_annotations')
+                if isinstance(grok_data, dict) else None
+            )
+            missing_enrichment = (
+                raw_data is None
+                or (
+                    grok_enabled
+                    and (
+                        not isinstance(grok_data, dict)
+                        or 'estimates' not in grok_data
+                    )
+                )
+                or not isinstance(annotations, dict)
+                or annotations.get('version') != 1
+                or annotations.get('image_signature')
+                != grok_photo_annotation_signature(vehicle.images)
+            )
+            if force or missing_enrichment:
+                vehicles.append(vehicle)
+        if limit:
+            vehicles = vehicles[:limit]
 
         click.echo(
             f'VIN backfill: {len(vehicles)} vehicle(s) queued.'
@@ -155,40 +183,76 @@ def register_commands(app):
         for index, vehicle in enumerate(vehicles):
             for attempt in range(1, retries + 1):
                 try:
-                    raw_data = (
-                        _stored_vin_decode_data(vehicle)
-                        if not force else None
-                    )
-                    if raw_data is not None and 'Grok' not in raw_data:
-                        grok_data = enrich_vin_decode_data_with_grok(raw_data)
-                        if grok_data is None:
-                            failed += 1
-                            click.echo(
-                                f'  Vehicle {vehicle.id}: Grok enrichment is not configured.',
-                                err=True,
+                    raw_data = None if force else _stored_vin_decode_data(vehicle)
+                    if raw_data is None:
+                        result = decode_vin(vehicle.vin, use_cache=False)
+                        if not _apply_vin_decode(vehicle, result):
+                            reason = result.get('error') or (
+                                'decoder response did not include full data for this VIN'
                             )
-                            break
-                        raw_data['Grok'] = grok_data
-                        vehicle.vin_decode_data = json.dumps(
-                            raw_data,
-                            separators=(',', ':'),
-                        )
-                        db.session.commit()
-                        updated += 1
-                        click.echo(
-                            f'  Vehicle {vehicle.id}: added '
-                            f'{len(grok_data["estimates"])} Grok estimate(s).'
-                        )
-                        break
-                    result = decode_vin(vehicle.vin, use_cache=False)
-                    if _apply_vin_decode(vehicle, result):
-                        db.session.commit()
-                        updated += 1
-                        click.echo(f'  Vehicle {vehicle.id}: updated.')
-                        break
-                    reason = result.get('error') or (
-                        'decoder response did not include full data for this VIN'
+                            raise RuntimeError(reason)
+                        raw_data = _stored_vin_decode_data(vehicle)
+                        if raw_data is None:
+                            raise RuntimeError(
+                                'saved decoder response did not match this vehicle VIN'
+                            )
+
+                    grok_data = raw_data.get('Grok')
+                    if not isinstance(grok_data, dict):
+                        grok_data = {}
+                    raw_data['Grok'] = grok_data
+                    if grok_enabled and 'estimates' not in grok_data:
+                        try:
+                            estimates = enrich_vin_decode_data_with_grok(raw_data)
+                        except RuntimeError as exc:
+                            current_app.logger.warning(
+                                'Grok VIN estimates unavailable for vehicle %s: %s',
+                                vehicle.id,
+                                exc,
+                            )
+                            grok_data['estimates'] = {}
+                        else:
+                            if estimates is not None:
+                                grok_data.update(estimates)
+
+                    annotations = (
+                        grok_data.get('photo_annotations')
+                        if isinstance(grok_data.get('photo_annotations'), dict)
+                        and grok_data['photo_annotations'].get('version') == 1
+                        else collect_grok_photo_annotations(vehicle.id)
                     )
+                    if annotations is not None:
+                        detail_lines = merge_grok_photo_annotations(raw_data, annotations)
+                        grok_data = raw_data['Grok']
+                        for field, lines in detail_lines.items():
+                            setattr(
+                                vehicle,
+                                field,
+                                _replace_photo_observation_lines(
+                                    getattr(vehicle, field),
+                                    lines,
+                                ),
+                            )
+                    elif grok_data:
+                        raw_data['Grok'] = grok_data
+
+                    vehicle.vin_decode_data = json.dumps(
+                        raw_data,
+                        separators=(',', ':'),
+                    )
+                    db.session.commit()
+                    updated += 1
+                    estimates_added = len(grok_data.get('estimates') or {})
+                    observations_added = sum(
+                        len(annotations.get(category, []))
+                        for category in ('exterior', 'interior', 'entertainment')
+                    ) if annotations else 0
+                    click.echo(
+                        f'  Vehicle {vehicle.id}: updated; '
+                        f'{estimates_added} Grok estimate(s), '
+                        f'{observations_added} photo observation(s).'
+                    )
+                    break
                 except Exception as exc:
                     db.session.rollback()
                     current_app.logger.exception(

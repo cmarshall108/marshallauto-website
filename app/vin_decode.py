@@ -11,6 +11,7 @@ provides values.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -662,6 +663,50 @@ _GROK_ESTIMATE_LABELS = {
     'fuel_type': 'Fuel type',
 }
 
+_GROK_PHOTO_FEATURE_CATEGORIES = {
+    'alloy wheels': ('exterior', {'exterior_front', 'exterior_side', 'exterior_rear', 'wheel_closeup'}),
+    'new tires': ('exterior', {'exterior_front', 'exterior_side', 'exterior_rear', 'wheel_closeup'}),
+    'sunroof': ('exterior', {'exterior_front', 'exterior_side', 'exterior_rear', 'interior_cabin'}),
+    'moonroof': ('exterior', {'exterior_front', 'exterior_side', 'interior_cabin'}),
+    'panoramic roof': ('exterior', {'exterior_front', 'exterior_side', 'interior_cabin'}),
+    'running boards': ('exterior', {'exterior_side'}),
+    'trailer tow': ('exterior', {'exterior_rear'}),
+    'tow package': ('exterior', {'exterior_rear'}),
+    'power liftgate': ('exterior', {'exterior_rear'}),
+    'leather seats': ('interior', {'interior_cabin'}),
+    'leather interior': ('interior', {'interior_cabin'}),
+    'heated seats': ('interior', {'interior_cabin'}),
+    'ventilated seats': ('interior', {'interior_cabin'}),
+    'third row seating': ('interior', {'interior_cabin'}),
+    'seat surface': ('interior', {'interior_cabin'}),
+    'apple carplay': ('entertainment', {'interior_dash', 'interior_cabin'}),
+    'android auto': ('entertainment', {'interior_dash', 'interior_cabin'}),
+    'navigation': ('entertainment', {'interior_dash', 'interior_cabin'}),
+    'bluetooth': ('entertainment', {'interior_dash', 'interior_cabin'}),
+    'premium audio': ('entertainment', {'interior_dash', 'interior_cabin'}),
+    'infotainment screen': ('entertainment', {'interior_dash', 'interior_cabin'}),
+}
+
+_GROK_PHOTO_CATEGORIES = ('exterior', 'interior', 'entertainment')
+_GROK_PHOTO_ANNOTATION_VERSION = 1
+_GROK_PHOTO_MIN_CONFIDENCE = 0.85
+
+
+def grok_photo_annotation_signature(images: list[Any]) -> str:
+    states = sorted(
+        (
+            image.id,
+            image.highlight_status,
+            image.highlight_version,
+            image.highlight_analyzed_at.isoformat()
+            if image.highlight_analyzed_at else '',
+        )
+        for image in images
+    )
+    return hashlib.sha256(
+        json.dumps(states, separators=(',', ':')).encode('utf-8'),
+    ).hexdigest()
+
 
 def _humanize_vin_field(field: str) -> str:
     if field.startswith('EPA '):
@@ -789,7 +834,190 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
             'label': 'Grok Estimates (not manufacturer-verified)',
             'fields': grok_fields,
         })
+    observations = (
+        grok_data.get('photo_annotations')
+        if isinstance(grok_data, dict) else None
+    )
+    if isinstance(observations, dict):
+        photo_fields = []
+        for category in _GROK_PHOTO_CATEGORIES:
+            for item in observations.get(category, []):
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get('label') or '').strip()
+                scene = str(item.get('scene') or '').strip().replace('_', ' ')
+                if not label or not scene:
+                    continue
+                try:
+                    confidence = float(item.get('confidence'))
+                except (TypeError, ValueError):
+                    continue
+                feature_info = _GROK_PHOTO_FEATURE_CATEGORIES.get(label.casefold())
+                if (
+                    not feature_info
+                    or feature_info[0] != category
+                    or scene.replace(' ', '_') not in feature_info[1]
+                    or not math.isfinite(confidence)
+                    or not _GROK_PHOTO_MIN_CONFIDENCE <= confidence <= 1
+                ):
+                    continue
+                photo_fields.append({
+                    'label': f'{category.title()}: {label}',
+                    'value': f'Visible in {scene} photo ({confidence:.0%} confidence)',
+                })
+        if photo_fields:
+            groups.append({
+                'label': 'Grok Photo Observations (visual; verify)',
+                'fields': photo_fields,
+            })
     return groups
+
+
+def classify_grok_photo_annotations(
+    images: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Keep high-confidence feature annotations relevant to their photo scene."""
+    classified: dict[str, dict[str, dict[str, Any]]] = {
+        category: {} for category in _GROK_PHOTO_CATEGORIES
+    }
+    for image in images:
+        scene = str(image.get('scene') or '').strip().casefold()
+        for highlight in image.get('highlights') or []:
+            if not isinstance(highlight, dict) or highlight.get('category') != 'feature':
+                continue
+            label = str(highlight.get('label') or '').strip()
+            feature_info = _GROK_PHOTO_FEATURE_CATEGORIES.get(label.casefold())
+            if not feature_info:
+                continue
+            category, allowed_scenes = feature_info
+            if scene not in allowed_scenes:
+                continue
+            try:
+                confidence = float(highlight.get('confidence'))
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(confidence) or not (
+                _GROK_PHOTO_MIN_CONFIDENCE <= confidence <= 1
+            ):
+                continue
+            prior = classified[category].get(label.casefold())
+            if prior and prior['confidence'] >= confidence:
+                continue
+            classified[category][label.casefold()] = {
+                'label': label,
+                'scene': scene,
+                'confidence': round(confidence, 3),
+            }
+    return {
+        category: list(classified[category].values())
+        for category in _GROK_PHOTO_CATEGORIES
+    }
+
+
+def collect_grok_photo_annotations(vehicle_id: int) -> dict[str, Any] | None:
+    """Reuse completed Grok photo results; return None while any image is pending."""
+    from app.models import PhotoHighlightJob, VehicleImage, VehicleImageHighlight
+
+    images = VehicleImage.query.filter_by(vehicle_id=vehicle_id).all()
+    if any(image.highlight_status in {'pending', 'processing'} for image in images):
+        return None
+    image_ids = [image.id for image in images]
+    if image_ids and PhotoHighlightJob.query.filter(
+        PhotoHighlightJob.vehicle_image_id.in_(image_ids),
+        PhotoHighlightJob.status.in_(('queued', 'running')),
+    ).first():
+        return None
+
+    ready_image_ids = [
+        image.id for image in images if image.highlight_status == 'ready'
+    ]
+    if not ready_image_ids:
+        return {
+            'version': _GROK_PHOTO_ANNOTATION_VERSION,
+            'image_signature': grok_photo_annotation_signature(images),
+            **{category: [] for category in _GROK_PHOTO_CATEGORIES},
+        }
+
+    jobs = PhotoHighlightJob.query.filter(
+        PhotoHighlightJob.vehicle_image_id.in_(ready_image_ids),
+        PhotoHighlightJob.status == 'completed',
+    ).order_by(
+        PhotoHighlightJob.finished_at.desc(),
+        PhotoHighlightJob.id.desc(),
+    ).all()
+    latest_jobs = {}
+    for job in jobs:
+        latest_jobs.setdefault(job.vehicle_image_id, job)
+    grok_image_ids = [
+        image_id
+        for image_id, job in latest_jobs.items()
+        if 'engine=grok' in (job.result_summary or '').casefold()
+    ]
+    if not grok_image_ids:
+        return {
+            'version': _GROK_PHOTO_ANNOTATION_VERSION,
+            'image_signature': grok_photo_annotation_signature(images),
+            **{category: [] for category in _GROK_PHOTO_CATEGORIES},
+        }
+
+    image_scenes = {
+        image.id: image.highlight_scene
+        for image in images
+        if image.id in grok_image_ids
+    }
+    highlights = VehicleImageHighlight.query.filter(
+        VehicleImageHighlight.vehicle_image_id.in_(grok_image_ids),
+        VehicleImageHighlight.source == 'auto',
+        VehicleImageHighlight.is_visible.is_(True),
+        VehicleImageHighlight.category == 'feature',
+        VehicleImageHighlight.confidence >= _GROK_PHOTO_MIN_CONFIDENCE,
+    ).all()
+    by_image: dict[int, list[dict[str, Any]]] = {}
+    for highlight in highlights:
+        by_image.setdefault(highlight.vehicle_image_id, []).append({
+            'label': highlight.label,
+            'category': highlight.category,
+            'confidence': highlight.confidence,
+        })
+    observations = classify_grok_photo_annotations([
+        {'scene': image_scenes.get(image_id), 'highlights': items}
+        for image_id, items in by_image.items()
+    ])
+    return {
+        'version': _GROK_PHOTO_ANNOTATION_VERSION,
+        'image_signature': grok_photo_annotation_signature(images),
+        **observations,
+    }
+
+
+def merge_grok_photo_annotations(
+    vin_decode_data: dict[str, Any],
+    annotations: dict[str, Any],
+) -> dict[str, list[str]]:
+    """Store visual observations separately and return labeled detail-tab lines."""
+    grok_data = vin_decode_data.setdefault('Grok', {})
+    if not isinstance(grok_data, dict):
+        grok_data = {}
+        vin_decode_data['Grok'] = grok_data
+    grok_data['photo_annotations'] = annotations
+
+    details = {
+        'exterior_features': [],
+        'interior_features': [],
+        'entertainment_features': [],
+    }
+    field_map = {
+        'exterior': 'exterior_features',
+        'interior': 'interior_features',
+        'entertainment': 'entertainment_features',
+    }
+    for category, field in field_map.items():
+        for item in annotations.get(category, []):
+            if isinstance(item, dict) and item.get('label'):
+                details[field].append(
+                    f"Photo-observed (verify): {str(item['label']).strip()}"
+                )
+    return details
 
 
 def _xai_api_key() -> str:
@@ -1711,6 +1939,7 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
                 vehicle['vin_decode_data']['Grok'] = grok_data
                 sources.append('grok-supplemental')
         except RuntimeError:
+            vehicle['vin_decode_data']['Grok'] = {'estimates': {}}
             warnings.append(
                 'Grok estimates are temporarily unavailable; NHTSA and EPA data are unchanged.'
             )

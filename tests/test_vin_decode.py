@@ -8,8 +8,8 @@ from werkzeug.datastructures import MultiDict
 
 from app.forms import VehicleForm
 from app.vin_decode import (
-    decode_vin, derive_vehicle_details, enrich_vin_decode_data_with_grok,
-    group_vin_decode_data, map_vehicle_fields,
+    classify_grok_photo_annotations, decode_vin, derive_vehicle_details,
+    enrich_vin_decode_data_with_grok, group_vin_decode_data, map_vehicle_fields,
 )
 
 
@@ -244,6 +244,102 @@ class VinDecodeDetailTests(unittest.TestCase):
             'Grok Estimates (not manufacturer-verified)',
         )
 
+    def test_grok_photo_annotations_fill_only_matching_high_confidence_categories(self):
+        annotations = classify_grok_photo_annotations([
+            {
+                'scene': 'exterior_side',
+                'highlights': [
+                    {
+                        'label': 'Alloy Wheels',
+                        'category': 'feature',
+                        'confidence': 0.91,
+                    },
+                    {
+                        'label': 'New Tires',
+                        'category': 'feature',
+                        'confidence': 0.72,
+                    },
+                    {
+                        'label': 'Possible Scratch',
+                        'category': 'imperfection',
+                        'confidence': 0.99,
+                    },
+                ],
+            },
+            {
+                'scene': 'interior_dash',
+                'highlights': [
+                    {
+                        'label': 'Apple CarPlay',
+                        'category': 'feature',
+                        'confidence': 0.9,
+                    },
+                    {
+                        'label': 'Heated Seats',
+                        'category': 'feature',
+                        'confidence': 0.98,
+                    },
+                ],
+            },
+            {
+                'scene': 'interior_cabin',
+                'highlights': [{
+                    'label': 'Leather Seats',
+                    'category': 'feature',
+                    'confidence': 0.88,
+                }],
+            },
+        ])
+
+        self.assertEqual(
+            [item['label'] for item in annotations['exterior']],
+            ['Alloy Wheels'],
+        )
+        self.assertEqual(
+            [item['label'] for item in annotations['interior']],
+            ['Leather Seats'],
+        )
+        self.assertEqual(
+            [item['label'] for item in annotations['entertainment']],
+            ['Apple CarPlay'],
+        )
+
+    def test_grok_photo_observations_render_after_authoritative_nhtsa_fields(self):
+        raw = {
+            'NHTSA': {'VIN': REFERENCE_VIN, 'EntertainmentSystem': 'Not Applicable'},
+            'Grok': {
+                'estimates': {'city_mpg': '26 MPG'},
+                'photo_annotations': {
+                    'version': 1,
+                    'exterior': [{
+                        'label': 'Alloy Wheels',
+                        'scene': 'exterior_side',
+                        'confidence': 0.91,
+                    }],
+                    'interior': [],
+                    'entertainment': [{
+                        'label': 'Apple CarPlay',
+                        'scene': 'interior_dash',
+                        'confidence': 0.9,
+                    }],
+                },
+            },
+        }
+
+        groups = group_vin_decode_data(raw)
+
+        self.assertEqual(groups[0]['label'], 'Vehicle Identity')
+        labels = [group['label'] for group in groups]
+        self.assertLess(labels.index('Vehicle Identity'), labels.index(
+            'Grok Estimates (not manufacturer-verified)',
+        ))
+        self.assertLess(labels.index('Vehicle Identity'), labels.index(
+            'Grok Photo Observations (visual; verify)',
+        ))
+        self.assertIn('Grok Photo Observations', labels[-1])
+        photo_values = groups[-1]['fields']
+        self.assertEqual(len(photo_values), 2)
+
     def test_grok_request_is_small_and_only_validates_missing_allowlisted_specs(self):
         nhtsa = self.reference_decode()
         original = json.loads(json.dumps(nhtsa))
@@ -302,7 +398,10 @@ class VinDecodeDetailTests(unittest.TestCase):
 
         self.assertTrue(result['ok'])
         self.assertIn('NHTSA', result['vehicle']['vin_decode_data'])
-        self.assertNotIn('Grok', result['vehicle']['vin_decode_data'])
+        self.assertEqual(
+            result['vehicle']['vin_decode_data']['Grok']['estimates'],
+            {},
+        )
         self.assertTrue(any(
             'Grok estimates are temporarily unavailable' in warning
             for warning in result['warnings']

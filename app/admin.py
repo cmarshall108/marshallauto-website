@@ -1,3 +1,4 @@
+import copy
 import os
 import base64
 import binascii
@@ -56,7 +57,10 @@ from app.video_jobs import (
     VideoUploadError, cancel_video_jobs, discard_staged_video, stage_video_upload,
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
-from app.vin_decode import decode_vin, normalize_vin
+from app.vin_decode import (
+    collect_grok_photo_annotations, decode_vin, merge_grok_photo_annotations,
+    normalize_vin,
+)
 from app.two_factor import (
     consume_code, decrypt_secret, encrypt_secret, mark_session_verified, pending_user,
     provisioning_uri, record_failure, replace_recovery_codes, requires_two_factor,
@@ -1427,6 +1431,29 @@ def vin_decode_api():
 
     vin = normalize_vin(raw)
     result = decode_vin(vin)
+    if result.get('ok'):
+        existing_vehicle = Vehicle.query.filter_by(vin=vin).first()
+        if existing_vehicle:
+            annotations = collect_grok_photo_annotations(existing_vehicle.id)
+            if annotations is not None:
+                result = copy.deepcopy(result)
+                vehicle_data = result.get('vehicle') or {}
+                raw_data = vehicle_data.get('vin_decode_data')
+                if isinstance(raw_data, dict):
+                    observed_details = merge_grok_photo_annotations(
+                        raw_data,
+                        annotations,
+                    )
+                    for field, lines in observed_details.items():
+                        if lines:
+                            existing = vehicle_data.get(field) or ''
+                            vehicle_data[field] = '\n'.join(
+                                dict.fromkeys(
+                                    part.strip()
+                                    for part in [*existing.splitlines(), *lines]
+                                    if part.strip()
+                                )
+                            )
     status = 200 if result.get('ok') else 400
     # 422 for shape errors; 502 when upstream NHTSA fails
     err = (result.get('error') or '').lower()

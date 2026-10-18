@@ -26,7 +26,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
-  - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle; optional, conservative Grok estimates for missing specifications; resumable bulk backfill for existing inventory
+  - VIN decode (NHTSA vPIC + EPA) to prefill vehicle specifications, MPG, and default safety features; optional conservative Grok estimates for missing data and free reuse of completed Grok photo annotations; resumable bulk backfill for existing inventory
   - Cascading typeahead suggestions for make/model/trim, colors, and features
   - “LOW MILES!” badge on inventory cards under 75,000 miles
   - Manage service records per vehicle
@@ -489,17 +489,20 @@ the complete NHTSA/EPA decode for existing vehicles:
 venv/bin/python -m flask --app run:app backfill-vin-data
 ```
 
-The command processes vehicles with a VIN that lack saved decode data or a
-Grok-enrichment attempt. If `XAI_API_KEY` is set, it makes one short Grok request
+The command processes vehicles with a VIN that lack saved decode data or
+supplemental data. If `XAI_API_KEY` is set, it makes one short text-model request
 only when eligible specifications are missing; each response is capped at 128
-generated tokens. Equipment, colors, and condition are never guessed. It
-preserves existing vehicle fields and staff-entered features, adding only missing
-NHTSA-derived values. Grok estimates are stored separately, labeled unverified,
-and never replace NHTSA or EPA values. Failed requests are reported and can be
-retried by running the command again. Use `--force` to refresh all decoded VINs,
-`--limit N` to cap one run, or `--delay SECONDS` to adjust request spacing. The
-Ubuntu auto-deployer runs this resumable backfill after a successful deploy;
-other deployment methods should run it once after `flask db upgrade`.
+generated tokens. A failed or empty estimate is recorded to prevent repeat
+charges; use `--force` to explicitly retry. Existing completed Grok photo
+annotations are reused at no extra model cost to add high-confidence, scene-
+matched exterior, interior, and entertainment observations. OpenCV results,
+low-confidence annotations, and inferred safety equipment are excluded.
+Photo-derived details are labeled as observations to verify; NHTSA/EPA values
+remain first and authoritative. Existing vehicle fields and staff-entered
+features are preserved. Use `--limit N` to cap one run or `--delay SECONDS` to
+adjust request spacing. The Ubuntu auto-deployer runs this resumable backfill
+after a successful deploy; other deployment methods should run it once after
+`flask db upgrade`.
 
 ## Photo Highlights (Carvana-style bubbles)
 
