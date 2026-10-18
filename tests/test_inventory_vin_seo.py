@@ -79,9 +79,11 @@ class InventoryVINSEOTests(unittest.TestCase):
                 html = self.page(path)
                 badges = html.select_one('.vehicle-card-badges')
                 self.assertIsNotNone(badges)
-                self.assertIn('Clean Title', badges.get_text(' ', strip=True))
-                self.assertIn('Apple CarPlay', badges.get_text(' ', strip=True))
-                self.assertIn('Android Auto', badges.get_text(' ', strip=True))
+                meta_badges = badges.select_one('.vehicle-card-meta-badges')
+                self.assertIsNotNone(meta_badges)
+                self.assertIn('Clean Title', meta_badges.get_text(' ', strip=True))
+                self.assertIn('Apple CarPlay', meta_badges.get_text(' ', strip=True))
+                self.assertIn('Android Auto', meta_badges.get_text(' ', strip=True))
 
     def test_all_vehicle_statuses_are_indexable_with_vins(self):
         for vehicle in (self.available, self.sold, self.pending):

@@ -234,7 +234,23 @@
 .public-site .vehicle-card .price { color: var(--primary); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.04em; margin-top: 0.75rem; }
 .public-site .vehicle-card .quick-specs { color: #59677a; }
 .public-site .vehicle-card .badge-condition { background: rgba(20, 34, 56, 0.94); }
-.public-site .vehicle-card .vehicle-card-badges { top: auto; bottom: 0.75rem; left: 0.75rem; right: auto; justify-content: flex-start; max-width: calc(100% - 1.5rem); }
+.public-site .vehicle-card .vehicle-card-badges {
+    top: auto;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    justify-content: space-between;
+    align-items: flex-end;
+    max-width: none;
+    gap: 0.5rem;
+}
+.public-site .vehicle-card .vehicle-card-meta-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    margin-left: auto;
+}
 .public-site .vehicle-card .badge-title-status { box-shadow: none; border-radius: 6px; }
 .public-site .vehicle-card > .favorite-btn { width: 44px; height: 44px; }
 .public-site a:not(.btn):not(.navbar-brand):not(.skip-to-content) { transition: color 0.18s ease; }
