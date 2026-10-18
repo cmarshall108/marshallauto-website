@@ -172,11 +172,20 @@
                                         <span class="badge-low-miles-value">{{ vehicle.mileage | format_mileage_badge }}</span>
                                     </span>
                                     {% endif %}
-                                    {% if vehicle.title_status == 'rebuilt' %}
+                                    {% if not vehicle.title_status or vehicle.title_status == 'clean' %}
+                                    <span class="badge badge-title-status bg-success">Clean Title</span>
+                                    {% elif vehicle.title_status == 'rebuilt' %}
                                     <span class="badge badge-title-status bg-warning text-dark">Rebuilt Title</span>
                                     {% elif vehicle.title_status == 'salvage' %}
                                     <span class="badge badge-title-status bg-danger">Salvage Title</span>
                                     {% endif %}
+                                    {% for feature in vehicle.entertainment_feature_list %}
+                                        {% if 'apple carplay' in feature | lower %}
+                                    <span class="badge badge-title-status bg-info text-dark">Apple CarPlay</span>
+                                        {% elif 'android auto' in feature | lower %}
+                                    <span class="badge badge-title-status bg-info text-dark">Android Auto</span>
+                                        {% endif %}
+                                    {% endfor %}
                                 </div>
                             </div>
                             <div class="card-body p-4">

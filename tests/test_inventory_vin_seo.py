@@ -71,6 +71,18 @@ class InventoryVINSEOTests(unittest.TestCase):
             ['Apple CarPlay', 'Android Auto'],
         )
 
+    def test_inventory_previews_show_clean_title_and_phone_integration_features(self):
+        self.available.entertainment_features = 'Apple CarPlay'
+
+        for path in ('/', '/inventory'):
+            with self.subTest(path=path):
+                html = self.page(path)
+                badges = html.select_one('.vehicle-card-badges')
+                self.assertIsNotNone(badges)
+                self.assertIn('Clean Title', badges.get_text(' ', strip=True))
+                self.assertIn('Apple CarPlay', badges.get_text(' ', strip=True))
+                self.assertIn('Android Auto', badges.get_text(' ', strip=True))
+
     def test_all_vehicle_statuses_are_indexable_with_vins(self):
         for vehicle in (self.available, self.sold, self.pending):
             with self.subTest(status=vehicle.status):
