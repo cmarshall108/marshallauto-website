@@ -411,7 +411,19 @@
                             <dd class="col-sm-8">{{ vehicle.fuel_type or 'N/A' }}</dd>
                             <dt class="col-sm-4">MPG</dt>
                             <dd class="col-sm-8">{{ vehicle.mpg_city or '--' }} City / {{ vehicle.mpg_highway or '--' }} Hwy</dd>
+                            <dt class="col-sm-4">Combined MPG</dt>
+                            <dd class="col-sm-8">{{ vehicle.mpg_combined or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Doors</dt>
+                            <dd class="col-sm-8">{{ vehicle.doors or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Passenger Capacity</dt>
+                            <dd class="col-sm-8">{{ vehicle.passenger_capacity or 'N/A' }}</dd>
+                            <dt class="col-sm-4">Gross Vehicle Weight Rating</dt>
+                            <dd class="col-sm-8">{{ vehicle.gvwr or 'N/A' }}</dd>
                         </dl>
+                        {% if vehicle.additional_specifications %}
+                        <h5 class="fw-bold mt-4 mb-3">Additional Specifications</h5>
+                        <div class="vehicle-additional-specifications">{{ vehicle.additional_specifications }}</div>
+                        {% endif %}
                     </div>
                     <div class="tab-pane fade" id="features" role="tabpanel" aria-labelledby="features-tab">
                         <h4 class="fw-bold mb-3">Features &amp; Options</h4>

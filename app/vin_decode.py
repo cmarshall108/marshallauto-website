@@ -874,6 +874,9 @@ def map_vehicle_fields(result: dict[str, Any]) -> dict[str, Any]:
         'mpg_highway': None,
         'mpg_combined': None,
         'doors': _nhtsa_get(result, 'Doors') or None,
+        'passenger_capacity': _nhtsa_get(
+            result, 'Seats', 'NumberOfSeats', 'PassengerCapacity',
+        ) or None,
         'plant_city': _nhtsa_get(result, 'PlantCity') or None,
         'plant_country': _nhtsa_get(result, 'PlantCountry') or None,
         'vehicle_type': _nhtsa_get(result, 'VehicleType') or None,

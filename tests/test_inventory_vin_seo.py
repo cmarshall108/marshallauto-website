@@ -58,6 +58,46 @@ class InventoryVINSEOTests(unittest.TestCase):
                 self.assertEqual(html.select_one('link[rel="canonical"]')['href'], f'https://dealer.example/inventory/{vehicle.slug}')
                 self.assertEqual(self.schema(html, 'Car')['vehicleIdentificationNumber'], vehicle.vin)
 
+    def test_detail_page_renders_extended_vehicle_specifications(self):
+        self.available.mpg_city = 25
+        self.available.mpg_highway = 30
+        self.available.mpg_combined = 27
+        self.available.doors = 4
+        self.available.passenger_capacity = 5
+        self.available.gvwr = '4,189 lbs'
+        self.available.additional_specifications = (
+            'Engine displacement: 2.0 L / 122 cu in\nHorsepower: 147 hp'
+        )
+        db.session.commit()
+
+        html = self.page('/inventory/available-accord')
+        spec_rows = {
+            dt.get_text(' ', strip=True): dt.find_next_sibling('dd').get_text(' ', strip=True)
+            for dt in html.select('.specs-table dt')
+        }
+        expected = {
+            'Combined MPG': '27',
+            'Doors': '4',
+            'Passenger Capacity': '5',
+            'Gross Vehicle Weight Rating': '4,189 lbs',
+        }
+        for label, value in expected.items():
+            with self.subTest(value=value):
+                self.assertEqual(spec_rows[label], value)
+        additional = html.select_one('.vehicle-additional-specifications')
+        self.assertEqual(
+            additional.get_text('\n', strip=True),
+            'Engine displacement: 2.0 L / 122 cu in\nHorsepower: 147 hp',
+        )
+        summary = self.client.get(
+            '/api/vehicles-summary?slugs=available-accord',
+        ).get_json()['vehicles'][0]
+        self.assertEqual(summary['mpg_combined'], 27)
+        self.assertEqual(summary['doors'], 4)
+        self.assertEqual(summary['passenger_capacity'], 5)
+        self.assertEqual(summary['features'], '')
+        self.assertEqual(summary['additional_specifications'], self.available.additional_specifications)
+
     def test_real_vins_have_indexable_vin_record_pages(self):
         for vehicle in (self.available, self.sold, self.pending):
             with self.subTest(status=vehicle.status):

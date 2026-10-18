@@ -112,6 +112,10 @@
         interior_color: form.querySelector('#interior_color'),
         mpg_city: form.querySelector('#mpg_city'),
         mpg_highway: form.querySelector('#mpg_highway'),
+        mpg_combined: form.querySelector('#mpg_combined'),
+        doors: form.querySelector('#doors'),
+        passenger_capacity: form.querySelector('#passenger_capacity'),
+        gvwr: form.querySelector('#gvwr'),
         features: form.querySelector('#features'),
         vin: form.querySelector('#vin'),
     };
@@ -499,6 +503,10 @@
             ['interior_color', vehicle.interior_color],
             ['mpg_city', vehicle.mpg_city],
             ['mpg_highway', vehicle.mpg_highway],
+            ['mpg_combined', vehicle.mpg_combined],
+            ['doors', vehicle.doors],
+            ['passenger_capacity', vehicle.passenger_capacity],
+            ['gvwr', vehicle.gvwr],
         ];
 
         fieldMap.forEach(([name, value]) => {

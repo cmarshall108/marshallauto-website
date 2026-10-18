@@ -1408,6 +1408,11 @@ body.gallery-lightbox-open {
     margin-bottom: 0.75rem;
 }
 
+.vehicle-additional-specifications {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
 .feature-tag {
     display: inline-block;
     background-color: #e9ecef;

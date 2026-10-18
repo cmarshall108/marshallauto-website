@@ -564,7 +564,8 @@ CSV_IMPORT_FIELDS = [
     'year', 'make', 'model', 'trim', 'vin', 'stock_number', 'price', 'sale_price',
     'mileage', 'condition', 'title_status', 'status', 'is_coming_soon', 'body_style', 'exterior_color',
     'interior_color', 'engine', 'transmission', 'drivetrain', 'fuel_type',
-    'mpg_city', 'mpg_highway', 'description', 'features',
+    'mpg_city', 'mpg_highway', 'mpg_combined', 'doors', 'passenger_capacity', 'gvwr',
+    'description', 'features', 'additional_specifications',
 ]
 CSV_REQUIRED_FIELDS = ['year', 'make', 'model', 'price', 'mileage']
 
@@ -622,8 +623,15 @@ def vehicle_import():
                     fuel_type=row.get('fuel_type')[:32] or None if row.get('fuel_type') else None,
                     mpg_city=int(row['mpg_city']) if row.get('mpg_city') else None,
                     mpg_highway=int(row['mpg_highway']) if row.get('mpg_highway') else None,
+                    mpg_combined=int(row['mpg_combined']) if row.get('mpg_combined') else None,
+                    doors=int(row['doors']) if row.get('doors') else None,
+                    passenger_capacity=(
+                        int(row['passenger_capacity']) if row.get('passenger_capacity') else None
+                    ),
+                    gvwr=row.get('gvwr')[:64] or None if row.get('gvwr') else None,
                     description=row.get('description') or None,
                     features=row.get('features') or None,
+                    additional_specifications=row.get('additional_specifications') or None,
                 )
             except (ValueError, TypeError, InvalidOperation) as exc:
                 errors.append(f"Row {idx}: invalid value ({exc})")
@@ -2091,8 +2099,13 @@ def _vehicle_from_form(form):
         fuel_type=form.fuel_type.data.strip() if form.fuel_type.data else None,
         mpg_city=form.mpg_city.data,
         mpg_highway=form.mpg_highway.data,
+        mpg_combined=form.mpg_combined.data,
+        doors=form.doors.data,
+        passenger_capacity=form.passenger_capacity.data,
+        gvwr=form.gvwr.data.strip() if form.gvwr.data else None,
         description=form.description.data,
         features=form.features.data,
+        additional_specifications=form.additional_specifications.data,
         seo_title=form.seo_title.data,
         seo_description=form.seo_description.data,
         meta_keywords=form.meta_keywords.data,
@@ -2123,8 +2136,13 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.fuel_type = form.fuel_type.data.strip() if form.fuel_type.data else None
     vehicle.mpg_city = form.mpg_city.data
     vehicle.mpg_highway = form.mpg_highway.data
+    vehicle.mpg_combined = form.mpg_combined.data
+    vehicle.doors = form.doors.data
+    vehicle.passenger_capacity = form.passenger_capacity.data
+    vehicle.gvwr = form.gvwr.data.strip() if form.gvwr.data else None
     vehicle.description = form.description.data
     vehicle.features = form.features.data
+    vehicle.additional_specifications = form.additional_specifications.data
     vehicle.seo_title = form.seo_title.data
     vehicle.seo_description = form.seo_description.data
     vehicle.meta_keywords = form.meta_keywords.data

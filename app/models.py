@@ -126,10 +126,15 @@ class Vehicle(db.Model):
     fuel_type = db.Column(db.String(32), nullable=True)
     mpg_city = db.Column(db.Integer, nullable=True)
     mpg_highway = db.Column(db.Integer, nullable=True)
+    mpg_combined = db.Column(db.Integer, nullable=True)
+    doors = db.Column(db.Integer, nullable=True)
+    passenger_capacity = db.Column(db.Integer, nullable=True)
+    gvwr = db.Column(db.String(64), nullable=True)
 
     # Content
     description = db.Column(db.Text, nullable=True)
     features = db.Column(db.Text, nullable=True)  # comma-separated
+    additional_specifications = db.Column(db.Text, nullable=True)
 
     # SEO
     seo_title = db.Column(db.String(160), nullable=True)

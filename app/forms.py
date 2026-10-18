@@ -95,9 +95,16 @@ class VehicleForm(FlaskForm):
     fuel_type = StringField('Fuel Type', validators=[Optional(), Length(max=32)])
     mpg_city = IntegerField('MPG City', validators=[Optional(), NumberRange(min=0)])
     mpg_highway = IntegerField('MPG Highway', validators=[Optional(), NumberRange(min=0)])
+    mpg_combined = IntegerField('MPG Combined', validators=[Optional(), NumberRange(min=0)])
+    doors = IntegerField('Doors', validators=[Optional(), NumberRange(min=0)])
+    passenger_capacity = IntegerField(
+        'Passenger Capacity', validators=[Optional(), NumberRange(min=0)],
+    )
+    gvwr = StringField('Gross Vehicle Weight Rating', validators=[Optional(), Length(max=64)])
 
     description = TextAreaField('Description')
     features = TextAreaField('Features (comma-separated)')
+    additional_specifications = TextAreaField('Additional Specifications')
 
     video_url = StringField(
         'Video Walkaround URL',
