@@ -628,6 +628,7 @@
         const lightboxPrev = document.getElementById('gallery-lightbox-prev');
         const lightboxNext = document.getElementById('gallery-lightbox-next');
         const lightboxCounter = document.getElementById('gallery-lightbox-counter');
+        const lightboxStage = lightbox && lightbox.querySelector('.gallery-lightbox-stage');
 
         if (mainImage && thumbButtons.length >= 1 && gallery) {
             const parseHighlights = (raw) => {
@@ -916,9 +917,9 @@
                     const restore = lightboxLastFocus;
                     lightboxLastFocus = null;
                     if (restore && typeof restore.focus === 'function') {
-                        try { restore.focus(); } catch (_) { /* ignore */ }
+                        try { restore.focus({ preventScroll: true }); } catch (_) { /* ignore */ }
                     } else if (maximizeBtn) {
-                        try { maximizeBtn.focus(); } catch (_) { /* ignore */ }
+                        try { maximizeBtn.focus({ preventScroll: true }); } catch (_) { /* ignore */ }
                     }
                 };
 
@@ -930,6 +931,9 @@
                     closeHotspotCard();
                     lightboxLastFocus = document.activeElement;
                     lightboxOpen = true;
+                    if (lightbox.parentElement !== document.body) {
+                        document.body.appendChild(lightbox);
+                    }
                     syncLightboxImage(currentIndex);
                     lightbox.hidden = false;
                     document.body.classList.add('gallery-lightbox-open');
@@ -938,7 +942,7 @@
                     }
                     const focusTarget = lightboxClose || lightbox;
                     window.setTimeout(() => {
-                        try { focusTarget.focus(); } catch (_) { /* ignore */ }
+                        try { focusTarget.focus({ preventScroll: true }); } catch (_) { /* ignore */ }
                     }, 0);
                     Analytics.trackGallery('maximize_open', currentIndex, slides.length);
                 };
@@ -992,7 +996,7 @@
                         }
                     });
 
-                    if (!opts.skipScroll && multi) {
+                    if (!opts.skipScroll && multi && !lightboxOpen) {
                         try {
                             slide.el.scrollIntoView({
                                 behavior: reduceMotion || mode === 'spin' ? 'auto' : 'smooth',
@@ -1164,6 +1168,69 @@
                             closeLightbox();
                         }
                     });
+                }
+                if (lightboxStage && multi) {
+                    const LIGHTBOX_SWIPE_THRESHOLD_PX = 40;
+                    const LIGHTBOX_SWIPE_THRESHOLD_RATIO = 0.12;
+                    const LIGHTBOX_AXIS_LOCK_PX = 8;
+                    let lightboxPointerId = null;
+                    let lightboxStartX = 0;
+                    let lightboxStartY = 0;
+                    let lightboxStartTime = 0;
+                    let lightboxAxis = null;
+
+                    const resetLightboxSwipe = (pointerId) => {
+                        if (pointerId !== undefined) {
+                            try { lightboxStage.releasePointerCapture(pointerId); } catch (_) { /* ignore */ }
+                        }
+                        lightboxPointerId = null;
+                        lightboxAxis = null;
+                    };
+
+                    lightboxStage.addEventListener('pointerdown', (e) => {
+                        if (!lightboxOpen || (e.pointerType === 'mouse' && e.button !== 0)) return;
+                        lightboxPointerId = e.pointerId;
+                        lightboxStartX = e.clientX;
+                        lightboxStartY = e.clientY;
+                        lightboxStartTime = Date.now();
+                        lightboxAxis = null;
+                        try { lightboxStage.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+                    });
+
+                    lightboxStage.addEventListener('pointermove', (e) => {
+                        if (!lightboxOpen || e.pointerId !== lightboxPointerId) return;
+                        const dx = e.clientX - lightboxStartX;
+                        const dy = e.clientY - lightboxStartY;
+                        if (!lightboxAxis) {
+                            if (Math.abs(dx) < LIGHTBOX_AXIS_LOCK_PX && Math.abs(dy) < LIGHTBOX_AXIS_LOCK_PX) return;
+                            lightboxAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+                        }
+                        if (lightboxAxis === 'x' && e.cancelable) e.preventDefault();
+                    }, { passive: false });
+
+                    lightboxStage.addEventListener('pointerup', (e) => {
+                        if (e.pointerId !== lightboxPointerId) return;
+                        const dx = e.clientX - lightboxStartX;
+                        const dy = e.clientY - lightboxStartY;
+                        const elapsed = Math.max(Date.now() - lightboxStartTime, 1);
+                        const width = lightboxStage.getBoundingClientRect().width || window.innerWidth || 320;
+                        const threshold = Math.max(LIGHTBOX_SWIPE_THRESHOLD_PX, width * LIGHTBOX_SWIPE_THRESHOLD_RATIO);
+                        const horizontal = lightboxAxis === 'x' ||
+                            (!lightboxAxis && Math.abs(dx) > LIGHTBOX_AXIS_LOCK_PX && Math.abs(dx) > Math.abs(dy));
+                        const isFlick = Math.abs(dx) / elapsed > 0.35 && Math.abs(dx) > 20;
+                        resetLightboxSwipe(e.pointerId);
+                        if (!lightboxOpen || !horizontal) return;
+                        if (Math.abs(dx) >= threshold || isFlick) {
+                            if (dx < 0) goNext('lightbox_swipe_next');
+                            else goPrev('lightbox_swipe_prev');
+                        }
+                    });
+
+                    const cancelLightboxSwipe = (e) => {
+                        if (e.pointerId === lightboxPointerId) resetLightboxSwipe();
+                    };
+                    lightboxStage.addEventListener('pointercancel', cancelLightboxSwipe);
+                    lightboxStage.addEventListener('lostpointercapture', cancelLightboxSwipe);
                 }
                 // Double-click / double-tap photo to maximize (photos mode only)
                 let lastStageTapAt = 0;

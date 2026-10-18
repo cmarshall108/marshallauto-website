@@ -819,7 +819,10 @@ a:hover {
     display: flex;
     align-items: center;
     justify-content: center;
+    height: 100vh;
+    height: 100dvh;
     padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+    box-sizing: border-box;
 }
 
 .gallery-lightbox[hidden] {
@@ -839,6 +842,7 @@ a:hover {
     z-index: 1;
     width: min(96vw, 1400px);
     height: min(92vh, 960px);
+    height: min(92dvh, 960px);
     max-width: 100%;
     max-height: 100%;
     display: flex;
@@ -853,6 +857,8 @@ a:hover {
     align-items: center;
     justify-content: center;
     padding: 3.5rem 4rem 3rem;
+    touch-action: pan-y pinch-zoom;
+    overscroll-behavior: contain;
 }
 
 .gallery-lightbox-stage img {
