@@ -48,6 +48,29 @@ class InventoryVINSEOTests(unittest.TestCase):
         schemas = [json.loads(script.string) for script in html.select('script[type="application/ld+json"]')]
         return next(schema for schema in schemas if schema.get('@type') == schema_type)
 
+    def test_phone_integration_features_are_inferred_in_both_directions(self):
+        vehicle = self.available
+
+        vehicle.entertainment_features = 'Android Auto'
+        self.assertEqual(
+            vehicle.entertainment_feature_list,
+            ['Android Auto', 'Apple CarPlay'],
+        )
+        self.assertEqual(vehicle.feature_list, ['Apple CarPlay'])
+
+        vehicle.entertainment_features = 'Apple CarPlay'
+        self.assertEqual(
+            vehicle.entertainment_feature_list,
+            ['Apple CarPlay', 'Android Auto'],
+        )
+        self.assertEqual(vehicle.feature_list, ['Android Auto'])
+
+        vehicle.entertainment_features = 'Apple CarPlay\nAndroid Auto'
+        self.assertEqual(
+            vehicle.entertainment_feature_list,
+            ['Apple CarPlay', 'Android Auto'],
+        )
+
     def test_all_vehicle_statuses_are_indexable_with_vins(self):
         for vehicle in (self.available, self.sold, self.pending):
             with self.subTest(status=vehicle.status):

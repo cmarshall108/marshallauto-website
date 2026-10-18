@@ -21,12 +21,17 @@ def _feature_values(raw: str | None) -> list[str]:
     return [feature.strip() for feature in (raw or '').split(',') if feature.strip()]
 
 
-def _include_android_auto(features: list[str], related_features: list[str]) -> list[str]:
+def _include_phone_integration_companion(
+    features: list[str],
+    related_features: list[str],
+) -> list[str]:
     all_features = features + related_features
     has_carplay = any('apple carplay' in feature.casefold() for feature in all_features)
-    has_android_auto = any('android auto' in feature.casefold() for feature in features)
+    has_android_auto = any('android auto' in feature.casefold() for feature in all_features)
     if has_carplay and not has_android_auto:
         features.append('Android Auto')
+    elif has_android_auto and not has_carplay:
+        features.append('Apple CarPlay')
     return features
 
 
@@ -228,7 +233,7 @@ class Vehicle(db.Model):
 
     @property
     def feature_list(self):
-        return _include_android_auto(
+        return _include_phone_integration_companion(
             _feature_values(self.features),
             _feature_values(self.entertainment_features),
         )
@@ -240,7 +245,10 @@ class Vehicle(db.Model):
             for item in (self.entertainment_features or '').splitlines()
             if item.strip()
         ]
-        return _include_android_auto(features, _feature_values(self.features))
+        return _include_phone_integration_companion(
+            features,
+            _feature_values(self.features),
+        )
 
     def savings_info(self):
         """Savings vs. retail clean-title market value, or None if not applicable.
