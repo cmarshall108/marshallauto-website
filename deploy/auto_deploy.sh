@@ -154,5 +154,10 @@ fi
 
 log "DEPLOYED $(git rev-parse --short HEAD) — healthy"
 
+# Non-fatal and resumable: fetch full VIN/EPA data for existing inventory.
+if ! FLASK_APP=run.py "$PYTHON" -m flask backfill-vin-data; then
+  log "WARNING: VIN data backfill was incomplete; rerun flask backfill-vin-data"
+fi
+
 # Keep the 10 most recent snapshots.
 ls -1dt "$BACKUP_ROOT"/instance-* 2>/dev/null | tail -n +11 | xargs -r rm -rf

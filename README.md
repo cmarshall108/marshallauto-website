@@ -26,7 +26,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
-  - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle
+  - VIN decode (NHTSA vPIC + EPA) to prefill year/make/model/trim/specs, MPG, and default safety features when adding a vehicle; resumable bulk backfill for existing inventory
   - Cascading typeahead suggestions for make/model/trim, colors, and features
   - “LOW MILES!” badge on inventory cards under 75,000 miles
   - Manage service records per vehicle
@@ -478,6 +478,23 @@ venv/bin/python -m flask --app run:app listing-sync
 The command checks up to 10 due vehicles per run (`--limit` accepts 1-100), with database claims preventing duplicate processing by concurrent workers. `marketplace-sync` remains a compatible alias. Both providers use the existing `MarketplaceSync` table, so Craigslist support adds no extra schema migration. For Ubuntu, the existing `deploy/install.sh` installer installs and enables `marshallauto-marketplace-sync.timer`, which now handles both Craigslist and Facebook records. On an existing deployment, rerun that installer as the server administrator after updating and migrating. The timer invokes the command every 15 minutes; each vehicle retains its six-hour schedule. Inspect failures with `journalctl -u marshallauto-marketplace-sync.service`. This macOS workspace does not install or start systemd services.
 
 For another host, schedule the same command every 15 minutes using cron or the host's scheduler, with the project working directory, virtual environment, and production environment. Merely starting the web server does **not** execute refresh tasks. Initial photo import can take up to about two minutes; configure WSGI/reverse-proxy request timeouts of at least 180 seconds for this admin operation.
+
+## Backfill Existing Vehicle VIN Data
+
+After applying database migrations, fill missing VIN-derived specifications and
+the complete NHTSA/EPA decode for existing vehicles:
+
+```bash
+venv/bin/python -m flask --app run:app backfill-vin-data
+```
+
+The command processes vehicles with a VIN that have no saved decode data. It
+preserves existing vehicle fields and staff-entered features, adding only missing
+values. Failed decodes are reported and can be retried by running the command
+again. Use `--force` to refresh all decoded VINs, `--limit N` to cap one run, or
+`--delay SECONDS` to adjust request spacing. The Ubuntu auto-deployer runs this
+resumable backfill after a successful deploy; other deployment methods should
+run it once after `flask db upgrade`.
 
 ## Photo Highlights (Carvana-style bubbles)
 

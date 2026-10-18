@@ -116,6 +116,8 @@ def create_app(config_class=None):
     register_commands(app)
     from app.buyer_guides import register_commands as register_buyer_guide_commands
     register_buyer_guide_commands(app)
+    from app.vin_backfill import register_commands as register_vin_backfill_commands
+    register_vin_backfill_commands(app)
 
     # Public analytics beacon (sendBeacon / no form token)
     csrf.exempt(analytics_collect)
