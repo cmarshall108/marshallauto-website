@@ -479,6 +479,16 @@
     .public-site .navbar { padding-block: 0.85rem; }
     .public-site .navbar .nav-link { font-size: 0.95rem; }
     .public-site .navbar-collapse { border-color: var(--line); }
+    .public-site .navbar-collapse.show {
+        max-height: calc(100vh - 13.5rem);
+        max-height: calc(100dvh - 13.5rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+    .public-site .navbar-collapse.collapsing {
+        max-height: calc(100vh - 13.5rem);
+        max-height: calc(100dvh - 13.5rem);
+    }
     .public-site .hero-section { min-height: auto; padding-block: 3rem; text-align: center; }
     .public-site .hero-section h1,
     .public-site .hero-section p { margin-inline: auto; }
@@ -487,8 +497,8 @@
     .public-site .section-padding { padding-block: 3.5rem; }
 }
 @media (max-width: 575.98px) {
-    .public-site .hero-section { padding-block: 2.25rem; }
-    .public-site .hero-section h1 { font-size: clamp(2.25rem, 9vw, 2.7rem); }
+    .public-site .hero-section { padding-block: 1.75rem; }
+    .public-site .hero-section h1 { font-size: clamp(2rem, 8.5vw, 2.5rem); }
     .public-site .hero-section .hero-actions .btn-primary { flex: 1 1 100%; }
     .public-site .hero-section .hero-actions .btn-outline-light {
         flex: 1 1 calc(50% - 0.75rem);
@@ -496,18 +506,42 @@
         padding-inline: 0.65rem;
         font-size: 0.88rem;
     }
+    .public-site .search-box form .row > .col-12:nth-child(-n+2) {
+        flex: 0 0 50%;
+        width: 50%;
+    }
+    .public-site .mobile-cta-bar .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 44px;
+        padding-inline: 0.25rem;
+        white-space: nowrap;
+    }
+    .public-site .mobile-cta-bar .btn span {
+        margin-left: 0 !important;
+    }
     .public-site .search-box { padding: 1.5rem; }
     .public-site .hero-assurances .container { gap: 0.75rem; justify-content: flex-start; padding-inline: 1.5rem; }
     .public-site .hero-assurances .container > div { width: 100%; }
+    .public-site .cookie-consent-banner {
+        max-height: calc(100vh - 9rem - env(safe-area-inset-bottom));
+        max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom));
+        overflow-y: auto;
+    }
     .public-site .form-control,
     .public-site .form-select { font-size: 16px; }
     .public-site .cta-section { padding-block: 3.5rem; }
 }
 @media (max-width: 767.98px) {
     .public-site .cookie-consent-banner {
-        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+        bottom: calc(4.75rem + env(safe-area-inset-bottom));
         width: calc(100% - 1rem);
         border-radius: 14px;
+    }
+    .public-site.has-mobile-cta.has-compare-bar .cookie-consent-banner {
+        bottom: calc(12rem + env(safe-area-inset-bottom));
     }
     .public-site .cookie-consent-banner .container {
         gap: 0.55rem !important;
@@ -518,7 +552,7 @@
         font-size: 0.74rem;
     }
     .public-site .cookie-consent-banner .d-flex { width: 100%; }
-    .public-site .cookie-consent-banner .btn { flex: 1; min-height: 40px; }
+    .public-site .cookie-consent-banner .btn { flex: 1; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .public-site *,

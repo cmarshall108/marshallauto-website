@@ -231,6 +231,21 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('mobile-cta-bar) .btn-primary', css)
         self.assertIn('prefers-reduced-motion: reduce', css)
 
+    def test_mobile_layout_keeps_fixed_actions_and_navigation_accessible(self):
+        public_css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
+        shared_css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()
+
+        self.assertIn('.mobile-cta-bar .btn {', public_css)
+        self.assertIn('white-space: nowrap;', public_css)
+        self.assertIn('min-height: 44px;', public_css)
+        self.assertIn('.navbar-collapse.show', public_css)
+        self.assertIn('overflow-y: auto;', public_css)
+        self.assertIn('max-height: calc(100dvh - 13.5rem);', public_css)
+        self.assertIn('.search-box form .row > .col-12:nth-child(-n+2)', public_css)
+        self.assertIn('body.has-mobile-cta.has-compare-bar .cookie-consent-banner', shared_css)
+        self.assertIn('bottom: calc(6rem + env(safe-area-inset-bottom));', shared_css)
+        self.assertIn('bottom: calc(12rem + env(safe-area-inset-bottom));', shared_css)
+
     def test_theme_contains_motion_and_focus_accessibility_rules(self):
         css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
         self.assertIn('@media (prefers-reduced-motion: reduce)', css)

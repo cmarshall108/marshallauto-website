@@ -332,7 +332,11 @@ a:hover {
     }
 
     body.has-mobile-cta .cookie-consent-banner {
-        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+        bottom: calc(4.75rem + env(safe-area-inset-bottom));
+    }
+
+    body.has-mobile-cta.has-compare-bar .cookie-consent-banner {
+        bottom: calc(12rem + env(safe-area-inset-bottom));
     }
 
     .cookie-consent-banner .container {
@@ -2090,11 +2094,11 @@ body.gallery-lightbox-open {
     }
 
     body.has-mobile-cta.has-compare-bar {
-        padding-bottom: calc(10.25rem + env(safe-area-inset-bottom));
+        padding-bottom: calc(12rem + env(safe-area-inset-bottom));
     }
 
     body.has-mobile-cta .compare-bar {
-        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+        bottom: calc(6rem + env(safe-area-inset-bottom));
     }
 
     .compare-bar .container {
@@ -2456,12 +2460,19 @@ body.gallery-lightbox-open {
     }
 
     body.has-mobile-cta.has-compare-bar {
-        padding-bottom: calc(10.25rem + env(safe-area-inset-bottom));
+        padding-bottom: calc(12rem + env(safe-area-inset-bottom));
     }
 
-    body.has-mobile-cta .compare-bar,
+    body.has-mobile-cta .compare-bar {
+        bottom: calc(6rem + env(safe-area-inset-bottom));
+    }
+
+    body.has-mobile-cta.has-compare-bar .cookie-consent-banner {
+        bottom: calc(12rem + env(safe-area-inset-bottom));
+    }
+
     body.has-mobile-cta .cookie-consent-banner {
-        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+        bottom: calc(4.75rem + env(safe-area-inset-bottom));
     }
 
     body.has-mobile-cta .chat-widget {
