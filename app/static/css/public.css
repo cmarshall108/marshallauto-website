@@ -475,6 +475,9 @@
     .public-site .navbar .nav-link { font-size: 0.74rem; padding-inline: 0.35rem; margin: 0; }
     .public-site .navbar .btn-sm { padding-inline: 0.65rem; font-size: 0.75rem; }
 }
+@media (min-width: 1400px) {
+    .public-site .inventory-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 @media (max-width: 991.98px) {
     .public-site .navbar { padding-block: 0.85rem; }
     .public-site .navbar .nav-link { font-size: 0.95rem; }
@@ -495,6 +498,7 @@
     .public-site .hero-section h1 { max-width: 18ch; }
     .public-site .search-box { margin-inline: auto; text-align: left; }
     .public-site .section-padding { padding-block: 3.5rem; }
+    .public-site .inventory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 575.98px) {
     .public-site .hero-section { padding-block: 1.75rem; }
@@ -525,6 +529,8 @@
     .public-site .search-box { padding: 1.5rem; }
     .public-site .hero-assurances .container { gap: 0.75rem; justify-content: flex-start; padding-inline: 1.5rem; }
     .public-site .hero-assurances .container > div { width: 100%; }
+    .public-site .inventory-grid { grid-template-columns: minmax(0, 1fr); }
+    .public-site .vehicle-card .card-img-wrapper { height: auto; aspect-ratio: 3 / 2; }
     .public-site .cookie-consent-banner {
         max-height: calc(100vh - 9rem - env(safe-area-inset-bottom));
         max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom));
@@ -553,6 +559,11 @@
     }
     .public-site .cookie-consent-banner .d-flex { width: 100%; }
     .public-site .cookie-consent-banner .btn { flex: 1; min-height: 44px; }
+}
+@media (hover: none) and (pointer: coarse) {
+    .public-site .badge-low-miles,
+    .public-site .badge-low-miles-inline { animation: none; }
+    .public-site :is(.vehicle-card, .coming-soon-card) img { transition: none; }
 }
 @media (prefers-reduced-motion: reduce) {
     .public-site *,

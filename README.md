@@ -36,6 +36,32 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Edit site settings, SEO defaults, and analytics IDs
   - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
 
+### Local IAAI Buy Now finder
+
+The optional `tools/iaai_buy_now_finder.py` utility opens a persistent local
+Chrome/Chromium profile and uses the visible IAAI Vehicles → Search page. Sign
+in and complete any MFA/CAPTCHA directly in the browser; if sign-in is needed,
+the terminal waits while Chrome remains open, and continues after you return to
+Vehicles → Search and press Enter. The utility does not read or store
+credentials. It applies Auction Type → Buy Now, Seller Type →
+Insurance, North Carolina/South Carolina/Virginia, odometer up to 79,999 miles,
+and Buy Now price up to $1,999. It walks the result pages, sorts verified
+listings by highest ACV first, and opens `iaai_buy_now_results.html` locally.
+The browser profile is stored under `~/.iaai-buy-now-finder/`.
+
+Install the optional browser automation dependency and its bundled browser:
+
+```bash
+python3 -m pip install -r tools/requirements-iaai.txt
+python3 -m playwright install chromium
+python3 tools/iaai_buy_now_finder.py
+```
+
+Use `--output /path/to/report.html` to choose a different report location.
+Listings whose displayed Buy Now price or odometer cannot be verified are
+excluded and counted in the report. Confirm current price, fees, title status,
+and condition on IAAI before bidding.
+
 CarFax PDFs linked from the admin list and edit pages use `/carfax/<report_id>/download`.
 Authenticated admins can view reports for available or sold vehicles; public visitors
 can only download reports for available vehicles.

@@ -51,6 +51,18 @@ class PublicThemeTests(unittest.TestCase):
         with self.client.get('/static/css/public.css') as response:
             self.assertEqual(response.status_code, 200)
 
+    def test_public_scripts_are_deferred_and_homepage_hero_is_preloaded(self):
+        html = self.page('/')
+        for script in html.select(
+            'script[src*="bootstrap.bundle"], script[src*="/static/js/"]',
+        ):
+            self.assertIn('defer', script.attrs, script.get('src'))
+        hero_preload = html.select_one(
+            'link[rel="preload"][as="image"][href*="gallardo_cover.jpg"]',
+        )
+        self.assertIsNotNone(hero_preload)
+        self.assertEqual(hero_preload.get('fetchpriority'), 'high')
+
     def test_current_navigation_and_inventory_section_are_distinguished(self):
         for path, label in (('/', 'Home'), ('/inventory', 'Inventory'),
                             ('/contact', 'Contact'), ('/financing', 'Financing')):

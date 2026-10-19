@@ -11,6 +11,7 @@ env/
 *.sqlite3
 .DS_Store
 instance/
+iaai_buy_now_results.html
 .pytest_cache/
 .mypy_cache/
 .coverage
