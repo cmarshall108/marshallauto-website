@@ -639,7 +639,11 @@ bi-check-circle
             <div class="col-lg-4">
                 <div class="card border-0 shadow p-4 mb-4 sticky-lg-top" style="top: 5.5rem;">
                     <h5 class="fw-bold mb-3">Have Questions?</h5>
-                    <p class="text-muted">Ask our team about dealership-arranged financing through Westlake Financial, or review the independent LightStream option.</p>
+                    {% if vehicle.is_available %}
+                    <p class="text-muted">Ask our team about dealership-arranged financing through Westlake Financial. You can also <a href="https://www.penfed.org/auto" target="_blank" rel="noopener noreferrer">try PenFed Credit Union for an auto loan</a> for this vehicle; check with PenFed about vehicle eligibility, approval, and terms.</p>
+                    {% else %}
+                    <p class="text-muted">Ask our team about dealership-arranged financing through Westlake Financial and current vehicle availability.</p>
+                    {% endif %}
                     <p class="text-break"><i class="bi bi-telephone-fill me-2 text-primary"></i> <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a></p>
                     <p class="text-break"><i class="bi bi-envelope-fill me-2 text-primary"></i> <a href="mailto:{{ business_email }}">{{ business_email }}</a></p>
                     <a href="{{ url_for('main.financing') }}" class="btn btn-primary w-100 mb-2">View Financing Options</a>
@@ -698,6 +702,7 @@ bi-check-circle
                             </p>
                         </div>
                     </a>
+                    <p class="px-4 pb-3 mb-0 small text-muted">Considering this vehicle? You can also <a href="https://www.penfed.org/auto" target="_blank" rel="noopener noreferrer">try PenFed Credit Union for an auto loan</a>. Check with PenFed about eligibility and terms.</p>
                 </div>
                 {% endfor %}
             </div>

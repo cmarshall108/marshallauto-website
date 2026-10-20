@@ -364,7 +364,7 @@ def _ensure_default_settings():
     defaults = {
         'site_title': 'Marshall Auto, LLC',
         'site_tagline': 'Quality Used Cars You Can Trust',
-        'meta_description': 'Marshall Auto, LLC is a used car dealer in Sanford, NC offering quality pre-owned vehicles and dealership-arranged financing through Westlake Financial. Buyers may also apply independently to LightStream by Truist; approval and terms vary.',
+        'meta_description': 'Marshall Auto, LLC is a used car dealer in Sanford, NC offering quality pre-owned vehicles and dealership-arranged financing through Westlake Financial. Buyers may also try PenFed Credit Union for an auto loan; approval and terms vary.',
         'meta_keywords': 'used cars Sanford NC, used car dealer Sanford, pre-owned vehicles, car dealership, auto sales, financing, CarFax, Marshall Auto LLC',
         'facebook_page_id': '',
         'facebook_page_access_token': '',
