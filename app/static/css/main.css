@@ -861,7 +861,7 @@ a:hover {
     align-items: center;
     justify-content: center;
     padding: 3.5rem 4rem 3rem;
-    touch-action: pan-y pinch-zoom;
+    touch-action: pinch-zoom;
     overscroll-behavior: contain;
 }
 
@@ -963,6 +963,7 @@ a:hover {
 
 body.gallery-lightbox-open {
     overflow: hidden;
+    overscroll-behavior: none;
 }
 
 @media (max-width: 767.98px) {

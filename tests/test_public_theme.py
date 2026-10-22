@@ -295,6 +295,14 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('bottom: calc(6rem + env(safe-area-inset-bottom));', shared_css)
         self.assertIn('bottom: calc(12rem + env(safe-area-inset-bottom));', shared_css)
 
+    def test_fullscreen_gallery_blocks_page_swipe_while_preserving_pinch_zoom(self):
+        css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()
+        self.assertIn('.gallery-lightbox-stage {', css)
+        self.assertIn('touch-action: pinch-zoom;', css)
+        self.assertIn('body.gallery-lightbox-open {', css)
+        self.assertIn('overflow: hidden;', css)
+        self.assertIn('overscroll-behavior: none;', css)
+
     def test_theme_contains_motion_and_focus_accessibility_rules(self):
         css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
         self.assertIn('@media (prefers-reduced-motion: reduce)', css)
