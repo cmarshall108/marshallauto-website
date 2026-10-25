@@ -921,16 +921,10 @@ def structured_data_local_business():
             "CarFax Reports",
             "Vehicle Trade-Ins"
         ],
-        "hasOfferCatalog": {
-            "@type": "OfferCatalog",
-            "name": "Used Vehicles",
-            "itemListElement": [
-                {"@type": "Offer", "itemOffered": {"@type": "Product", "name": "Used Cars"}},
-                {"@type": "Offer", "itemOffered": {"@type": "Product", "name": "Used Trucks"}},
-                {"@type": "Offer", "itemOffered": {"@type": "Product", "name": "Used SUVs"}},
-                {"@type": "Offer", "itemOffered": {"@type": "Product", "name": "Rebuilt Title Vehicles"}}
-            ]
-        },
+        # Do not emit category Product nodes here. Google Product rich results require
+        # offers/review/aggregateRating on every Product, and placeholder catalog items
+        # (Used Cars/SUVs/etc.) fail Search Console validation on every page that embeds
+        # AutoDealer markup. Real sellable inventory is marked up as Car + Offer instead.
         "sameAs": social
     }
     return data

@@ -77,6 +77,34 @@ class SeoTests(unittest.TestCase):
         self.assertIn('A test review.', html.get_text())
         self.assertIn('Rated 5.0 out of 5 stars based on 1 reviews.', html.get_text())
 
+    def test_dealership_schema_omits_placeholder_product_catalog(self):
+        """Category Product stubs lack offers and fail Google Product rich results."""
+        for path in ('/', '/about', '/contact', '/inventory/test-car-0'):
+            html = self.page(path)
+            schemas = [
+                json.loads(script.string)
+                for script in html.select('script[type="application/ld+json"]')
+            ]
+            dealership = next(
+                schema for schema in schemas if schema.get('@type') == 'AutoDealer'
+            )
+            self.assertNotIn('hasOfferCatalog', dealership)
+            products = [
+                schema for schema in schemas
+                if schema.get('@type') == 'Product'
+                or (
+                    isinstance(schema.get('@type'), list)
+                    and 'Product' in schema.get('@type')
+                )
+            ]
+            self.assertEqual(products, [])
+            cars = [schema for schema in schemas if schema.get('@type') == 'Car']
+            for car in cars:
+                self.assertIn('offers', car)
+                self.assertEqual(car['offers'].get('@type'), 'Offer')
+                self.assertIn(car['offers'].get('priceCurrency'), (None, 'USD', 'usd'))
+                self.assertTrue(car['offers'].get('price') or car['offers'].get('priceSpecification'))
+
     def test_inventory_pagination_canonical_keeps_page_not_tracking(self):
         html = self.page('/inventory?page=2&utm_source=test')
         self.assertEqual(html.select_one('link[rel="canonical"]')['href'],
