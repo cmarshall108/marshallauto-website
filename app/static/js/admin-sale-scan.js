@@ -46,12 +46,11 @@
         scans.forEach((scan, index) => {
             const column = document.createElement('div');
             column.className = 'col-12 col-md-6';
-            const frame = document.createElement('iframe');
-            frame.src = scan.url;
-            frame.title = `Scanned page ${index + 1}`;
-            frame.className = 'w-100 rounded border';
-            frame.style.height = '280px';
-            column.appendChild(frame);
+            const image = document.createElement('img');
+            image.src = scan.url;
+            image.alt = `Scanned page ${index + 1}`;
+            image.className = 'w-100 rounded border bg-white';
+            column.appendChild(image);
             pages.appendChild(column);
 
             const input = document.createElement('input');
@@ -118,13 +117,14 @@
                 throw new Error(message);
             }
             const bytes = new Uint8Array(await response.arrayBuffer());
+            const contentType = (response.headers.get('Content-Type') || 'image/jpeg').split(';', 1)[0];
             let binary = '';
             const chunk = 8192;
             for (let offset = 0; offset < bytes.length; offset += chunk) {
                 binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + chunk));
             }
-            const dataUrl = `data:application/pdf;base64,${btoa(binary)}`;
-            scans.push({ dataUrl, url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })) });
+            const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
+            scans.push({ dataUrl, url: URL.createObjectURL(new Blob([bytes], { type: contentType })) });
             syncPrinterLabel();
             renderScans();
         } catch (error) {

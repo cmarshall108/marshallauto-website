@@ -26,7 +26,7 @@ SCAN_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
   </pwg:ScanRegions>
   <pwg:InputSource>Platen</pwg:InputSource>
   <scan:ColorMode>RGB24</scan:ColorMode>
-  <scan:DocumentFormatExt>application/pdf</scan:DocumentFormatExt>
+  <scan:DocumentFormatExt>image/jpeg</scan:DocumentFormatExt>
   <scan:XResolution>300</scan:XResolution>
   <scan:YResolution>300</scan:YResolution>
 </scan:ScanSettings>
@@ -130,13 +130,14 @@ def _job_url(host, location):
     return f'https://{host}:443{location if location.startswith("/") else "/" + location}'
 
 
-def _download_pdf(job_url):
+def _download_scan(job_url):
     for suffix in ('/NextDocument', '/NextDocument?timeout=30'):
         result = _curl(['-D', '-', f'{job_url}{suffix}'], timeout=90)
         body = result.stdout
-        start = body.find(b'%PDF-')
-        if start >= 0:
-            return body[start:]
+        for marker in (b'\xff\xd8\xff', b'%PDF-'):
+            start = body.find(marker)
+            if start >= 0:
+                return body[start:]
     raise ScannerError('The printer did not return a scanned page. Place the document on the glass and try again.')
 
 
@@ -163,4 +164,4 @@ def scan_document(printer_id):
     for line in header.splitlines():
         if line.lower().startswith('location:'):
             location = line.split(':', 1)[1].strip()
-    return _download_pdf(_job_url(host, location))
+    return _download_scan(_job_url(host, location))

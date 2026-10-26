@@ -58,11 +58,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(self.rfile.read(length) or b'{}')
             printer_id = str(payload.get('printer_id') or '')
-            pdf = scan_document(printer_id)
+            page = scan_document(printer_id)
         except (ScannerError, ValueError, json.JSONDecodeError) as exc:
             self._send(422, {'error': str(exc)})
             return
-        self._send(200, pdf, 'application/pdf')
+        content_type = 'application/pdf' if page.startswith(b'%PDF-') else 'image/jpeg'
+        self._send(200, page, content_type)
 
     def log_message(self, fmt, *args):
         sys.stderr.write('%s - %s\n' % (self.address_string(), fmt % args))
