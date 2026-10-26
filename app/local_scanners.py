@@ -15,13 +15,12 @@ ESCL_NS = {
 SCAN_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
 <scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
   <pwg:Version>2.6</pwg:Version>
-  <scan:Intent>Document</scan:Intent>
   <pwg:ScanRegions>
     <pwg:ScanRegion>
+      <pwg:Height>3300</pwg:Height>
+      <pwg:Width>2550</pwg:Width>
       <pwg:XOffset>0</pwg:XOffset>
       <pwg:YOffset>0</pwg:YOffset>
-      <pwg:Width>2550</pwg:Width>
-      <pwg:Height>3300</pwg:Height>
       <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
     </pwg:ScanRegion>
   </pwg:ScanRegions>
@@ -158,7 +157,7 @@ def scan_document(printer_id):
     header_blob, _, _ = created.stdout.partition(b'\r\n\r\n')
     header = header_blob.decode('latin1', 'replace')
     status_line = header.splitlines()[0] if header.splitlines() else ''
-    if created.returncode or not status_line.endswith('201'):
+    if created.returncode or ' 201 ' not in status_line:
         raise ScannerError('The printer refused the scan. Confirm it is on and a page is on the glass.')
     location = ''
     for line in header.splitlines():
