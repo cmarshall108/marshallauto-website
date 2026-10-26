@@ -78,10 +78,9 @@
 
         <div class="col-12">
             <hr>
-            <label class="form-label fw-semibold">Driver's License Photo / Scan</label>
+            <label class="form-label fw-semibold">Scan Driver's License</label>
             <p class="small text-muted mb-2">
-                Capture with a webcam or a document scanner set up as a camera device, take a photo on a
-                phone/tablet, or upload a file already scanned to this computer.
+                Place the customer's license on the printer glass and scan it. Scanning is preferred over a photo.
             </p>
 
             {% if test_drive and test_drive.license_image_filename %}
@@ -91,12 +90,28 @@
             </div>
             {% endif %}
 
-            <div class="d-flex flex-wrap gap-2 mb-2">
-                <button type="button" id="td-camera-start" class="btn btn-outline-primary btn-sm"><i class="bi bi-camera me-1"></i> Use Camera / Scanner</button>
-                <button type="button" id="td-camera-capture" class="btn btn-primary btn-sm d-none"><i class="bi bi-camera-fill me-1"></i> Capture</button>
-                <button type="button" id="td-camera-retake" class="btn btn-outline-secondary btn-sm d-none"><i class="bi bi-arrow-counterclockwise me-1"></i> Retake</button>
-                <button type="button" id="td-camera-stop" class="btn btn-outline-danger btn-sm d-none"><i class="bi bi-x-lg me-1"></i> Cancel</button>
+            <div class="row g-2 align-items-end mb-2">
+                <div class="col-md-8">
+                    <label class="form-label" for="td-printer-select">Printer / Scanner</label>
+                    <select id="td-printer-select" class="form-select">
+                        <option value="">Select a printer or scanner</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="button" id="td-license-scan" class="btn btn-primary"><i class="bi bi-person-vcard me-1"></i>Scan License</button>
+                </div>
             </div>
+            <p id="td-scan-error" class="small text-danger d-none"></p>
+
+            <details class="mb-2">
+                <summary class="small text-muted">Use a camera or upload a photo instead</summary>
+                <div class="d-flex flex-wrap gap-2 mt-2 mb-2">
+                    <button type="button" id="td-camera-start" class="btn btn-outline-primary btn-sm"><i class="bi bi-camera me-1"></i> Use Camera</button>
+                    <button type="button" id="td-camera-capture" class="btn btn-primary btn-sm d-none"><i class="bi bi-camera-fill me-1"></i> Capture</button>
+                    <button type="button" id="td-camera-retake" class="btn btn-outline-secondary btn-sm d-none"><i class="bi bi-arrow-counterclockwise me-1"></i> Retake</button>
+                    <button type="button" id="td-camera-stop" class="btn btn-outline-danger btn-sm d-none"><i class="bi bi-x-lg me-1"></i> Cancel</button>
+                </div>
+            </details>
 
             <div id="td-camera-wrap" class="d-none mb-2" style="max-width: 420px;">
                 <video id="td-camera-video" autoplay playsinline class="w-100 rounded border"></video>
@@ -109,11 +124,15 @@
             <div id="td-license-analysis" class="alert d-none mb-3" role="status" aria-live="polite"></div>
 
             {{ form.license_image_data(id="license_image_data") }}
+            <input type="hidden" name="license_scan_data" id="license_scan_data">
 
-            <div>
-                <label class="form-label small text-muted">Or upload a file</label>
-                {{ form.license_image(class="form-control", accept="image/*,.heic,.heif", capture="environment") }}
-            </div>
+            {% for error in form.license_image.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            <details>
+                <summary class="small text-muted">Upload a license photo instead</summary>
+                <div class="mt-2">
+                    {{ form.license_image(class="form-control", accept="image/*,.heic,.heif") }}
+                </div>
+            </details>
         </div>
 
         <div class="col-12">

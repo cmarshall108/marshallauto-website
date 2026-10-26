@@ -36,15 +36,9 @@
             {% for error in form.sale_notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-12">
-            {{ form.buyer_id_images.label(class="form-label") }}
-            {{ form.buyer_id_images(class="form-control", accept="image/jpeg,image/png,image/webp", multiple=True) }}
-            <div class="form-text">Attach front/back ID photos when needed, such as for a cashier's check. Up to 10 photos per save, 15 MB each; total request limit {{ config.MAX_CONTENT_LENGTH // (1024 * 1024) }} MB. Only upload IDs you are authorized to retain. Photos are stored privately outside the public gallery.</div>
-            {% for error in form.buyer_id_images.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-        </div>
-        <div class="col-12">
             <hr>
-            <label class="form-label fw-semibold">Scan Documents from a Printer</label>
-            <p class="small text-muted mb-2">Choose the printer installed on this computer, place the page on the glass, then scan. Each page is saved with this vehicle only.</p>
+            <label class="form-label fw-semibold">Scan Customer ID</label>
+            <p class="small text-muted mb-2">Optional. Place the customer's ID on the selected printer glass and scan the front, then the back if needed. Scanning is preferred over a photo upload.</p>
             <div class="row g-2 align-items-end mb-2">
                 <div class="col-md-8">
                     <label class="form-label" for="sale-printer-select">Printer / Scanner</label>
@@ -54,8 +48,28 @@
                     {{ form.printer_label(id="sale-printer-label", class="d-none") }}
                 </div>
                 <div class="col-md-4 d-flex flex-wrap gap-2">
-                    <button type="button" id="sale-scan-start" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Scan Page</button>
+                    <button type="button" id="sale-id-scan-start" class="btn btn-primary"><i class="bi bi-person-vcard me-1"></i>Scan Customer ID</button>
                 </div>
+            </div>
+            <div id="sale-id-scan-pages" class="row g-2 mb-2"></div>
+            <div id="sale-id-scan-fields"></div>
+            <p id="sale-id-scan-error" class="small text-danger d-none"></p>
+            <details class="mb-2">
+                <summary class="small text-muted">Upload an ID photo instead</summary>
+                <div class="mt-2">
+                    {{ form.buyer_id_images.label(class="form-label") }}
+                    {{ form.buyer_id_images(class="form-control", accept="image/jpeg,image/png,image/webp", multiple=True) }}
+                    <div class="form-text">Use only when the printer cannot scan the ID. Up to 10 photos per save, 15 MB each. Only keep IDs you are authorized to retain. Photos stay private and are never added to the public listing.</div>
+                </div>
+            </details>
+            {% for error in form.buyer_id_images.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            <hr>
+            <label class="form-label fw-semibold">Scan Documents from a Printer</label>
+            <p class="small text-muted mb-2">Place the page on the same printer glass, then scan. Each page is saved with this vehicle only.</p>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button type="button" id="sale-scan-start" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Scan Page</button>
             </div>
             <div class="d-flex flex-wrap gap-2 mb-2">
                 <button type="button" id="sale-scan-clear" class="btn btn-outline-secondary btn-sm d-none">Clear Scanned Pages</button>

@@ -12,23 +12,31 @@ ESCL_NS = {
     'scan': 'http://schemas.hp.com/imaging/escl/2011/05/03',
     'pwg': 'http://www.pwg.org/schemas/2010/12/sm',
 }
-SCAN_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
+# Letter glass. Units are 1/300 inch and do not change with scan resolution.
+PLATEN_REGION = (2550, 3300, 0, 0)
+
+
+def _scan_settings(resolution, width, height, x_offset=0, y_offset=0):
+    resolution = int(resolution)
+    if resolution not in (300, 600):
+        raise ScannerError('That scan resolution is not supported.')
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
 <scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
   <pwg:Version>2.6</pwg:Version>
   <pwg:ScanRegions>
     <pwg:ScanRegion>
-      <pwg:Height>3300</pwg:Height>
-      <pwg:Width>2550</pwg:Width>
-      <pwg:XOffset>0</pwg:XOffset>
-      <pwg:YOffset>0</pwg:YOffset>
+      <pwg:Height>{int(height)}</pwg:Height>
+      <pwg:Width>{int(width)}</pwg:Width>
+      <pwg:XOffset>{int(x_offset)}</pwg:XOffset>
+      <pwg:YOffset>{int(y_offset)}</pwg:YOffset>
       <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
     </pwg:ScanRegion>
   </pwg:ScanRegions>
   <pwg:InputSource>Platen</pwg:InputSource>
   <scan:ColorMode>RGB24</scan:ColorMode>
   <scan:DocumentFormatExt>image/jpeg</scan:DocumentFormatExt>
-  <scan:XResolution>300</scan:XResolution>
-  <scan:YResolution>300</scan:YResolution>
+  <scan:XResolution>{resolution}</scan:XResolution>
+  <scan:YResolution>{resolution}</scan:YResolution>
 </scan:ScanSettings>
 """
 
@@ -146,8 +154,12 @@ def _close_scan(job_url):
     _curl(['-X', 'DELETE', job_url], timeout=8)
 
 
-def scan_document(printer_id):
-    """Scan the platen of one installed printer and return PDF bytes."""
+def scan_document(printer_id, *, purpose='document'):
+    """Scan the platen of one installed printer and return JPEG bytes.
+
+    Customer IDs use the scanner's 600 dpi photo setting across the glass so
+    the portrait and small text stay readable. Sale documents stay at 300 dpi.
+    """
     printers = {name: uri for name, uri in _printer_rows()}
     if printer_id not in printers:
         raise ScannerError('That printer is not installed on this computer.')
@@ -159,7 +171,10 @@ def scan_document(printer_id):
         '-H', 'Content-Type: text/xml',
         '--data-binary', '@-',
         f'https://{host}:443/eSCL/ScanJobs',
-    ], timeout=20, body=SCAN_SETTINGS.encode())
+    ], timeout=20, body=_scan_settings(
+        600 if purpose == 'id' else 300,
+        *PLATEN_REGION,
+    ).encode())
     header_blob, _, _ = created.stdout.partition(b'\r\n\r\n')
     header = header_blob.decode('latin1', 'replace')
     status_line = header.splitlines()[0] if header.splitlines() else ''

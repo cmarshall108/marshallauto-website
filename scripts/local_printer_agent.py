@@ -58,7 +58,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(self.rfile.read(length) or b'{}')
             printer_id = str(payload.get('printer_id') or '')
-            page = scan_document(printer_id)
+            purpose = str(payload.get('purpose') or 'document')
+            if purpose not in ('document', 'id'):
+                raise ValueError('That scan type is not supported.')
+            page = scan_document(printer_id, purpose=purpose)
         except (ScannerError, ValueError, json.JSONDecodeError) as exc:
             self._send(422, {'error': str(exc)})
             return

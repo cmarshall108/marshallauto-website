@@ -1,10 +1,16 @@
+import base64
 import io
+import os
 import unittest
+from io import BytesIO
+from tempfile import TemporaryDirectory
 from unittest import mock
+
+from PIL import Image
 
 from app import create_app, db
 from app.license_analysis import _extract_json_object, normalize_license_analysis
-from app.models import User
+from app.models import TestDrive, User, Vehicle
 from config import TestingConfig
 
 
@@ -96,6 +102,64 @@ class LicenseAnalysisRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()['details']['customer_name'], 'Jane Driver')
         analyzer.assert_called_once_with(b'image bytes')
+
+
+class TestDriveLicenseScanTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = TemporaryDirectory()
+        self.app = create_app(TestingConfig)
+        self.app.config.update(
+            UPLOAD_FOLDER=os.path.join(self.tmp.name, 'public'),
+            PRIVATE_UPLOAD_FOLDER=os.path.join(self.tmp.name, 'private'),
+        )
+        self.context = self.app.app_context()
+        self.context.push()
+        db.create_all()
+        self.vehicle = Vehicle(
+            year=2021, make='Toyota', model='Corolla', price=16000,
+            mileage=30000, status='available', slug='license-scan-corolla',
+        )
+        user = User(username='td-scan-admin')
+        user.set_password('test-password')
+        db.session.add_all([self.vehicle, user])
+        db.session.commit()
+        self.client = self.app.test_client()
+        with mock.patch('app.admin.rate_limit_exceeded', return_value=False):
+            response = self.client.post('/admin/login', data={
+                'username': 'td-scan-admin', 'password': 'test-password',
+            })
+        self.assertEqual(response.status_code, 302)
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.context.pop()
+        self.tmp.cleanup()
+
+    def scan_data_url(self):
+        stream = BytesIO()
+        Image.new('RGB', (80, 50), 'white').save(stream, 'JPEG')
+        return 'data:image/jpeg;base64,' + base64.b64encode(stream.getvalue()).decode()
+
+    def test_checkout_prefers_printer_scan_over_photo_upload(self):
+        page = self.client.get('/admin/test-drives/new')
+        self.assertIn("Scan Driver's License", page.text)
+        self.assertIn('Scanning is preferred over a photo', page.text)
+        self.assertIn('id="td-license-scan"', page.text)
+        response = self.client.post('/admin/test-drives/new', data={
+            'vehicle_id': self.vehicle.id,
+            'customer_name': 'Jane Driver',
+            'start_mileage': '30000',
+            'license_scan_data': self.scan_data_url(),
+            'license_image': (BytesIO(b'not-used'), 'phone-photo.jpg'),
+        })
+        self.assertEqual(response.status_code, 302)
+        test_drive = TestDrive.query.one()
+        self.assertTrue(test_drive.license_image_filename)
+        path = os.path.join(
+            self.app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses', test_drive.license_image_filename,
+        )
+        self.assertTrue(os.path.isfile(path))
 
 
 if __name__ == '__main__':

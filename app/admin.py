@@ -1094,6 +1094,22 @@ def _clean_printer_label(value):
     return label[:128] or None
 
 
+def _save_buyer_id_scans():
+    """Save optional customer ID pages scanned from the selected printer."""
+    captured = [item.strip() for item in request.form.getlist('buyer_id_scan_data') if item and item.strip()]
+    if len(captured) > 2:
+        raise ValueError('Scan no more than the front and back of the customer ID.')
+    filenames = []
+    for data_url in captured:
+        if not data_url.startswith('data:image/'):
+            raise ValueError('Could not save a scanned customer ID. Place the ID on the glass and scan again.')
+        filename = save_license_image_data_url(data_url)
+        if not filename:
+            raise ValueError('Could not save a scanned customer ID. Place the ID on the glass and scan again.')
+        filenames.append(filename)
+    return filenames
+
+
 def _save_sale_documents(form):
     """Persist every scan from the selected printer for this vehicle."""
     uploads = [file for file in request.files.getlist('scanned_documents') if file.filename]
@@ -1144,6 +1160,7 @@ def vehicle_sale(id):
         try:
             if len(uploads) > 10:
                 raise ValueError('Upload no more than 10 ID photos at a time.')
+            filenames.extend(_save_buyer_id_scans())
             for upload in uploads:
                 size = len(upload.stream.read(MAX_LICENSE_IMAGE_BYTES + 1))
                 if size > MAX_LICENSE_IMAGE_BYTES:
@@ -1169,7 +1186,7 @@ def vehicle_sale(id):
                 delete_sale_document(document.filename)
             current_app.logger.warning('Sale document upload rejected for vehicle %s: %s', id, exc)
             message = str(exc)
-            if 'ID photo' in message:
+            if 'ID photo' in message or 'customer ID' in message:
                 form.buyer_id_images.errors.append(message)
             else:
                 form.scanned_documents.errors.append(message)
@@ -1688,11 +1705,18 @@ def carfax_report_delete(id):
 # ------------------------------ TEST DRIVES ------------------------------
 
 def _apply_test_drive_license(test_drive, form):
-    """Save a license image from either a file upload or an in-browser camera capture."""
-    if form.license_image.data and getattr(form.license_image.data, 'filename', None):
-        new_filename = save_uploaded_license_image(form.license_image.data)
+    """Prefer a printer scan, then a camera capture, then a photo upload."""
+    scanned = (request.form.get('license_scan_data') or '').strip()
+    if scanned:
+        if not scanned.startswith('data:image/'):
+            raise ValueError('Could not save the scanned license. Place it on the glass and scan again.')
+        new_filename = save_license_image_data_url(scanned)
+        if not new_filename:
+            raise ValueError('Could not save the scanned license. Place it on the glass and scan again.')
     elif (form.license_image_data.data or '').strip():
         new_filename = save_license_image_data_url(form.license_image_data.data)
+    elif form.license_image.data and getattr(form.license_image.data, 'filename', None):
+        new_filename = save_uploaded_license_image(form.license_image.data)
     else:
         new_filename = None
     if new_filename:
@@ -1703,16 +1727,17 @@ def _apply_test_drive_license(test_drive, form):
 
 def _license_analysis_bytes():
     upload = request.files.get('license_image')
-    if upload and getattr(upload, 'filename', None):
-        raw_bytes = upload.read(MAX_LICENSE_IMAGE_BYTES + 1)
-    else:
-        data_url = (request.form.get('license_image_data') or '').strip()
+    scanned = (request.form.get('license_scan_data') or '').strip()
+    if scanned or not (upload and getattr(upload, 'filename', None)):
+        data_url = scanned or (request.form.get('license_image_data') or '').strip()
         if not data_url.startswith('data:image/') or ',' not in data_url:
-            raise ValueError('Select or capture a license image first')
+            raise ValueError('Scan or capture a license image first')
         try:
             raw_bytes = base64.b64decode(data_url.split(',', 1)[1], validate=True)
         except (ValueError, binascii.Error) as exc:
             raise ValueError('The captured license image is invalid') from exc
+    else:
+        raw_bytes = upload.read(MAX_LICENSE_IMAGE_BYTES + 1)
     if len(raw_bytes) > MAX_LICENSE_IMAGE_BYTES:
         raise ValueError('The license image must be 15 MB or smaller')
     return raw_bytes
@@ -1779,7 +1804,11 @@ def test_drive_new():
             started_at=utcnow(),
             status='out',
         )
-        _apply_test_drive_license(test_drive, form)
+        try:
+            _apply_test_drive_license(test_drive, form)
+        except ValueError as exc:
+            form.license_image.errors.append(str(exc))
+            return render_template('admin/test_drive_form.html', form=form, test_drive=None, title='Check Out Test Drive'), 422
         db.session.add(test_drive)
         db.session.commit()
         flash('Test drive checked out.', 'success')
@@ -1807,7 +1836,11 @@ def test_drive_edit(id):
         test_drive.end_mileage = form.end_mileage.data
         test_drive.status = form.status.data
         test_drive.notes = form.notes.data
-        _apply_test_drive_license(test_drive, form)
+        try:
+            _apply_test_drive_license(test_drive, form)
+        except ValueError as exc:
+            form.license_image.errors.append(str(exc))
+            return render_template('admin/test_drive_form.html', form=form, test_drive=test_drive, title='Edit Test Drive'), 422
         if test_drive.status == 'returned' and was_out and not test_drive.returned_at:
             test_drive.returned_at = utcnow()
         elif test_drive.status == 'out':

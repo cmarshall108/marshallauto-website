@@ -1,10 +1,6 @@
 /**
- * In-browser camera capture for the driver's license photo on the test-drive form.
- * Works with any camera the OS exposes to the browser (webcam, or a document
- * scanner/scan station registered as a UVC video device) — no native driver
- * integration is possible from a web page, so this is the closest equivalent
- * to "connect to a scanner". A plain file upload (below) covers flatbed/network
- * scanners that save an image file instead.
+ * Scan a driver's license from the printer on this computer.
+ * Camera capture and file upload remain available only when a scan is not used.
  */
 (function () {
     'use strict';
@@ -21,9 +17,13 @@
     const errorEl = document.getElementById('td-camera-error');
     const analysisEl = document.getElementById('td-license-analysis');
     const dataField = document.getElementById('license_image_data');
+    const scanField = document.getElementById('license_scan_data');
+    const printerSelect = document.getElementById('td-printer-select');
+    const scanBtn = document.getElementById('td-license-scan');
+    const scanError = document.getElementById('td-scan-error');
     const fileInput = document.querySelector('input[type="file"][name="license_image"]');
 
-    if (!startBtn || !dataField) return;
+    if (!dataField) return;
 
     let stream = null;
     let analysisRequest = 0;
@@ -47,7 +47,9 @@
         const body = new FormData();
         const csrf = document.querySelector('input[name="csrf_token"]');
         if (csrf) body.append('csrf_token', csrf.value);
-        if (fileInput && fileInput.files.length) {
+        if (scanField && scanField.value) {
+            body.append('license_scan_data', scanField.value);
+        } else if (fileInput && fileInput.files.length) {
             body.append('license_image', fileInput.files[0]);
         } else {
             body.append('license_image_data', dataField.value);
@@ -148,15 +150,100 @@
         startCamera();
     }
 
-    startBtn.addEventListener('click', startCamera);
-    captureBtn.addEventListener('click', capturePhoto);
-    stopBtn.addEventListener('click', stopStream);
-    retakeBtn.addEventListener('click', retake);
+    if (startBtn) startBtn.addEventListener('click', startCamera);
+    if (captureBtn) captureBtn.addEventListener('click', capturePhoto);
+    if (stopBtn) stopBtn.addEventListener('click', stopStream);
+    if (retakeBtn) retakeBtn.addEventListener('click', retake);
+
+    async function loadPrinters() {
+        if (!printerSelect) return;
+        printerSelect.replaceChildren(new Option('Looking for printers…', ''));
+        try {
+            const response = await fetch('http://127.0.0.1:8765/printers', { cache: 'no-store' });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.error || 'Could not list printers.');
+            const printers = payload.printers || [];
+            printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
+            printers.forEach((printer) => printerSelect.add(new Option(printer.label, printer.id)));
+            if (printers.length === 1) printerSelect.value = printers[0].id;
+            if (!printers.length && scanError) {
+                scanError.textContent = 'No scanner was found on this computer. Use a camera or upload a photo instead.';
+                scanError.classList.remove('d-none');
+            }
+        } catch (error) {
+            printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
+            if (scanError) {
+                scanError.textContent = 'Printers on this computer are unavailable. Start the local printer agent, then reload this page.';
+                scanError.classList.remove('d-none');
+            }
+        }
+    }
+
+    async function scanLicense() {
+        if (!scanBtn || !scanField || !printerSelect) return;
+        if (scanError) scanError.classList.add('d-none');
+        if (!printerSelect.value) {
+            if (scanError) {
+                scanError.textContent = 'Select a printer or scanner before scanning the license.';
+                scanError.classList.remove('d-none');
+            }
+            return;
+        }
+        const original = scanBtn.innerHTML;
+        scanBtn.disabled = true;
+        scanBtn.textContent = 'Scanning…';
+        try {
+            const response = await fetch('http://127.0.0.1:8765/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ printer_id: printerSelect.value, purpose: 'id' }),
+            });
+            if (!response.ok) {
+                let message = 'The selected printer could not scan the license.';
+                try {
+                    const payload = await response.json();
+                    if (payload.error) message = payload.error;
+                } catch (parseError) {
+                    message = 'The selected printer could not scan the license.';
+                }
+                throw new Error(message);
+            }
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            const contentType = (response.headers.get('Content-Type') || 'image/jpeg').split(';', 1)[0];
+            if (!contentType.startsWith('image/')) {
+                throw new Error('The license scan must be an image. Place the license on the glass and scan again.');
+            }
+            let binary = '';
+            for (let offset = 0; offset < bytes.length; offset += 8192) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + 8192));
+            }
+            scanField.value = `data:${contentType};base64,${btoa(binary)}`;
+            dataField.value = '';
+            if (fileInput) fileInput.value = '';
+            preview.src = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+            preview.alt = 'Scanned driver license';
+            previewWrap.classList.remove('d-none');
+            stopStream();
+            analyzeLicense();
+        } catch (error) {
+            if (scanError) {
+                scanError.textContent = error && error.message ? error.message : 'The selected printer could not scan the license.';
+                scanError.classList.remove('d-none');
+            }
+        } finally {
+            scanBtn.disabled = false;
+            scanBtn.innerHTML = original;
+        }
+    }
+
+    if (scanBtn) scanBtn.addEventListener('click', scanLicense);
+    loadPrinters();
 
     if (fileInput) {
         fileInput.addEventListener('change', () => {
             if (fileInput.files && fileInput.files.length) {
                 dataField.value = '';
+                if (scanField) scanField.value = '';
                 previewWrap.classList.add('d-none');
                 analyzeLicense();
             }

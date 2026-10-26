@@ -1,3 +1,4 @@
+import base64
 import importlib
 import os
 import stat
@@ -347,6 +348,23 @@ class SaleDocumentTests(VehicleSaleTests):
         self.assertEqual(self.client.post(f'/admin/vehicles/{self.vehicle.id}/delete').status_code, 302)
         self.assertEqual(self.documents(), [])
         self.assertEqual(VehicleSaleDocument.query.count(), 0)
+
+    def test_optional_customer_id_scan_is_preferred_and_saved_privately(self):
+        page = self.client.get(self.path)
+        self.assertIn('Scan Customer ID', page.text)
+        self.assertIn('Scanning is preferred over a photo upload', page.text)
+        self.assertIn('id="sale-id-scan-start"', page.text)
+        captured = id_photo()
+        captured.seek(0)
+        data_url = 'data:image/jpeg;base64,' + base64.b64encode(captured.read()).decode()
+        response = self.save(buyer_id_scan_data=[data_url, data_url])
+        self.assertEqual(response.status_code, 302)
+        db.session.refresh(self.vehicle)
+        self.assertEqual(len(self.vehicle.sale_images), 2)
+        self.assertEqual(len(self.photos()), 2)
+        self.assertEqual(self.save(buyer_id_scan_data=[data_url, data_url, data_url]).status_code, 422)
+        db.session.refresh(self.vehicle)
+        self.assertEqual(len(self.vehicle.sale_images), 2)
 
     def test_invalid_scan_does_not_save_partial_documents(self):
         response = self.save(scanned_documents=[(BytesIO(b'not a scan'), 'notes.txt')])
