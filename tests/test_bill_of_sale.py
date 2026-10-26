@@ -81,3 +81,9 @@ class BillOfSaleTests(unittest.TestCase):
         button = edit_html.select_one('a[href="/admin/vehicles/1/bill-of-sale"]')
         self.assertIsNotNone(button)
         self.assertIn('Print Bill of Sale', button.get_text())
+
+        listing = self.client.get('/admin/vehicles')
+        listing_html = BeautifulSoup(listing.data, 'html.parser')
+        list_button = listing_html.select_one('a[href="/admin/vehicles/1/bill-of-sale"]')
+        self.assertIsNotNone(list_button)
+        self.assertIn('Bill of Sale', list_button.get_text())

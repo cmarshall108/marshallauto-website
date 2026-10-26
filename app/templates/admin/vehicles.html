@@ -53,6 +53,7 @@
                     <td data-label="Stock #">{{ vehicle.stock_number or 'N/A' }}</td>
                     <td data-label="Added">{{ vehicle.created_at.strftime('%m/%d/%Y') }}</td>
                     <td data-label="Actions">
+                        <a href="{{ url_for('admin.vehicle_bill_of_sale', id=vehicle.id) }}" class="btn btn-sm btn-outline-success mb-1" title="Print bill of sale" aria-label="Print bill of sale for {{ vehicle.title }}"><i class="bi bi-printer"></i> Bill of Sale</a>
                         <a href="{{ url_for('admin.vehicle_qr_print', id=vehicle.id) }}" class="btn btn-sm btn-outline-success mb-1" title="Print window QR code" aria-label="Print window QR code for {{ vehicle.title }}"><i class="bi bi-qr-code"></i> QR</a>
                         <a href="{{ url_for('main.coming_soon') if vehicle.is_coming_soon else url_for('main.vehicle_detail', slug=vehicle.slug) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary mb-1" aria-label="View {{ vehicle.title }}"><i class="bi bi-eye" aria-hidden="true"></i></a>
                         <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-sm btn-primary mb-1" aria-label="Edit {{ vehicle.title }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
