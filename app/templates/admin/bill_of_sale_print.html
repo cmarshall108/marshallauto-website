@@ -33,11 +33,11 @@
         </p>
 
         <dl class="bos-vehicle">
-            <div><dt>Make:</dt><dd>{{ vehicle.make }}</dd></div>
+            <div class="bos-shade"><dt>Make:</dt><dd>{{ vehicle.make }}</dd></div>
             <div><dt>Model:</dt><dd>{{ vehicle.model }}</dd></div>
-            <div><dt>Body Type:</dt><dd>{{ vehicle.body_style or '' }}</dd></div>
+            <div class="bos-shade"><dt>Body Type:</dt><dd>{{ vehicle.body_style or '' }}</dd></div>
             <div><dt>Year:</dt><dd>{{ vehicle.year }}</dd></div>
-            <div><dt>VIN:</dt><dd>{{ vehicle.vin or '' }}</dd></div>
+            <div class="bos-shade"><dt>VIN:</dt><dd>{{ vehicle.vin or '' }}</dd></div>
         </dl>
 
         <p class="bos-body">To have and to hold the same unto Buyer and Buyer&apos;s executors, administrators, and assigns, forever.</p>
@@ -62,17 +62,15 @@
         <div class="bos-signatures">
             <div>
                 <p class="bos-party">Seller:</p>
-                <p class="bos-sign-line">________________________</p>
-                <p class="bos-sign-label">Signature</p>
-                <p class="bos-sign-line">_______________________</p>
-                <p class="bos-sign-line">_____________________</p>
+                <p class="bos-sign-line"><span>Signature</span></p>
+                <p class="bos-sign-line"><span>Printed Name</span></p>
+                <p class="bos-sign-line"><span>Date</span></p>
             </div>
             <div>
                 <p class="bos-party">Buyer:</p>
-                <p class="bos-sign-line">________________________</p>
-                <p class="bos-sign-label">Signature</p>
-                <p class="bos-sign-line">_______________________</p>
-                <p class="bos-sign-line">_____________________</p>
+                <p class="bos-sign-line"><span>Signature</span></p>
+                <p class="bos-sign-line"><span>Printed Name</span></p>
+                <p class="bos-sign-line"><span>Date</span></p>
             </div>
         </div>
     </article>
@@ -133,24 +131,36 @@
     .bos-blank-address { width: 2.7in; }
     .bos-blank-county { width: 1.15in; }
     .bos-blank-terms { width: 100%; margin-top: 0.18in; }
-    .bos-vehicle { margin: 0.22in 0 0.18in 0.85in; }
-    .bos-vehicle div { display: flex; gap: 0.12in; margin: 0 0 0.02in; }
+    .bos-vehicle { margin: 0.22in 0.4in 0.18in 0.85in; }
+    .bos-vehicle div {
+        display: flex;
+        gap: 0.08in;
+        margin: 0;
+        padding: 0.01in 0.08in;
+        background: #fff;
+    }
+    .bos-vehicle .bos-shade { background: #e8e8e8; }
     .bos-vehicle dt { min-width: 0.95in; font-weight: 700; }
     .bos-vehicle dd {
         margin: 0;
-        min-width: 2.4in;
+        flex: 1;
         border-bottom: 1px solid #000;
         font-weight: 700;
     }
     .bos-signatures {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 0.4in;
-        margin-top: 0.42in;
+        gap: 0.8in;
+        margin-top: 0.55in;
     }
-    .bos-party { margin: 0 0 0.28in; font-weight: 700; }
-    .bos-sign-line, .bos-sign-label { margin: 0.08in 0 0; }
-    .bos-sign-label { margin-bottom: 0.12in; }
+    .bos-party { margin: 0 0 0.42in; font-weight: 700; }
+    .bos-sign-line {
+        margin: 0.22in 0 0;
+        max-width: 2.55in;
+        border-bottom: 1px solid #000;
+        line-height: 1.05;
+    }
+    .bos-sign-line span { display: block; padding-top: 0.02in; }
     @page { size: letter portrait; margin: 0.4in; }
     @media print {
         body { background: #fff !important; }
