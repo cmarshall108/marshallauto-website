@@ -104,6 +104,19 @@ class VehicleSaleImage(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
 
+class VehicleSaleDocument(db.Model):
+    """Private scan captured from a printer/scanner and stored with a sold vehicle."""
+    __tablename__ = 'vehicle_sale_documents'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, index=True)
+    filename = db.Column(db.String(128), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=True)
+    content_type = db.Column(db.String(64), nullable=False, default='image/jpeg')
+    printer_label = db.Column(db.String(128), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+
 class Vehicle(db.Model):
     __tablename__ = 'vehicles'
 
@@ -214,6 +227,13 @@ class Vehicle(db.Model):
         lazy='select',
         cascade='all, delete-orphan',
         order_by='VehicleSaleImage.id.asc()',
+    )
+    sale_documents = db.relationship(
+        'VehicleSaleDocument',
+        backref='vehicle',
+        lazy='select',
+        cascade='all, delete-orphan',
+        order_by='VehicleSaleDocument.id.asc()',
     )
 
     @hybrid_property

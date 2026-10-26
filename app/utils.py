@@ -384,6 +384,87 @@ def save_uploaded_license_image(file_obj):
     return _save_license_image_bytes(file_obj.read(MAX_PRIVATE_IMAGE_BYTES + 1))
 
 
+MAX_SALE_DOCUMENT_BYTES = 25 * 1024 * 1024
+SALE_DOCUMENT_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif', 'tif', 'tiff', 'bmp'}
+
+
+def _sale_document_extension(filename):
+    if not filename or '.' not in filename:
+        return ''
+    return filename.rsplit('.', 1)[1].lower()
+
+
+def save_sale_document_bytes(raw_bytes, extension):
+    """Store one private sale scan. Images are normalized; PDFs keep their bytes."""
+    extension = (extension or '').lower().lstrip('.')
+    if extension == 'pdf':
+        if len(raw_bytes) > MAX_SALE_DOCUMENT_BYTES or not raw_bytes.startswith(b'%PDF-'):
+            current_app.logger.warning('Rejected invalid private sale PDF')
+            return None
+        filename = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}.pdf"
+        content_type = 'application/pdf'
+        payload = raw_bytes
+    elif extension in SALE_DOCUMENT_IMAGE_EXTENSIONS:
+        filename = _save_private_image_bytes(raw_bytes, 'sale_documents')
+        return (filename, 'image/jpeg') if filename else None
+    else:
+        return None
+
+    upload_path = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'sale_documents')
+    os.makedirs(upload_path, mode=0o700, exist_ok=True)
+    destination = os.path.join(upload_path, filename)
+    fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, 'wb') as output:
+            output.write(payload)
+    except Exception:
+        if os.path.exists(destination):
+            os.remove(destination)
+        raise
+    return filename, content_type
+
+
+def save_uploaded_sale_document(file_obj):
+    """Save a document produced by a selected printer/scanner."""
+    if not file_obj or not getattr(file_obj, 'filename', None):
+        return None
+    extension = _sale_document_extension(file_obj.filename)
+    file_obj.seek(0)
+    saved = save_sale_document_bytes(file_obj.read(MAX_SALE_DOCUMENT_BYTES + 1), extension)
+    if not saved:
+        current_app.logger.warning('Rejected unsupported sale document upload')
+    return saved
+
+
+def save_sale_document_data_url(data_url):
+    """Save a scan captured in-browser from a printer exposed as a camera."""
+    import base64
+
+    if not data_url or not isinstance(data_url, str) or not data_url.startswith('data:image/'):
+        return None
+    try:
+        _header, encoded = data_url.split(',', 1)
+        raw_bytes = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError):
+        return None
+    return save_sale_document_bytes(raw_bytes, 'jpg')
+
+
+def delete_sale_document(filename):
+    if not filename:
+        return
+    path = os.path.join(
+        current_app.config['PRIVATE_UPLOAD_FOLDER'], 'sale_documents', os.path.basename(filename),
+    )
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        current_app.logger.warning('Sale document already missing: %s', filename)
+    except OSError:
+        current_app.logger.exception('Could not delete sale document: %s', filename)
+        raise
+
+
 def save_uploaded_receipt_image(file_obj):
     """Store a receipt photo privately as a normalized JPEG."""
     if not file_obj or not getattr(file_obj, 'filename', None):

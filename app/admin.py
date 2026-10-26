@@ -31,7 +31,7 @@ from app.forms import (
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
     RebuildCostEntry, RebuildCostReceipt, SiteSetting, TestDrive, User, Vehicle, VehicleImage,
-    VehicleImageHighlight, VehicleSaleImage, VideoUploadJob, utcnow,
+    VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -50,8 +50,9 @@ from app.utils import (
     MAX_PRIVATE_IMAGE_BYTES, client_ip, delete_license_image, delete_local_video_file,
     delete_receipt_image, is_safe_redirect,
     rate_limit_exceeded, save_license_image_data_url,
-    save_uploaded_image, save_uploaded_license_image, save_uploaded_pdf,
-    save_uploaded_receipt_image,
+    save_sale_document_data_url, save_uploaded_image, save_uploaded_license_image,
+    save_uploaded_pdf, save_uploaded_receipt_image, save_uploaded_sale_document,
+    delete_sale_document,
 )
 from app.video_jobs import (
     VideoUploadError, cancel_video_jobs, discard_staged_video, stage_video_upload,
@@ -1067,6 +1068,46 @@ def _delete_sale_image_file(filename):
         raise
 
 
+def _clean_printer_label(value):
+    label = ' '.join((value or '').split())
+    return label[:128] or None
+
+
+def _save_sale_documents(form):
+    """Persist every scan from the selected printer for this vehicle."""
+    uploads = [file for file in request.files.getlist('scanned_documents') if file.filename]
+    captured = [item.strip() for item in request.form.getlist('scanned_document_data') if item and item.strip()]
+    if len(uploads) + len(captured) > 20:
+        raise ValueError('Save no more than 20 scanned documents at a time.')
+    printer_label = _clean_printer_label(form.printer_label.data)
+    saved = []
+    for upload in uploads:
+        size = len(upload.stream.read(25 * 1024 * 1024 + 1))
+        if size > 25 * 1024 * 1024:
+            raise ValueError('Each scanned document must be 25 MB or smaller.')
+        upload.stream.seek(0)
+        result = save_uploaded_sale_document(upload)
+        if not result:
+            raise ValueError('Could not save a scanned document. Use a PDF or a JPEG, PNG, WebP, TIFF, or BMP scan.')
+        filename, content_type = result
+        saved.append((filename, content_type, os.path.basename(upload.filename)[:255]))
+    for data_url in captured:
+        result = save_sale_document_data_url(data_url)
+        if not result:
+            raise ValueError('Could not save a scan from the selected printer. Capture the page again.')
+        filename, content_type = result
+        saved.append((filename, content_type, None))
+    return [
+        VehicleSaleDocument(
+            filename=filename,
+            content_type=content_type,
+            original_filename=original_filename,
+            printer_label=printer_label,
+        )
+        for filename, content_type, original_filename in saved
+    ]
+
+
 @admin_bp.route('/vehicles/<int:id>/sale', methods=['GET', 'POST'])
 @admin_required
 def vehicle_sale(id):
@@ -1078,6 +1119,7 @@ def vehicle_sale(id):
     if form.validate_on_submit():
         uploads = [file for file in request.files.getlist('buyer_id_images') if file.filename]
         filenames = []
+        documents = []
         try:
             if len(uploads) > 10:
                 raise ValueError('Upload no more than 10 ID photos at a time.')
@@ -1090,23 +1132,33 @@ def vehicle_sale(id):
                 if not filename:
                     raise ValueError('Could not save a buyer ID photo. Use a valid JPEG, PNG, or WebP image.')
                 filenames.append(filename)
+            documents = _save_sale_documents(form)
             vehicle.sold_price = form.sold_price.data
             vehicle.payment_method = form.payment_method.data or None
             vehicle.sale_notes = (form.sale_notes.data or '').strip() or None
             for filename in filenames:
                 vehicle.sale_images.append(VehicleSaleImage(filename=filename))
+            vehicle.sale_documents.extend(documents)
             db.session.commit()
         except ValueError as exc:
             db.session.rollback()
             for filename in filenames:
                 _delete_sale_image_file(filename)
-            current_app.logger.warning('Sale ID upload rejected for vehicle %s: %s', id, exc)
-            form.buyer_id_images.errors.append(str(exc))
+            for document in documents:
+                delete_sale_document(document.filename)
+            current_app.logger.warning('Sale document upload rejected for vehicle %s: %s', id, exc)
+            message = str(exc)
+            if 'ID photo' in message:
+                form.buyer_id_images.errors.append(message)
+            else:
+                form.scanned_documents.errors.append(message)
             return render_template('admin/vehicle_sale.html', form=form, vehicle=vehicle), 422
         except Exception:
             db.session.rollback()
             for filename in filenames:
                 _delete_sale_image_file(filename)
+            for document in documents:
+                delete_sale_document(document.filename)
             raise
         flash('Sale details saved.', 'success')
         return redirect(url_for('admin.vehicle_sale', id=id))
@@ -1131,6 +1183,28 @@ def vehicle_sale_image_delete(id, image_id):
     db.session.delete(image)
     db.session.commit()
     flash('Buyer ID photo deleted.', 'success')
+    return redirect(url_for('admin.vehicle_sale', id=id))
+
+
+@admin_bp.get('/vehicles/<int:id>/sale/documents/<int:document_id>')
+@admin_required
+def vehicle_sale_document(id, document_id):
+    document = VehicleSaleDocument.query.filter_by(id=document_id, vehicle_id=id).first_or_404()
+    directory = os.path.join(current_app.config['PRIVATE_UPLOAD_FOLDER'], 'sale_documents')
+    response = send_from_directory(directory, os.path.basename(document.filename))
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@admin_bp.post('/vehicles/<int:id>/sale/documents/<int:document_id>/delete')
+@admin_required
+def vehicle_sale_document_delete(id, document_id):
+    document = VehicleSaleDocument.query.filter_by(id=document_id, vehicle_id=id).first_or_404()
+    delete_sale_document(document.filename)
+    db.session.delete(document)
+    db.session.commit()
+    flash('Scanned document deleted.', 'success')
     return redirect(url_for('admin.vehicle_sale', id=id))
 
 
@@ -1243,6 +1317,8 @@ def vehicle_delete(id):
             _delete_carfax_file(report.filename)
     for image in list(vehicle.sale_images):
         _delete_sale_image_file(image.filename)
+    for document in list(vehicle.sale_documents):
+        delete_sale_document(document.filename)
     for entry in list(vehicle.rebuild_cost_entries):
         for receipt in list(entry.receipts):
             delete_receipt_image(receipt.filename)

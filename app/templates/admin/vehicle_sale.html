@@ -41,6 +41,40 @@
             <div class="form-text">Attach front/back ID photos when needed, such as for a cashier's check. Up to 10 photos per save, 15 MB each; total request limit {{ config.MAX_CONTENT_LENGTH // (1024 * 1024) }} MB. Only upload IDs you are authorized to retain. Photos are stored privately outside the public gallery.</div>
             {% for error in form.buyer_id_images.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
+        <div class="col-12">
+            <hr>
+            <label class="form-label fw-semibold">Scan Documents from a Printer</label>
+            <p class="small text-muted mb-2">Choose the printer or scanner, then capture every page. All captured scans are saved with this vehicle only.</p>
+            <div class="row g-2 align-items-end mb-2">
+                <div class="col-md-8">
+                    <label class="form-label" for="sale-printer-select">Printer / Scanner</label>
+                    <select id="sale-printer-select" class="form-select">
+                        <option value="">Select a printer or scanner</option>
+                    </select>
+                    {{ form.printer_label(id="sale-printer-label", class="d-none") }}
+                </div>
+                <div class="col-md-4 d-flex flex-wrap gap-2">
+                    <button type="button" id="sale-scan-start" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Use Selected Printer</button>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button type="button" id="sale-scan-capture" class="btn btn-primary btn-sm d-none"><i class="bi bi-file-earmark-plus me-1"></i>Capture Page</button>
+                <button type="button" id="sale-scan-stop" class="btn btn-outline-danger btn-sm d-none">Stop</button>
+                <button type="button" id="sale-scan-clear" class="btn btn-outline-secondary btn-sm d-none">Clear Captured Pages</button>
+            </div>
+            <div id="sale-scan-wrap" class="d-none mb-2" style="max-width: 520px;">
+                <video id="sale-scan-video" autoplay playsinline class="w-100 rounded border"></video>
+            </div>
+            <canvas id="sale-scan-canvas" class="d-none"></canvas>
+            <div id="sale-scan-pages" class="row g-2 mb-2"></div>
+            <div id="sale-scan-fields"></div>
+            <p id="sale-scan-error" class="small text-danger d-none"></p>
+            <label class="form-label small text-muted" for="scanned_documents">Or attach files already scanned by the selected printer</label>
+            {{ form.scanned_documents(class="form-control", accept="application/pdf,image/jpeg,image/png,image/webp,image/tiff,image/bmp,.pdf,.tif,.tiff,.bmp", multiple=True) }}
+            <div class="form-text">Up to 20 documents per save, 25 MB each. PDFs and image scans stay private and are never added to the public listing.</div>
+            {% for error in form.scanned_documents.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            {% for error in form.printer_label.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
         <div class="col-12">{{ form.submit(class="btn btn-primary") }}</div>
     </div>
 </form>
@@ -66,4 +100,32 @@
     </div>
 </section>
 {% endif %}
+{% if vehicle.sale_documents %}
+<section class="mt-4">
+    <h4>Saved Scanned Documents</h4>
+    <div class="list-group">
+        {% for document in vehicle.sale_documents %}
+        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <a href="{{ url_for('admin.vehicle_sale_document', id=vehicle.id, document_id=document.id) }}" target="_blank" rel="noopener">
+                    {{ document.original_filename or ('Scanned document ' ~ loop.index) }}
+                </a>
+                <div class="small text-muted">
+                    {% if document.printer_label %}{{ document.printer_label }} &middot; {% endif %}
+                    {{ document.created_at.strftime('%m/%d/%Y %I:%M %p') }}
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('admin.vehicle_sale_document_delete', id=vehicle.id, document_id=document.id) }}" onsubmit="return confirm('Permanently delete this scanned document?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ asset_url('js/admin-sale-scan.js') }}"></script>
 {% endblock %}

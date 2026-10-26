@@ -13,7 +13,7 @@ from PIL import Image
 from sqlalchemy import create_engine, inspect, text
 
 from app import create_app, db
-from app.models import User, Vehicle, VehicleSaleImage
+from app.models import User, Vehicle, VehicleSaleDocument, VehicleSaleImage
 from app.utils import save_uploaded_license_image
 from config import TestingConfig
 from werkzeug.datastructures import FileStorage
@@ -72,6 +72,10 @@ class VehicleSaleTests(unittest.TestCase):
 
     def photos(self):
         directory = os.path.join(self.app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses')
+        return os.listdir(directory) if os.path.isdir(directory) else []
+
+    def documents(self):
+        directory = os.path.join(self.app.config['PRIVATE_UPLOAD_FOLDER'], 'sale_documents')
         return os.listdir(directory) if os.path.isdir(directory) else []
 
     def test_save_render_edit_append_photos_and_keep_public_price(self):
@@ -285,6 +289,68 @@ class VehicleSaleTests(unittest.TestCase):
         self.assertIsNotNone(vehicle.sold_at)
 
 
+class SaleDocumentTests(VehicleSaleTests):
+    def pdf(self, name='bill-of-sale.pdf'):
+        return FileStorage(BytesIO(b'%PDF-1.4 sale packet'), filename=name, content_type='application/pdf')
+
+    def test_selected_printer_scans_save_for_this_vehicle_only(self):
+        other = Vehicle(
+            year=2019, make='Ford', model='F-150', price=22000, mileage=80000,
+            status='sold', slug='other-sale-truck',
+        )
+        db.session.add(other)
+        db.session.commit()
+        captured = id_photo()
+        import base64
+        captured.seek(0)
+        data_url = 'data:image/jpeg;base64,' + base64.b64encode(captured.read()).decode()
+        response = self.save(
+            printer_label='Front Office Scanner',
+            scanned_documents=[
+                (self.pdf().stream, 'bill-of-sale.pdf'),
+                (id_photo(), 'title-front.tiff'),
+            ],
+            scanned_document_data=[data_url, data_url],
+        )
+        self.assertEqual(response.status_code, 302)
+        db.session.refresh(self.vehicle)
+        self.assertEqual(len(self.vehicle.sale_documents), 4)
+        self.assertEqual({item.printer_label for item in self.vehicle.sale_documents}, {'Front Office Scanner'})
+        self.assertEqual(VehicleSaleDocument.query.filter_by(vehicle_id=other.id).count(), 0)
+        self.assertEqual(len(self.documents()), 4)
+        page = self.client.get(self.path)
+        self.assertIn('Front Office Scanner', page.text)
+        self.assertIn('bill-of-sale.pdf', page.text)
+        self.assertIn('Select a printer or scanner', page.text)
+        document = next(item for item in self.vehicle.sale_documents if item.original_filename == 'bill-of-sale.pdf')
+        download = self.client.get(f'{self.path}/documents/{document.id}')
+        self.assertEqual(download.status_code, 200)
+        self.assertTrue(download.data.startswith(b'%PDF-'))
+        self.assertEqual(download.headers['Cache-Control'], 'private, no-store')
+        download.close()
+        from flask.globals import _cv_app
+        _cv_app.get().g.pop('_login_user', None)
+        anonymous = self.app.test_client()
+        denied = anonymous.get(f'{self.path}/documents/{document.id}')
+        self.assertEqual(denied.status_code, 302)
+        self.assertIn('/admin/login', denied.headers['Location'])
+        self.assertNotIn('bill-of-sale.pdf', anonymous.get('/inventory/sale-test-civic').text)
+        _cv_app.get().g.pop('_login_user', None)
+        self.assertEqual(self.client.post(f'{self.path}/documents/{document.id}/delete').status_code, 302)
+        self.assertEqual(len(self.vehicle.sale_documents), 3)
+        self.assertEqual(self.client.post(f'/admin/vehicles/{self.vehicle.id}/delete').status_code, 302)
+        self.assertEqual(self.documents(), [])
+        self.assertEqual(VehicleSaleDocument.query.count(), 0)
+
+    def test_invalid_scan_does_not_save_partial_documents(self):
+        response = self.save(scanned_documents=[(BytesIO(b'not a scan'), 'notes.txt')])
+        self.assertEqual(response.status_code, 422)
+        self.assertIn('Could not save a scanned document', response.text)
+        self.assertEqual(VehicleSaleDocument.query.count(), 0)
+        self.assertEqual(self.documents(), [])
+        self.assertIsNone(self.vehicle.sold_price)
+
+
 class SaleMigrationTests(unittest.TestCase):
     def test_upgrade_idempotence_and_downgrade_preserve_vehicle(self):
         migration = importlib.import_module(
@@ -303,4 +369,19 @@ class SaleMigrationTests(unittest.TestCase):
                 migration.downgrade()
                 self.assertNotIn('vehicle_sale_images', inspect(connection).get_table_names())
                 self.assertEqual(connection.execute(text('SELECT price FROM vehicles')).scalar(), 15000)
+        engine.dispose()
+
+    def test_document_upgrade_is_idempotent(self):
+        migration = importlib.import_module(
+            'migrations.versions.b1c2d3e4f5a7_add_vehicle_sale_documents',
+        )
+        engine = create_engine('sqlite:///:memory:')
+        with engine.begin() as connection:
+            connection.execute(text('CREATE TABLE vehicles (id INTEGER PRIMARY KEY)'))
+            with Operations.context(MigrationContext.configure(connection)):
+                migration.upgrade()
+                migration.upgrade()
+                self.assertIn('vehicle_sale_documents', inspect(connection).get_table_names())
+                migration.downgrade()
+                self.assertNotIn('vehicle_sale_documents', inspect(connection).get_table_names())
         engine.dispose()

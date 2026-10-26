@@ -173,6 +173,9 @@ class VehicleSaleForm(FlaskForm):
     ], validators=[Optional()])
     sale_notes = TextAreaField('Sale Notes', validators=[Optional(), Length(max=20000)])
     buyer_id_images = FileField('Buyer ID Photos', render_kw={'multiple': True})
+    scanned_documents = FileField('Scanned Documents', render_kw={'multiple': True})
+    scanned_document_data = HiddenField()
+    printer_label = StringField('Selected Printer', validators=[Optional(), Length(max=128)])
     submit = SubmitField('Save Sale Details')
 
 
