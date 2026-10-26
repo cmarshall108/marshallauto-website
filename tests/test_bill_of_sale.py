@@ -71,6 +71,10 @@ class BillOfSaleTests(unittest.TestCase):
         self.assertIn('Year: 2018', text)
         self.assertIn('VIN: 4T1BF1FK5JU000001', text)
         self.assertIsNotNone(html.select_one('button[onclick="window.print()"]'))
+        logo = html.select_one('img.bos-logo')
+        self.assertIsNotNone(logo)
+        self.assertIn('images/dealership-logo.jpg', logo.get('src', ''))
+        self.assertEqual(logo.get('alt'), 'Marshall Auto')
 
         edit = self.client.get('/admin/vehicles/1/edit')
         edit_html = BeautifulSoup(edit.data, 'html.parser')

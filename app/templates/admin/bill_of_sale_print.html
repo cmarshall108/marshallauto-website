@@ -16,6 +16,7 @@
     <article class="bos-sheet">
         <h1>NORTH CAROLINA MOTOR VEHICLE BILL OF SALE</h1>
         <p class="bos-subtitle">(Sold &quot;As-Is&quot; without Warranty)</p>
+        <img class="bos-logo" src="{{ url_for('static', filename='images/dealership-logo.jpg') }}" alt="Marshall Auto">
 
         <p class="bos-meta">STATE OF:&nbsp;&nbsp;North Carolina</p>
         <p class="bos-meta">COUNTY OF:&nbsp;&nbsp;<span class="bos-fill">{{ seller_county }}</span></p>
@@ -80,6 +81,7 @@
 <style>
     .bos-print-page { max-width: 8.5in; margin: 0 auto; }
     .bos-sheet {
+        position: relative;
         min-height: 11in;
         padding: 0.48in 0.5in 0.4in;
         border: 1px solid #d5dbe2;
@@ -89,6 +91,13 @@
         font-size: 11pt;
         line-height: 1.15;
         box-shadow: 0 12px 36px rgba(20, 34, 56, 0.1);
+    }
+    .bos-logo {
+        position: absolute;
+        top: 1.05in;
+        right: 0.42in;
+        width: 2.05in;
+        height: auto;
     }
     .bos-sheet h1 {
         margin: 0;
@@ -105,7 +114,8 @@
         text-align: center;
     }
     .bos-meta, .bos-presents, .bos-body { margin: 0 0 0.08in; }
-    .bos-presents { margin-top: 0.16in; margin-bottom: 0.22in; font-weight: 700; }
+    .bos-meta { max-width: 4.7in; }
+    .bos-presents { margin-top: 0.72in; margin-bottom: 0.22in; font-weight: 700; }
     .bos-caps { font-weight: 700; text-transform: uppercase; }
     .bos-fill {
         border-bottom: 1px solid #000;

@@ -141,6 +141,11 @@ def _download_scan(job_url):
     raise ScannerError('The printer did not return a scanned page. Place the document on the glass and try again.')
 
 
+def _close_scan(job_url):
+    """Tell the printer this page is finished so its display leaves Scanning."""
+    _curl(['-X', 'DELETE', job_url], timeout=8)
+
+
 def scan_document(printer_id):
     """Scan the platen of one installed printer and return PDF bytes."""
     printers = {name: uri for name, uri in _printer_rows()}
@@ -164,4 +169,8 @@ def scan_document(printer_id):
     for line in header.splitlines():
         if line.lower().startswith('location:'):
             location = line.split(':', 1)[1].strip()
-    return _download_scan(_job_url(host, location))
+    job_url = _job_url(host, location)
+    try:
+        return _download_scan(job_url)
+    finally:
+        _close_scan(job_url)
