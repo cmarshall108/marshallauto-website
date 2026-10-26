@@ -44,7 +44,7 @@
         <div class="col-12">
             <hr>
             <label class="form-label fw-semibold">Scan Documents from a Printer</label>
-            <p class="small text-muted mb-2">Choose the printer or scanner, then capture every page. All captured scans are saved with this vehicle only.</p>
+            <p class="small text-muted mb-2">Choose the printer installed on this computer, place the page on the glass, then scan. Each page is saved with this vehicle only.</p>
             <div class="row g-2 align-items-end mb-2">
                 <div class="col-md-8">
                     <label class="form-label" for="sale-printer-select">Printer / Scanner</label>
@@ -54,18 +54,12 @@
                     {{ form.printer_label(id="sale-printer-label", class="d-none") }}
                 </div>
                 <div class="col-md-4 d-flex flex-wrap gap-2">
-                    <button type="button" id="sale-scan-start" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Use Selected Printer</button>
+                    <button type="button" id="sale-scan-start" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Scan Page</button>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mb-2">
-                <button type="button" id="sale-scan-capture" class="btn btn-primary btn-sm d-none"><i class="bi bi-file-earmark-plus me-1"></i>Capture Page</button>
-                <button type="button" id="sale-scan-stop" class="btn btn-outline-danger btn-sm d-none">Stop</button>
-                <button type="button" id="sale-scan-clear" class="btn btn-outline-secondary btn-sm d-none">Clear Captured Pages</button>
+                <button type="button" id="sale-scan-clear" class="btn btn-outline-secondary btn-sm d-none">Clear Scanned Pages</button>
             </div>
-            <div id="sale-scan-wrap" class="d-none mb-2" style="max-width: 520px;">
-                <video id="sale-scan-video" autoplay playsinline class="w-100 rounded border"></video>
-            </div>
-            <canvas id="sale-scan-canvas" class="d-none"></canvas>
             <div id="sale-scan-pages" class="row g-2 mb-2"></div>
             <div id="sale-scan-fields"></div>
             <p id="sale-scan-error" class="small text-danger d-none"></p>

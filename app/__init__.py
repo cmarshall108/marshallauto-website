@@ -33,7 +33,7 @@ CONTENT_SECURITY_POLICY = (
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
     "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
     "img-src 'self' data: https: blob:; "
-    "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com; "
+    "connect-src 'self' http://127.0.0.1:8765 https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com; "
     "frame-src 'self' https://www.googletagmanager.com https://www.google.com https://maps.google.com "
     "https://www.youtube-nocookie.com https://player.vimeo.com; "
     "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"

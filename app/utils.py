@@ -437,17 +437,22 @@ def save_uploaded_sale_document(file_obj):
 
 
 def save_sale_document_data_url(data_url):
-    """Save a scan captured in-browser from a printer exposed as a camera."""
+    """Save a scan captured from the printer selected on this computer."""
     import base64
 
-    if not data_url or not isinstance(data_url, str) or not data_url.startswith('data:image/'):
+    if not data_url or not isinstance(data_url, str) or not data_url.startswith('data:'):
+        return None
+    header, separator, encoded = data_url.partition(',')
+    if not separator:
+        return None
+    extension = 'pdf' if header.startswith('data:application/pdf') else 'jpg' if header.startswith('data:image/') else ''
+    if not extension:
         return None
     try:
-        _header, encoded = data_url.split(',', 1)
         raw_bytes = base64.b64decode(encoded, validate=True)
     except (ValueError, TypeError):
         return None
-    return save_sale_document_bytes(raw_bytes, 'jpg')
+    return save_sale_document_bytes(raw_bytes, extension)
 
 
 def delete_sale_document(filename):
