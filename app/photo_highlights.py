@@ -872,7 +872,7 @@ def _grok_model() -> str:
     return (
         os.environ.get('PHOTO_HIGHLIGHTS_GROK_MODEL')
         or os.environ.get('XAI_MODEL')
-        or 'grok-4.5'
+        or 'grok-4.7'
     ).strip()
 
 

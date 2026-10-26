@@ -439,7 +439,7 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PHOTO_HIGHLIGHTS_AUTO_ENQUEUE` | Auto-queue analysis on image upload (`true`/`false`, default true) |
 | `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `5`) |
 | `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` fallback-only |
-| `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.5`) |
+| `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.7`) |
 | `XAI_API_KEY` | xAI API key for Grok vision highlights and optional VIN-spec estimates |
 | `VIN_GROK_MODEL` | Text model for conservative missing-spec estimates (default `grok-4.20-0309-non-reasoning`) |
 | `LICENSE_GROK_MODEL` | xAI vision model for license extraction and visual screening (default `grok-4.5`) |
@@ -554,7 +554,7 @@ Coordinates are stored as percent of the **full source image**. The gallery JS m
 ```bash
 XAI_API_KEY=xai-...
 PHOTO_HIGHLIGHTS_ENGINE=grok
-PHOTO_HIGHLIGHTS_GROK_MODEL=grok-4.5
+PHOTO_HIGHLIGHTS_GROK_MODEL=grok-4.7
 PHOTO_HIGHLIGHTS_MAX=5
 ```
 
