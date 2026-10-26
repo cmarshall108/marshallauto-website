@@ -144,7 +144,7 @@ class TestDriveLicenseScanTests(unittest.TestCase):
     def test_checkout_prefers_printer_scan_over_photo_upload(self):
         page = self.client.get('/admin/test-drives/new')
         self.assertIn("Scan Driver's License", page.text)
-        self.assertIn('Scanning is preferred over a photo', page.text)
+        self.assertIn('id="td-photo-fallback" class="d-none mb-2"', page.text)
         self.assertIn('id="td-license-scan"', page.text)
         response = self.client.post('/admin/test-drives/new', data={
             'vehicle_id': self.vehicle.id,

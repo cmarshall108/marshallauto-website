@@ -352,7 +352,7 @@ class SaleDocumentTests(VehicleSaleTests):
     def test_optional_customer_id_scan_is_preferred_and_saved_privately(self):
         page = self.client.get(self.path)
         self.assertIn('Scan Customer ID', page.text)
-        self.assertIn('Scanning is preferred over a photo upload', page.text)
+        self.assertIn('id="sale-id-photo-fallback" class="d-none mb-2"', page.text)
         self.assertIn('id="sale-id-scan-start"', page.text)
         captured = id_photo()
         captured.seek(0)

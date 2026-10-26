@@ -21,6 +21,7 @@
     const printerSelect = document.getElementById('td-printer-select');
     const scanBtn = document.getElementById('td-license-scan');
     const scanError = document.getElementById('td-scan-error');
+    const photoFallback = document.getElementById('td-photo-fallback');
     const fileInput = document.querySelector('input[type="file"][name="license_image"]');
 
     if (!dataField) return;
@@ -166,14 +167,17 @@
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             printers.forEach((printer) => printerSelect.add(new Option(printer.label, printer.id)));
             if (printers.length === 1) printerSelect.value = printers[0].id;
-            if (!printers.length && scanError) {
-                scanError.textContent = 'No scanner was found on this computer. Use a camera or upload a photo instead.';
+            const scannerReady = printers.length > 0;
+            if (photoFallback) photoFallback.classList.toggle('d-none', scannerReady);
+            if (!scannerReady && scanError) {
+                scanError.textContent = 'No scanner was found on this computer. Take or upload a license photo instead.';
                 scanError.classList.remove('d-none');
             }
         } catch (error) {
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
+            if (photoFallback) photoFallback.classList.remove('d-none');
             if (scanError) {
-                scanError.textContent = 'Printers on this computer are unavailable. Start the local printer agent, then reload this page.';
+                scanError.textContent = 'No scanner is available on this computer. Take or upload a license photo instead.';
                 scanError.classList.remove('d-none');
             }
         }
@@ -226,6 +230,7 @@
             stopStream();
             analyzeLicense();
         } catch (error) {
+            if (photoFallback) photoFallback.classList.remove('d-none');
             if (scanError) {
                 scanError.textContent = error && error.message ? error.message : 'The selected printer could not scan the license.';
                 scanError.classList.remove('d-none');

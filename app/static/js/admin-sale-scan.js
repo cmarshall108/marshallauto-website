@@ -17,6 +17,7 @@
     const idFields = document.getElementById('sale-id-scan-fields');
     const errorEl = document.getElementById('sale-scan-error');
     const idErrorEl = document.getElementById('sale-id-scan-error');
+    const idPhotoFallback = document.getElementById('sale-id-photo-fallback');
     const fileInput = document.querySelector('input[type="file"][name="scanned_documents"]');
 
     if (!printerSelect || !scanBtn || !fields) return;
@@ -90,12 +91,15 @@
                 printerSelect.value = printers[0].id;
                 syncPrinterLabel();
             }
-            if (!printers.length) {
-                showError('No scanner was found on this computer. Attach a scanned file below instead.');
+            const scannerReady = printers.length > 0;
+            if (idPhotoFallback) idPhotoFallback.classList.toggle('d-none', scannerReady);
+            if (!scannerReady) {
+                showError('No scanner was found on this computer. Use a photo for the customer ID, or attach a scanned file below.');
             }
         } catch (error) {
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
-            showError('Printers on this computer are unavailable. Start the local printer agent, then reload this page.');
+            if (idPhotoFallback) idPhotoFallback.classList.remove('d-none');
+            showError('No scanner is available on this computer. Use a photo for the customer ID instead.');
         }
     }
 
@@ -153,6 +157,7 @@
             syncPrinterLabel();
             renderScans();
         } catch (error) {
+            if (isId && idPhotoFallback) idPhotoFallback.classList.remove('d-none');
             showError(error && error.message ? error.message : 'The selected printer could not scan.', errorTarget);
         } finally {
             scanBtn.disabled = false;
