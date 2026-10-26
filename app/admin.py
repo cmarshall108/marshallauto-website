@@ -48,7 +48,7 @@ from app.marketplace_import import (
 )
 from app.utils import (
     MAX_PRIVATE_IMAGE_BYTES, client_ip, delete_license_image, delete_local_video_file,
-    delete_receipt_image, is_safe_redirect,
+    delete_receipt_image, format_currency, is_safe_redirect,
     rate_limit_exceeded, save_license_image_data_url,
     save_sale_document_data_url, save_uploaded_image, save_uploaded_license_image,
     save_uploaded_pdf, save_uploaded_receipt_image, save_uploaded_sale_document,
@@ -562,6 +562,27 @@ def vehicle_qr_print(id):
         vehicle=vehicle,
         public_url=public_url,
         qr_code=qr_code,
+    )
+
+
+@admin_bp.get('/vehicles/<int:id>/bill-of-sale')
+@login_required
+def vehicle_bill_of_sale(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    amount = vehicle.sold_price if vehicle.sold_price is not None else vehicle.display_price
+    return render_template(
+        'admin/bill_of_sale_print.html',
+        vehicle=vehicle,
+        sale_amount=format_currency(amount) if amount is not None else '',
+        seller_name=current_app.config['BUSINESS_NAME'],
+        seller_address=(
+            f"{current_app.config['BUSINESS_ADDRESS']}, "
+            f"{current_app.config['BUSINESS_CITY']}, "
+            f"{current_app.config['BUSINESS_STATE']} "
+            f"{current_app.config['BUSINESS_ZIP']}"
+        ),
+        seller_county='Lee',
+        vehicle_county='Lee',
     )
 
 

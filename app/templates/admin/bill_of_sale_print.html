@@ -1,0 +1,161 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Bill of Sale - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="bos-print-page">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3 no-print">
+        <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Vehicle
+        </a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>Print Bill of Sale
+        </button>
+    </div>
+
+    <article class="bos-sheet">
+        <h1>NORTH CAROLINA MOTOR VEHICLE BILL OF SALE</h1>
+        <p class="bos-subtitle">(Sold &quot;As-Is&quot; without Warranty)</p>
+
+        <p class="bos-meta">STATE OF:&nbsp;&nbsp;North Carolina</p>
+        <p class="bos-meta">COUNTY OF:&nbsp;&nbsp;<span class="bos-fill">{{ seller_county }}</span></p>
+
+        <p class="bos-presents">KNOW ALL PERSONS BY THESE PRESENTS:</p>
+
+        <p class="bos-body">
+            That I, <span class="bos-fill">{{ seller_name }}</span> (Seller),of <span class="bos-fill">{{ seller_address }}</span>
+            (address),County of <span class="bos-fill">{{ seller_county }}</span>, <span class="bos-fill">{{ sale_amount }}</span> (amount of sale), receipt of payment
+            acknowledged, do hereby sell and transfer to <span class="bos-blank bos-blank-buyer"></span> (Buyer), of
+            <span class="bos-blank bos-blank-address"></span>(Buyers Address), County of <span class="bos-blank bos-blank-county"></span>, North Carolina,
+            his/her successors and assigns, the following motor vehicle (Vehicle), which is located in the County of <span class="bos-fill">{{ vehicle_county }}</span>,
+            North Carolina:
+        </p>
+
+        <dl class="bos-vehicle">
+            <div><dt>Make:</dt><dd>{{ vehicle.make }}</dd></div>
+            <div><dt>Model:</dt><dd>{{ vehicle.model }}</dd></div>
+            <div><dt>Body Type:</dt><dd>{{ vehicle.body_style or '' }}</dd></div>
+            <div><dt>Year:</dt><dd>{{ vehicle.year }}</dd></div>
+            <div><dt>VIN:</dt><dd>{{ vehicle.vin or '' }}</dd></div>
+        </dl>
+
+        <p class="bos-body">To have and to hold the same unto Buyer and Buyer&apos;s executors, administrators, and assigns, forever.</p>
+
+        <p class="bos-body">
+            <strong>WARRANTY OF OWNERSHIP.</strong> The Seller warrants that the Seller is the true and lawful owner of the Vehicle, and that
+            the Vehicle is free of any and all legal claims, encumbrances, and offsets by others. Further, the Seller warrants that the
+            Seller will defend the Buyer against any and all lawful claims and demands whatsoever in relation to this bill of sale.
+        </p>
+
+        <p class="bos-body bos-caps">
+            DISCLAIMER OF ALL OTHER WARRANTIES. OTHER THAN THE SELLER&apos;S WARRANTY OF OWNERSHIP STATED
+            ABOVE, THE BUYER TAKES THE VEHICLE &quot;AS-IS&quot; WITHOUT ANY WARRANTIES, EXPRESS OR IMPLIED, AS TO
+            ITS CONDITION. THE BUYER HAS PERSONALLY INSPECTED THE VEHICLE AND ACCEPTS IT &quot;AS-IS&quot;.
+        </p>
+
+        <p class="bos-body">
+            <strong>ADDITIONAL TERMS OF SALE.</strong> The Seller and Buyer agree to the following additional terms in conjunction with this bill
+            of sale: <span class="bos-blank bos-blank-terms"></span>
+        </p>
+
+        <div class="bos-signatures">
+            <div>
+                <p class="bos-party">Seller:</p>
+                <p class="bos-sign-line">________________________</p>
+                <p class="bos-sign-label">Signature</p>
+                <p class="bos-sign-line">_______________________</p>
+                <p class="bos-sign-line">_____________________</p>
+            </div>
+            <div>
+                <p class="bos-party">Buyer:</p>
+                <p class="bos-sign-line">________________________</p>
+                <p class="bos-sign-label">Signature</p>
+                <p class="bos-sign-line">_______________________</p>
+                <p class="bos-sign-line">_____________________</p>
+            </div>
+        </div>
+    </article>
+</div>
+
+<style>
+    .bos-print-page { max-width: 8.5in; margin: 0 auto; }
+    .bos-sheet {
+        min-height: 11in;
+        padding: 0.48in 0.5in 0.4in;
+        border: 1px solid #d5dbe2;
+        background: #fff;
+        color: #000;
+        font-family: "Times New Roman", Times, serif;
+        font-size: 11pt;
+        line-height: 1.15;
+        box-shadow: 0 12px 36px rgba(20, 34, 56, 0.1);
+    }
+    .bos-sheet h1 {
+        margin: 0;
+        font-size: 16pt;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        text-align: center;
+        text-transform: uppercase;
+    }
+    .bos-subtitle {
+        margin: 0.05in 0 0.28in;
+        font-size: 11pt;
+        font-style: italic;
+        text-align: center;
+    }
+    .bos-meta, .bos-presents, .bos-body { margin: 0 0 0.08in; }
+    .bos-presents { margin-top: 0.16in; margin-bottom: 0.22in; font-weight: 700; }
+    .bos-caps { font-weight: 700; text-transform: uppercase; }
+    .bos-fill {
+        border-bottom: 1px solid #000;
+        font-weight: 700;
+        padding: 0 0.08in;
+        white-space: nowrap;
+    }
+    .bos-blank {
+        display: inline-block;
+        border-bottom: 1px solid #000;
+        height: 0.9em;
+        vertical-align: baseline;
+    }
+    .bos-blank-buyer { width: 2.35in; }
+    .bos-blank-address { width: 2.7in; }
+    .bos-blank-county { width: 1.15in; }
+    .bos-blank-terms { width: 100%; margin-top: 0.18in; }
+    .bos-vehicle { margin: 0.22in 0 0.18in 0.85in; }
+    .bos-vehicle div { display: flex; gap: 0.12in; margin: 0 0 0.02in; }
+    .bos-vehicle dt { min-width: 0.95in; font-weight: 700; }
+    .bos-vehicle dd {
+        margin: 0;
+        min-width: 2.4in;
+        border-bottom: 1px solid #000;
+        font-weight: 700;
+    }
+    .bos-signatures {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.4in;
+        margin-top: 0.42in;
+    }
+    .bos-party { margin: 0 0 0.28in; font-weight: 700; }
+    .bos-sign-line, .bos-sign-label { margin: 0.08in 0 0; }
+    .bos-sign-label { margin-bottom: 0.12in; }
+    @page { size: letter portrait; margin: 0.4in; }
+    @media print {
+        body { background: #fff !important; }
+        .admin-sidebar,
+        .admin-mobile-nav,
+        .admin-content > *:not(.bos-print-page),
+        .no-print { display: none !important; }
+        .admin-content { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        .bos-print-page { max-width: none; margin: 0; }
+        .bos-sheet {
+            min-height: auto;
+            padding: 0;
+            border: 0;
+            box-shadow: none;
+        }
+    }
+</style>
+{% endblock %}
