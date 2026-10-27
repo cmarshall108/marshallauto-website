@@ -53,15 +53,18 @@ class AdminVehicleQrTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/admin/login', response.headers['Location'])
 
-    def test_print_sheet_contains_current_public_url_price_and_valid_qr_svg(self):
+    def test_print_sheet_contains_public_url_and_valid_qr_svg_without_price(self):
         self.login()
         response = self.client.get('/admin/vehicles/1/qr-print')
         self.assertEqual(response.status_code, 200)
         html = BeautifulSoup(response.data, 'html.parser')
+        page_text = html.get_text()
 
         self.assertIn('2022 Toyota Camry', html.select_one('h1').get_text())
-        self.assertEqual(html.select_one('.qr-price').get_text(strip=True), '$17,900')
-        self.assertIn('Website price', html.get_text())
+        self.assertIsNone(html.select_one('.qr-price'))
+        self.assertNotIn('$17,900', page_text)
+        self.assertNotIn('$18,900', page_text)
+        self.assertIn('Scan for the current price and vehicle details', page_text)
         self.assertIn('https://marshallautosanford.com/inventory/qr-test-car',
                       html.select_one('.qr-url').get_text())
         self.assertIsNotNone(html.select_one('button[onclick="window.print()"]'))

@@ -20,7 +20,7 @@
                 {% if vehicle.is_coming_soon and vehicle.status == 'available' %}
                 Scan for updates when this vehicle is ready
                 {% else %}
-                Scan to see current price and vehicle details
+                Scan for the current price and vehicle details
                 {% endif %}
             </p>
         </header>
@@ -35,14 +35,9 @@
             Price and full details will be posted when this vehicle is ready.
         </p>
         {% else %}
-        <p class="qr-price-label mb-0">
-            {% if vehicle.status == 'available' %}
-            Website price
-            {% else %}
-            Last listed price
-            {% endif %}
+        <p class="qr-price-note">
+            Price is not printed here. Scan the code for the current website price.
         </p>
-        <p class="qr-price">{{ vehicle.display_price | format_price }}</p>
         {% endif %}
 
         <img class="qr-code-image"
@@ -74,8 +69,7 @@
     }
     .qr-prompt { color: #59677a; font-size: 1.15rem; font-weight: 600; }
     .qr-vehicle-title { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; }
-    .qr-price-label { color: #59677a; font-size: 1rem; font-weight: 600; }
-    .qr-price { color: #142238; font-size: clamp(3rem, 8vw, 4.5rem); font-weight: 900; line-height: 1.1; }
+    .qr-price-note,
     .qr-coming-soon-notice { max-width: 30rem; margin: 1rem auto; color: #59677a; font-size: 1.15rem; font-weight: 600; }
     .qr-code-image {
         display: block;
@@ -112,8 +106,7 @@
         .qr-business-name { font-size: 22pt; }
         .qr-prompt { font-size: 16pt; }
         .qr-vehicle-title { font-size: 26pt; }
-        .qr-price-label { font-size: 14pt; }
-        .qr-price { font-size: 52pt; }
+        .qr-price-note,
         .qr-coming-soon-notice { font-size: 16pt; }
         .qr-code-image { width: 3.25in; max-width: 100%; margin-top: 0.1in; }
         .qr-scan-caption { font-size: 16pt; }
