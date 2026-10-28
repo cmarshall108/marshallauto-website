@@ -565,6 +565,29 @@ def vehicle_qr_print(id):
     )
 
 
+@admin_bp.get('/vehicles/<int:id>/hold-deposit')
+@login_required
+def vehicle_hold_deposit(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    asking = vehicle.display_price
+    return render_template(
+        'admin/hold_deposit_print.html',
+        vehicle=vehicle,
+        asking_price=format_currency(asking) if asking is not None else '',
+        dealer_name=current_app.config['BUSINESS_NAME'],
+        dealer_address=(
+            f"{current_app.config['BUSINESS_ADDRESS']}, "
+            f"{current_app.config['BUSINESS_CITY']}, "
+            f"{current_app.config['BUSINESS_STATE']} "
+            f"{current_app.config['BUSINESS_ZIP']}"
+        ),
+        dealer_phone=current_app.config['BUSINESS_PHONE'],
+        dealer_email=current_app.config['BUSINESS_EMAIL'],
+        dealer_county='Lee',
+        hold_hours=72,
+    )
+
+
 @admin_bp.get('/vehicles/<int:id>/bill-of-sale')
 @login_required
 def vehicle_bill_of_sale(id):

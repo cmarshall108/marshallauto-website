@@ -7,6 +7,9 @@
     <h2 class="fw-bold mb-0">{{ title }}</h2>
     <div class="d-flex gap-2">
         {% if vehicle %}
+        <a href="{{ url_for('admin.vehicle_hold_deposit', id=vehicle.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-printer me-1"></i>Print Hold Deposit
+        </a>
         <a href="{{ url_for('admin.vehicle_bill_of_sale', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-printer me-1"></i>Print Bill of Sale
         </a>

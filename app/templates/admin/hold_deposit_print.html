@@ -1,0 +1,278 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Vehicle Hold Deposit - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="hold-print-page">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3 no-print">
+        <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Vehicle
+        </a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>Print Hold Deposit Form
+        </button>
+    </div>
+
+    <article class="hold-sheet">
+        <header class="hold-header">
+            <div>
+                <p class="hold-dealer">{{ dealer_name }}</p>
+                <p>{{ dealer_address }}</p>
+                <p>Lee County, North Carolina</p>
+                <p>{{ dealer_phone }} &middot; {{ dealer_email }}</p>
+            </div>
+            <img class="hold-logo" src="{{ url_for('static', filename='images/dealership-logo.jpg') }}" alt="Marshall Auto">
+        </header>
+
+        <h1>Vehicle Hold Deposit Agreement</h1>
+        <p class="hold-subtitle">Temporary reservation only &mdash; not a bill of sale and not a contract to buy</p>
+
+        <p class="hold-body">
+            This agreement is made in Lee County, North Carolina, between <strong>{{ dealer_name }}</strong>
+            (&ldquo;Dealer&rdquo;) and the person identified below (&ldquo;Depositor&rdquo;). Depositor pays the
+            deposit stated below solely to ask Dealer to hold the identified vehicle and not accept another
+            buyer&rsquo;s offer for it during the hold period. <strong>This deposit does not buy the vehicle,
+            transfer any ownership or title interest, create a security interest, or require either party to
+            complete a sale.</strong>
+        </p>
+
+        <h2>1. Vehicle</h2>
+        <dl class="hold-grid">
+            <div><dt>Year</dt><dd>{{ vehicle.year }}</dd></div>
+            <div><dt>Make</dt><dd>{{ vehicle.make }}</dd></div>
+            <div><dt>Model</dt><dd>{{ vehicle.model }}</dd></div>
+            <div><dt>Trim</dt><dd>{{ vehicle.trim or '' }}</dd></div>
+            <div><dt>VIN</dt><dd>{{ vehicle.vin or '' }}</dd></div>
+            <div><dt>Stock #</dt><dd>{{ vehicle.stock_number or '' }}</dd></div>
+            <div><dt>Body</dt><dd>{{ vehicle.body_style or '' }}</dd></div>
+            <div><dt>Odometer</dt><dd>{{ '{:,}'.format(vehicle.mileage) }} mi (not guaranteed)</dd></div>
+            <div><dt>Title status</dt><dd>{{ vehicle.title_status | replace('_', ' ') | title }}</dd></div>
+            <div class="hold-wide"><dt>Current asking price</dt><dd>{{ asking_price }} &mdash; not a locked sale price</dd></div>
+        </dl>
+
+        <h2>2. Deposit and {{ hold_hours }}-hour hold</h2>
+        <p class="hold-body">
+            Deposit amount: <span class="hold-blank hold-blank-money"></span>, paid by
+            <span class="hold-check"></span> cash
+            <span class="hold-check"></span> card
+            <span class="hold-check"></span> other: <span class="hold-blank hold-blank-short"></span>.
+            Receipt / reference no.: <span class="hold-blank hold-blank-short"></span>.
+        </p>
+        <p class="hold-body">
+            Hold starts: Date <span class="hold-blank hold-blank-date"></span>
+            Time <span class="hold-blank hold-blank-time"></span>
+            <span class="hold-check"></span> a.m. <span class="hold-check"></span> p.m.
+            (Dealer&rsquo;s local time).
+        </p>
+        <p class="hold-body">
+            <strong>The hold ends exactly {{ hold_hours }} hours after the start time above, and in no event
+            later than {{ hold_hours }} hours after Dealer receives this deposit. {{ hold_hours }} hours is the
+            maximum hold. Dealer has no authority to extend it, and any requested extension is void unless both
+            parties sign a new hold agreement and Depositor pays a new deposit.</strong>
+        </p>
+        <p class="hold-body">
+            During the hold, Dealer will not accept another person&rsquo;s offer to buy this vehicle. Dealer may
+            continue to show and advertise it and must disclose that it is subject to this hold. This agreement
+            does not cover any other vehicle.
+        </p>
+
+        <h2>3. What each party must do before the hold ends</h2>
+        <p class="hold-body">
+            If Depositor wants to buy the vehicle, Depositor must, before the hold ends: (a) sign Dealer&rsquo;s
+            separate bill of sale or other sale documents; (b) pay the full agreed price, including taxes and
+            official fees then due, in collected funds or complete financing acceptable to Dealer; and
+            (c) satisfy every condition stated in those sale documents. Price, taxes, fees, and financing are
+            agreed only in the separate sale documents. The asking price above is not an offer that Depositor
+            can accept by paying this deposit.
+        </p>
+        <p class="hold-body">
+            Dealer is not obligated to sell the vehicle if, before the sale documents are signed, Dealer
+            discovers a title, lien, odometer, safety, or other condition that prevents a lawful sale, or if
+            Depositor does not meet the conditions above. Dealer will then return the deposit as provided below.
+        </p>
+
+        <h2>4. Deposit is earned unless Dealer cannot perform</h2>
+        <p class="hold-body">
+            Depositor agrees that Dealer gives up the chance to sell this vehicle to someone else during the
+            hold, and that the deposit is a fair charge for that reservation&mdash;not a down payment and not
+            earnest money. <strong>Dealer earns and may keep the entire deposit if the hold ends without a
+            completed sale for any reason other than Dealer&rsquo;s inability or refusal to complete a lawful
+            sale on the terms later offered to Depositor.</strong> That includes Depositor changing their mind,
+            not returning, not obtaining financing, not completing paperwork, or not paying on time.
+        </p>
+        <p class="hold-body">
+            Dealer will return the full deposit, with no deduction, within five (5) business days if: (a) Dealer
+            sells or agrees to sell the vehicle to someone else during the hold; (b) Dealer cannot convey the
+            title it represented, subject to disclosed liens and the stated title brand; or (c) Dealer otherwise
+            refuses or is unable to complete a lawful sale. Return of the deposit is Depositor&rsquo;s only
+            remedy. Dealer is not liable for incidental, consequential, or lost-profit damages.
+        </p>
+        <p class="hold-body">
+            If a sale is completed, this deposit is credited against the sale price. It is not a separate fee.
+            If the sale is later rescinded or the vehicle is returned under a separate written agreement, that
+            agreement&mdash;not this form&mdash;controls what happens to the credited amount.
+        </p>
+
+        <h2>5. No warranty and no reliance</h2>
+        <p class="hold-caps">
+            The vehicle is used and is offered &ldquo;as is,&rdquo; with all faults. Except for a title warranty
+            that will appear only in a signed bill of sale, Dealer disclaims all express and implied warranties,
+            including merchantability and fitness for a particular purpose, to the maximum extent allowed by
+            North Carolina law. Nothing in this hold agreement limits a warranty that cannot legally be
+            disclaimed. Depositor has had, or has knowingly declined, a reasonable opportunity to inspect the
+            vehicle and have an independent mechanic inspect it. Any inspection must be finished before the hold
+            ends. Oral statements, advertisements, and window writings are not part of this agreement.
+        </p>
+
+        <h2>6. Other terms</h2>
+        <ul class="hold-terms">
+            <li>Depositor is at least 18 years old and is the person paying the deposit, or is authorized to bind the payer.</li>
+            <li>A card chargeback or reversed payment cancels the hold immediately, and Depositor remains responsible for the unpaid deposit.</li>
+            <li>Dealer may require a government-issued photo ID before accepting the deposit or releasing the vehicle.</li>
+            <li>This agreement is the entire agreement about the hold. It can be changed only by a written instrument signed by both parties. North Carolina law governs it. Venue lies in the state courts of Lee County, North Carolina.</li>
+            <li>If any provision is unenforceable, the rest remains in effect. In particular, if a court limits the amount Dealer may retain, Dealer may retain the greatest amount a court of competent jurisdiction allows.</li>
+            <li>Depositor may not assign this agreement. Dealer may assign it to a successor of the dealership.</li>
+        </ul>
+
+        <p class="hold-ack">
+            <strong>Depositor acknowledges:</strong> I have read this agreement, including the {{ hold_hours }}-hour
+            maximum and the deposit terms in Section 4. I understand that paying this deposit does not buy the
+            vehicle, does not lock the price, and does not give me a refund if I decide not to complete the purchase.
+        </p>
+
+        <div class="hold-signatures">
+            <div>
+                <p class="hold-party">Depositor</p>
+                <p class="hold-line"><span>Signature</span></p>
+                <p class="hold-line"><span>Printed name</span></p>
+                <p class="hold-line"><span>Address</span></p>
+                <p class="hold-line"><span>City, state, ZIP</span></p>
+                <p class="hold-line"><span>Phone</span></p>
+                <p class="hold-line"><span>Email</span></p>
+                <p class="hold-line"><span>Driver license no. / state</span></p>
+                <p class="hold-line"><span>Date and time signed</span></p>
+            </div>
+            <div>
+                <p class="hold-party">{{ dealer_name }}</p>
+                <p class="hold-line"><span>Authorized signature</span></p>
+                <p class="hold-line"><span>Printed name and title</span></p>
+                <p class="hold-line"><span>Date and time signed</span></p>
+                <p class="hold-received">Deposit received by Dealer</p>
+                <p class="hold-line"><span>Amount received</span></p>
+                <p class="hold-line"><span>Received by (print and sign)</span></p>
+                <p class="hold-line"><span>Date and time received</span></p>
+            </div>
+        </div>
+
+        <p class="hold-footer">
+            Give one signed copy to Depositor and keep one with the deposit receipt.
+            Hold expires {{ hold_hours }} hours after the start time in Section 2.
+        </p>
+    </article>
+</div>
+
+<style>
+    .hold-print-page { max-width: 8.5in; margin: 0 auto; }
+    .hold-sheet {
+        padding: 0.38in 0.46in 0.32in;
+        border: 1px solid #d5dbe2;
+        background: #fff;
+        color: #111;
+        font-family: "Times New Roman", Times, serif;
+        font-size: 8.6pt;
+        line-height: 1.22;
+        box-shadow: 0 12px 36px rgba(20, 34, 56, 0.1);
+    }
+    .hold-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.3in;
+        align-items: flex-start;
+        margin-bottom: 0.08in;
+    }
+    .hold-header p { margin: 0; }
+    .hold-dealer { font-size: 11pt; font-weight: 700; }
+    .hold-logo { width: 1.45in; height: auto; }
+    .hold-sheet h1 {
+        margin: 0.04in 0 0;
+        font-size: 13.5pt;
+        letter-spacing: 0.01em;
+        text-align: center;
+        text-transform: uppercase;
+    }
+    .hold-subtitle {
+        margin: 0 0 0.08in;
+        font-style: italic;
+        text-align: center;
+    }
+    .hold-sheet h2 {
+        margin: 0.07in 0 0.02in;
+        font-size: 9.4pt;
+        text-transform: uppercase;
+    }
+    .hold-body, .hold-ack, .hold-footer { margin: 0 0 0.045in; }
+    .hold-caps { margin: 0 0 0.045in; font-weight: 700; text-transform: uppercase; }
+    .hold-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.02in 0.18in;
+        margin: 0 0 0.04in;
+    }
+    .hold-grid div { display: flex; gap: 0.06in; margin: 0; }
+    .hold-grid .hold-wide { grid-column: 1 / -1; }
+    .hold-grid dt { min-width: 0.85in; font-weight: 700; }
+    .hold-grid dd {
+        margin: 0;
+        flex: 1;
+        border-bottom: 1px solid #000;
+        font-weight: 700;
+    }
+    .hold-blank {
+        display: inline-block;
+        border-bottom: 1px solid #000;
+        height: 0.85em;
+        vertical-align: baseline;
+    }
+    .hold-blank-money { width: 1.15in; }
+    .hold-blank-short { width: 1.35in; }
+    .hold-blank-date { width: 1.15in; }
+    .hold-blank-time { width: 0.75in; }
+    .hold-check {
+        display: inline-block;
+        width: 0.11in;
+        height: 0.11in;
+        margin: 0 0.03in 0 0.06in;
+        border: 1px solid #000;
+        vertical-align: -0.01in;
+    }
+    .hold-terms { margin: 0 0 0.05in 0.18in; padding: 0; }
+    .hold-terms li { margin: 0 0 0.02in; }
+    .hold-ack { border: 1px solid #000; padding: 0.05in 0.07in; }
+    .hold-signatures {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.32in;
+        margin-top: 0.08in;
+    }
+    .hold-party, .hold-received { margin: 0 0 0.08in; font-weight: 700; }
+    .hold-received { margin-top: 0.1in; }
+    .hold-line {
+        margin: 0.075in 0 0;
+        border-bottom: 1px solid #000;
+        line-height: 1;
+    }
+    .hold-line span { display: block; padding-top: 0.01in; font-size: 8pt; }
+    .hold-footer { margin-top: 0.08in; font-size: 8pt; text-align: center; }
+    @page { size: letter portrait; margin: 0.32in; }
+    @media print {
+        body { background: #fff !important; }
+        .admin-sidebar,
+        .admin-mobile-nav,
+        .admin-content > *:not(.hold-print-page),
+        .no-print { display: none !important; }
+        .admin-content { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        .hold-print-page { max-width: none; margin: 0; }
+        .hold-sheet { padding: 0; border: 0; box-shadow: none; }
+    }
+</style>
+{% endblock %}
