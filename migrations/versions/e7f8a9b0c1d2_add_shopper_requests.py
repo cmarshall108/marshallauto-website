@@ -1,6 +1,6 @@
 """Add public hold requests and inventory alerts.
 
-Revision ID: c3d4e5f6a7b8
+Revision ID: e7f8a9b0c1d2
 Revises: b1c2d3e4f5a7
 Create Date: 2026-09-10
 """
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 from migrations.compat import create_index_if_missing, create_table_if_missing
 
-revision = 'c3d4e5f6a7b8'
+revision = 'e7f8a9b0c1d2'
 down_revision = 'b1c2d3e4f5a7'
 branch_labels = None
 depends_on = None
