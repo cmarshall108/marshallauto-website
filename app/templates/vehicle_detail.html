@@ -117,42 +117,42 @@ bi-check-circle
                              fetchpriority="high"
                              draggable="false">
                         <div class="gallery-hotspots" id="gallery-hotspots" aria-live="polite"></div>
-                        <div class="gallery-hotspot-card" id="gallery-hotspot-card" hidden role="dialog" aria-modal="false" aria-labelledby="gallery-hotspot-card-title">
-                            <div class="gallery-hotspot-card-copy">
-                                <div class="gallery-hotspot-card-kicker" id="gallery-hotspot-card-kicker">Highlight</div>
-                                <h3 class="gallery-hotspot-card-title" id="gallery-hotspot-card-title">Detail</h3>
-                                <p class="gallery-hotspot-card-text" id="gallery-hotspot-card-text"></p>
-                                <button type="button" class="gallery-hotspot-zoom" id="gallery-hotspot-zoom" aria-label="Enlarge highlighted area">
-                                    <span class="gallery-hotspot-zoom-frame" id="gallery-hotspot-zoom-frame">
-                                        <img id="gallery-hotspot-zoom-image" alt="" draggable="false">
-                                    </span>
-                                    <span class="gallery-hotspot-zoom-badge" aria-hidden="true">
-                                        <i class="bi bi-zoom-in"></i>
-                                    </span>
+                    </div>
+                    <div class="gallery-hotspot-card" id="gallery-hotspot-card" hidden role="dialog" aria-modal="false" aria-labelledby="gallery-hotspot-card-title">
+                        <div class="gallery-hotspot-card-copy">
+                            <div class="gallery-hotspot-card-kicker" id="gallery-hotspot-card-kicker">Highlight</div>
+                            <h3 class="gallery-hotspot-card-title" id="gallery-hotspot-card-title">Detail</h3>
+                            <p class="gallery-hotspot-card-text" id="gallery-hotspot-card-text"></p>
+                            <button type="button" class="gallery-hotspot-zoom" id="gallery-hotspot-zoom" aria-label="Enlarge highlighted area">
+                                <span class="gallery-hotspot-zoom-frame" id="gallery-hotspot-zoom-frame">
+                                    <img id="gallery-hotspot-zoom-image" alt="" draggable="false">
+                                </span>
+                                <span class="gallery-hotspot-zoom-badge" aria-hidden="true">
+                                    <i class="bi bi-zoom-in"></i>
+                                </span>
+                            </button>
+                            <dl class="gallery-hotspot-facts" id="gallery-hotspot-facts"></dl>
+                        </div>
+                        <div class="gallery-hotspot-nav">
+                            <span class="gallery-hotspot-count" id="gallery-hotspot-count">1 of 1</span>
+                            <div class="gallery-hotspot-steps">
+                                <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-prev" aria-label="Previous highlight">
+                                    <i class="bi bi-arrow-left" aria-hidden="true"></i>
                                 </button>
-                                <dl class="gallery-hotspot-facts" id="gallery-hotspot-facts"></dl>
+                                <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-next" aria-label="Next highlight">
+                                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                </button>
                             </div>
-                            <div class="gallery-hotspot-nav">
-                                <span class="gallery-hotspot-count" id="gallery-hotspot-count">1 of 1</span>
-                                <div class="gallery-hotspot-steps">
-                                    <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-prev" aria-label="Previous highlight">
-                                        <i class="bi bi-arrow-left" aria-hidden="true"></i>
-                                    </button>
-                                    <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-next" aria-label="Next highlight">
-                                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <button type="button" class="gallery-hotspot-card-close" id="gallery-hotspot-card-close" aria-label="Close highlight details">
-                                <i class="bi bi-x-lg" aria-hidden="true"></i>
-                            </button>
                         </div>
-                        <div class="gallery-hotspot-zoom-lightbox" id="gallery-hotspot-zoom-lightbox" hidden>
-                            <button type="button" class="gallery-hotspot-zoom-lightbox-close" id="gallery-hotspot-zoom-lightbox-close" aria-label="Close enlarged highlight">
-                                <i class="bi bi-x-lg" aria-hidden="true"></i>
-                            </button>
-                            <img id="gallery-hotspot-zoom-lightbox-image" alt="" draggable="false">
-                        </div>
+                        <button type="button" class="gallery-hotspot-card-close" id="gallery-hotspot-card-close" aria-label="Close highlight details">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="gallery-hotspot-zoom-lightbox" id="gallery-hotspot-zoom-lightbox" hidden>
+                        <button type="button" class="gallery-hotspot-zoom-lightbox-close" id="gallery-hotspot-zoom-lightbox-close" aria-label="Close enlarged highlight">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </button>
+                        <img id="gallery-hotspot-zoom-lightbox-image" alt="" draggable="false">
                     </div>
                     {% if gallery_count > 1 %}
                     <button type="button" class="gallery-nav gallery-nav-prev" id="gallery-prev" aria-label="Previous photo">

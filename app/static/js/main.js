@@ -736,8 +736,8 @@
                     closeZoomLightbox();
                     if (hotspotCard) {
                         hotspotCard.hidden = true;
-                        if (galleryStage && hotspotCard.parentElement === document.body) {
-                            galleryStage.appendChild(hotspotCard);
+                        if (gallery && hotspotCard.parentElement === document.body) {
+                            gallery.appendChild(hotspotCard);
                         }
                     }
                     hotspotRoots().forEach((root) => {
@@ -801,6 +801,12 @@
                             btn.setAttribute('aria-expanded', active ? 'true' : 'false');
                         });
                     });
+                };
+
+                const syncGalleryChrome = () => {
+                    if (!gallery || !galleryStage) return;
+                    const height = Math.round(galleryStage.getBoundingClientRect().height);
+                    if (height > 0) gallery.style.setProperty('--gallery-photo-height', `${height}px`);
                 };
 
                 const placeHotspotCard = () => {
@@ -1125,6 +1131,7 @@
 
                     const reveal = () => {
                         gallery.classList.remove('is-changing');
+                        syncGalleryChrome();
                         if (!opts.skipHotspots) renderHotspots(normalized);
                     };
                     if (!useFade) {
@@ -1243,8 +1250,10 @@
                     } catch (_) { /* ignore */ }
                 }
                 mainImage.addEventListener('load', () => {
+                    syncGalleryChrome();
                     renderHotspots(currentIndex);
                 });
+                syncGalleryChrome();
 
                 if (hotspotCardClose) {
                     hotspotCardClose.addEventListener('click', (e) => {

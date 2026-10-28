@@ -696,7 +696,8 @@ a:hover {
 .gallery-spin-badge {
     position: absolute;
     left: 0.75rem;
-    bottom: 0.75rem;
+    top: calc(var(--gallery-photo-height, 500px) - 0.75rem);
+    transform: translateY(-100%);
     z-index: 3;
     display: inline-flex;
     align-items: center;
@@ -719,7 +720,7 @@ a:hover {
 
 .gallery-nav {
     position: absolute;
-    top: 50%;
+    top: calc(var(--gallery-photo-height, 500px) / 2);
     transform: translateY(-50%);
     z-index: 3;
     width: 44px;
@@ -767,7 +768,8 @@ a:hover {
 .gallery-counter {
     position: absolute;
     right: 0.75rem;
-    bottom: 0.75rem;
+    top: calc(var(--gallery-photo-height, 500px) - 0.75rem);
+    transform: translateY(-100%);
     z-index: 3;
     padding: 0.35rem 0.7rem;
     border-radius: 999px;
@@ -1002,8 +1004,8 @@ body.gallery-lightbox-open {
 .gallery-swipe-hint {
     position: absolute;
     left: 50%;
-    bottom: 0.75rem;
-    transform: translateX(-50%);
+    top: calc(var(--gallery-photo-height, 500px) - 0.75rem);
+    transform: translate(-50%, -100%);
     z-index: 3;
     display: inline-flex;
     align-items: center;
@@ -1160,8 +1162,8 @@ body.gallery-lightbox-open {
     z-index: 6;
     display: flex;
     flex-direction: column;
-    width: min(100%, 420px);
-    margin: 0.85rem 0 0 auto;
+    width: 100%;
+    margin: 0.85rem 0 0;
     padding: 1.15rem 1.2rem 0.85rem;
     border: 1px solid #e6ebf2;
     border-radius: 22px;
@@ -1471,9 +1473,9 @@ body.hotspot-zoom-open {
         top: auto;
         right: auto;
         left: auto;
-        width: min(100%, 440px);
+        width: 100%;
         max-height: none;
-        margin: 0.85rem 0 0 auto;
+        margin: 0.85rem 0 0;
         overflow: visible;
         z-index: 6;
     }
@@ -2461,12 +2463,12 @@ body.hotspot-zoom-open {
 
     .gallery-spin-badge {
         left: 0.5rem;
-        bottom: 0.5rem;
+        top: calc(var(--gallery-photo-height, 320px) - 0.5rem);
         font-size: 0.72rem;
     }
 
     .vehicle-gallery.is-spin-mode .gallery-swipe-hint {
-        bottom: 2.55rem;
+        top: calc(var(--gallery-photo-height, 320px) - 2.55rem);
     }
 
     .vehicle-card .card-img-wrapper {
@@ -2511,12 +2513,12 @@ body.hotspot-zoom-open {
 
     .gallery-counter {
         right: 0.5rem;
-        bottom: 0.5rem;
+        top: calc(var(--gallery-photo-height, 320px) - 0.5rem);
         font-size: 0.75rem;
     }
 
     .gallery-swipe-hint {
-        bottom: 2.55rem;
+        top: calc(var(--gallery-photo-height, 320px) - 2.55rem);
         font-size: 0.72rem;
     }
 
