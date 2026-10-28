@@ -68,8 +68,10 @@ bi-check-circle
                 {% set gallery_images = vehicle.ordered_images() %}
                 {% set primary = vehicle.primary_image() %}
                 {% set gallery_count = gallery_images|length %}
+                {% set model_review = vehicle.model_review_video() %}
+                {% set gallery_total = gallery_count + (1 if model_review else 0) %}
                 {% set spin_ready = gallery_count >= 4 %}
-                {% if gallery_count > 1 %}
+                {% if gallery_total > 1 %}
                 <div class="gallery-toolbar mb-2" id="gallery-toolbar" role="group" aria-label="Photo viewer mode">
                     <button type="button"
                             class="gallery-mode-btn active"
@@ -102,6 +104,7 @@ bi-check-circle
                      aria-roledescription="carousel"
                      aria-label="{{ vehicle.title }} photo gallery. Swipe left or right to change photos. Tap highlight bubbles for details."
                      data-gallery-count="{{ gallery_count }}"
+                     data-gallery-total="{{ gallery_total }}"
                      data-spin-ready="{{ 'true' if spin_ready else 'false' }}"
                      data-gallery-mode="photos"
                      data-highlights-enabled="true"
@@ -117,36 +120,56 @@ bi-check-circle
                              fetchpriority="high"
                              draggable="false">
                         <div class="gallery-hotspots" id="gallery-hotspots" aria-live="polite"></div>
-                    </div>
-                    <div class="gallery-hotspot-card" id="gallery-hotspot-card" hidden role="dialog" aria-modal="false" aria-labelledby="gallery-hotspot-card-title">
-                        <div class="gallery-hotspot-card-copy">
-                            <div class="gallery-hotspot-card-kicker" id="gallery-hotspot-card-kicker">Highlight</div>
-                            <h3 class="gallery-hotspot-card-title" id="gallery-hotspot-card-title">Detail</h3>
-                            <p class="gallery-hotspot-card-text" id="gallery-hotspot-card-text"></p>
-                            <button type="button" class="gallery-hotspot-zoom" id="gallery-hotspot-zoom" aria-label="Enlarge highlighted area">
-                                <span class="gallery-hotspot-zoom-frame" id="gallery-hotspot-zoom-frame">
-                                    <img id="gallery-hotspot-zoom-image" alt="" draggable="false">
-                                </span>
-                                <span class="gallery-hotspot-zoom-badge" aria-hidden="true">
-                                    <i class="bi bi-zoom-in"></i>
-                                </span>
-                            </button>
-                            <dl class="gallery-hotspot-facts" id="gallery-hotspot-facts"></dl>
-                        </div>
-                        <div class="gallery-hotspot-nav">
-                            <span class="gallery-hotspot-count" id="gallery-hotspot-count">1 of 1</span>
-                            <div class="gallery-hotspot-steps">
-                                <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-prev" aria-label="Previous highlight">
-                                    <i class="bi bi-arrow-left" aria-hidden="true"></i>
-                                </button>
-                                <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-next" aria-label="Next highlight">
-                                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
-                                </button>
+                        {% if model_review %}
+                        <div class="gallery-review" id="gallery-review" hidden>
+                            <div class="gallery-review-frame">
+                                <iframe id="gallery-review-frame"
+                                        title="{{ model_review.title }} by {{ model_review.source }}"
+                                        data-src="{{ model_review.embed_url }}"
+                                        loading="lazy"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        allowfullscreen
+                                        referrerpolicy="strict-origin-when-cross-origin"></iframe>
                             </div>
+                            <p class="gallery-review-note">
+                                Model review of the {{ model_review.year_label }} {{ vehicle.make }} {{ vehicle.model }} by {{ model_review.source }}. Not a review of this specific vehicle.
+                            </p>
                         </div>
-                        <button type="button" class="gallery-hotspot-card-close" id="gallery-hotspot-card-close" aria-label="Close highlight details">
-                            <i class="bi bi-x-lg" aria-hidden="true"></i>
-                        </button>
+                        {% endif %}
+                        <div class="gallery-hotspot-card" id="gallery-hotspot-card" hidden role="dialog" aria-modal="false" aria-labelledby="gallery-hotspot-card-title">
+                            <div class="gallery-hotspot-card-copy">
+                                <div class="gallery-hotspot-card-head">
+                                    <button type="button" class="gallery-hotspot-zoom" id="gallery-hotspot-zoom" aria-label="Enlarge highlighted area">
+                                        <span class="gallery-hotspot-zoom-frame" id="gallery-hotspot-zoom-frame">
+                                            <img id="gallery-hotspot-zoom-image" alt="" draggable="false">
+                                        </span>
+                                        <span class="gallery-hotspot-zoom-badge" aria-hidden="true">
+                                            <i class="bi bi-zoom-in"></i>
+                                        </span>
+                                    </button>
+                                    <div class="gallery-hotspot-card-heading">
+                                        <div class="gallery-hotspot-card-kicker" id="gallery-hotspot-card-kicker">Highlight</div>
+                                        <h3 class="gallery-hotspot-card-title" id="gallery-hotspot-card-title">Detail</h3>
+                                    </div>
+                                </div>
+                                <p class="gallery-hotspot-card-text" id="gallery-hotspot-card-text"></p>
+                                <dl class="gallery-hotspot-facts" id="gallery-hotspot-facts"></dl>
+                            </div>
+                            <div class="gallery-hotspot-nav">
+                                <span class="gallery-hotspot-count" id="gallery-hotspot-count">1 of 1</span>
+                                <div class="gallery-hotspot-steps">
+                                    <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-prev" aria-label="Previous highlight">
+                                        <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" class="gallery-hotspot-step" id="gallery-hotspot-next" aria-label="Next highlight">
+                                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" class="gallery-hotspot-card-close" id="gallery-hotspot-card-close" aria-label="Close highlight details">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="gallery-hotspot-zoom-lightbox" id="gallery-hotspot-zoom-lightbox" hidden>
                         <button type="button" class="gallery-hotspot-zoom-lightbox-close" id="gallery-hotspot-zoom-lightbox-close" aria-label="Close enlarged highlight">
@@ -154,14 +177,14 @@ bi-check-circle
                         </button>
                         <img id="gallery-hotspot-zoom-lightbox-image" alt="" draggable="false">
                     </div>
-                    {% if gallery_count > 1 %}
+                    {% if gallery_total > 1 %}
                     <button type="button" class="gallery-nav gallery-nav-prev" id="gallery-prev" aria-label="Previous photo">
                         <i class="bi bi-chevron-left" aria-hidden="true"></i>
                     </button>
                     <button type="button" class="gallery-nav gallery-nav-next" id="gallery-next" aria-label="Next photo">
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                     </button>
-                    <div class="gallery-counter" id="gallery-counter" aria-live="polite">1 / {{ gallery_count }}</div>
+                    <div class="gallery-counter" id="gallery-counter" aria-live="polite">1 / {{ gallery_total }}</div>
                     {% if spin_ready %}
                     <div class="gallery-spin-badge" id="gallery-spin-badge" hidden>
                         <i class="bi bi-arrow-repeat" aria-hidden="true"></i> 360°
@@ -190,7 +213,7 @@ bi-check-circle
                     {% endif %}
                 </div>
                 {% if gallery_count >= 1 %}
-                <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable{% if gallery_count == 1 %} d-none{% endif %}" id="gallery-thumbs" role="list" aria-label="Photo thumbnails">
+                <div class="thumbnail-list d-flex gap-2 flex-wrap is-scrollable{% if gallery_total == 1 %} d-none{% endif %}" id="gallery-thumbs" role="list" aria-label="Photo thumbnails">
                     {% for image in gallery_images %}
                     <button type="button"
                             class="thumbnail-btn{% if (primary and image.id == primary.id) or (not primary and loop.first) %} active{% endif %}"
@@ -215,6 +238,27 @@ bi-check-circle
                         {% endif %}
                     </button>
                     {% endfor %}
+                    {% if model_review %}
+                    <button type="button"
+                            class="thumbnail-btn thumbnail-btn-review"
+                            data-kind="review"
+                            data-full="{{ model_review.thumbnail_url }}"
+                            data-embed="{{ model_review.embed_url }}"
+                            data-review-title="{{ model_review.title }}"
+                            data-review-source="{{ model_review.source }}"
+                            data-index="{{ gallery_count }}"
+                            aria-label="Play {{ model_review.year_label }} {{ vehicle.make }} {{ vehicle.model }} model review by {{ model_review.source }}"
+                            aria-current="false">
+                        <img src="{{ model_review.thumbnail_url }}"
+                             alt="{{ model_review.title }} by {{ model_review.source }}"
+                             width="100"
+                             height="75"
+                             loading="lazy"
+                             decoding="async"
+                             draggable="false">
+                        <span class="thumbnail-review-badge" aria-hidden="true"><i class="bi bi-play-fill"></i> Review</span>
+                    </button>
+                    {% endif %}
                 </div>
                 {% if spin_ready %}
                 <p class="gallery-spin-help small text-muted mt-2 mb-0" id="gallery-spin-help" hidden>
@@ -236,7 +280,7 @@ bi-check-circle
                                 aria-label="Close enlarged photo">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
                         </button>
-                        {% if gallery_count > 1 %}
+                        {% if gallery_total > 1 %}
                         <button type="button"
                                 class="gallery-lightbox-nav gallery-lightbox-prev"
                                 id="gallery-lightbox-prev"
@@ -249,7 +293,7 @@ bi-check-circle
                                 aria-label="Next photo">
                             <i class="bi bi-chevron-right" aria-hidden="true"></i>
                         </button>
-                        <div class="gallery-lightbox-counter" id="gallery-lightbox-counter" aria-live="polite">1 / {{ gallery_count }}</div>
+                        <div class="gallery-lightbox-counter" id="gallery-lightbox-counter" aria-live="polite">1 / {{ gallery_total }}</div>
                         {% endif %}
                         <div class="gallery-lightbox-stage">
                             <img id="gallery-lightbox-image"

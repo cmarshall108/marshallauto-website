@@ -372,6 +372,14 @@ class Vehicle(db.Model):
         from app.utils import parse_video_url
         return parse_video_url(self.video_url) if self.video_url else None
 
+    def model_review_video(self):
+        """Verified public review of this year/make/model, or None.
+
+        Distinct from video_url, which is this vehicle's own walkaround.
+        """
+        from app.utils import model_review_video
+        return model_review_video(self.year, self.make, self.model)
+
 
 class MarketplaceSync(db.Model):
     __tablename__ = 'marketplace_syncs'

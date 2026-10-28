@@ -711,6 +711,144 @@ _YOUTUBE_RE = re.compile(
 _VIMEO_RE = re.compile(r'vimeo\.com/(?:video/)?(\d+)')
 
 
+# Public model reviews, not reviews of a specific lot car. Only verified,
+# still-public videos are listed. Unmatched year/make/model pairs render nothing.
+MODEL_REVIEW_VIDEOS = {
+    (2016, 'kia', 'forte'): {
+        'video_id': 'IoYebZDP07U',
+        'title': '2016 Kia Forte - Review and Road Test',
+        'source': 'Kelley Blue Book',
+        'year_label': '2016',
+    },
+    (2015, 'genesis', 'g80'): {
+        'video_id': 'fFU-tnQXVIA',
+        'title': '2015 Hyundai Genesis V8 and V6 Review',
+        'source': 'savagegeese',
+        'year_label': '2015',
+    },
+    (2015, 'hyundai', 'genesis'): {
+        'video_id': 'fFU-tnQXVIA',
+        'title': '2015 Hyundai Genesis V8 and V6 Review',
+        'source': 'savagegeese',
+        'year_label': '2015',
+    },
+    (2010, 'bmw', '328i'): {
+        'video_id': 'NVt3t3Ov8mQ',
+        'title': 'BMW 328i Review',
+        'source': 'Everyday Driver',
+        'year_label': '2010',
+    },
+    (2010, 'lincoln', 'town car'): {
+        'video_id': 'Jq-TWBhhWYE',
+        'title': 'Lincoln Town Car Signature Series Review',
+        'source': 'TFLclassics',
+        'year_label': '2010',
+    },
+    (2009, 'audi', 'a5'): {
+        'video_id': 'A498w5NE4IQ',
+        'title': '2009 Audi A5 & S5 Review',
+        'source': 'Kelley Blue Book',
+        'year_label': '2009',
+    },
+    (2007, 'lamborghini', 'gallardo'): {
+        'video_id': 'QAI8XE2BKw4',
+        'title': 'Lamborghini Gallardo Review',
+        'source': 'Doug DeMuro',
+        'year_label': '2007',
+    },
+    (2005, 'nissan', '350z'): {
+        'video_id': '7FNug8F481w',
+        'title': 'Nissan 350Z Review',
+        'source': 'Doug DeMuro',
+        'year_label': '2005',
+    },
+    (2018, 'buick', 'regal'): {
+        'video_id': 'wb1sY98tjmY',
+        'title': '2018 Buick Regal Sportback Review',
+        'source': 'Redline Reviews',
+        'year_label': '2018',
+    },
+    (2018, 'buick', 'regal sportback'): {
+        'video_id': 'wb1sY98tjmY',
+        'title': '2018 Buick Regal Sportback Review',
+        'source': 'Redline Reviews',
+        'year_label': '2018',
+    },
+    (2015, 'ford', 'taurus'): {
+        'video_id': '1OqQ7St4eJs',
+        'title': '2015 Ford Taurus - Review and Road Test',
+        'source': 'Kelley Blue Book',
+        'year_label': '2015',
+    },
+    (2012, 'dodge', 'challenger'): {
+        'video_id': 'nPB54IhpYNE',
+        'title': '2012 Dodge Challenger Review',
+        'source': 'Matt Maran Motoring',
+        'year_label': '2012',
+    },
+    (2012, 'hyundai', 'sonata'): {
+        'video_id': '-Ufk9njd0Aw',
+        'title': '2012 Hyundai Sonata Review',
+        'source': 'Edmunds',
+        'year_label': '2012',
+    },
+    (2011, 'ford', 'taurus'): {
+        'video_id': 't-VeYcEjgkY',
+        'title': '2010-2012 Ford Taurus Road Test',
+        'source': 'Consumer Reports',
+        'year_label': '2011',
+    },
+    (2011, 'mazda', 'mazda3'): {
+        'video_id': '55K4_LogzHo',
+        'title': '2010 Mazda3 Road Test',
+        'source': 'MotorWeek',
+        'year_label': '2010-2011',
+    },
+    (2011, 'mazda', '3'): {
+        'video_id': '55K4_LogzHo',
+        'title': '2010 Mazda3 Road Test',
+        'source': 'MotorWeek',
+        'year_label': '2010-2011',
+    },
+    (2006, 'scion', 'xa'): {
+        'video_id': 'Tl0pir91Dk8',
+        'title': '2006 Scion xA Review',
+        'source': 'Shooting Cars',
+        'year_label': '2006',
+    },
+    (2006, 'toyota', 'scion xa'): {
+        'video_id': 'Tl0pir91Dk8',
+        'title': '2006 Scion xA Review',
+        'source': 'Shooting Cars',
+        'year_label': '2006',
+    },
+}
+
+
+def model_review_video(year, make, model):
+    """Return a verified public model-review embed, or None.
+
+    This is a review of the year/make/model, never of the specific vehicle.
+    """
+    if year is None or not make or not model:
+        return None
+    key = (int(year), str(make).strip().lower(), str(model).strip().lower())
+    entry = MODEL_REVIEW_VIDEOS.get(key)
+    if not entry:
+        return None
+    video_id = entry['video_id']
+    return {
+        'kind': 'youtube',
+        'video_id': video_id,
+        'embed_url': f'https://www.youtube-nocookie.com/embed/{video_id}',
+        'watch_url': f'https://www.youtube.com/watch?v={video_id}',
+        'thumbnail_url': f'https://i.ytimg.com/vi/{video_id}/hqdefault.jpg',
+        'title': entry['title'],
+        'source': entry['source'],
+        'year_label': entry['year_label'],
+    }
+
+
 def parse_video_url(raw_url):
     """Classify a vehicle walkaround video URL for safe embedding.
 

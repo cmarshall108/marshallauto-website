@@ -638,6 +638,8 @@
         const lightboxCounter = document.getElementById('gallery-lightbox-counter');
         const lightboxStage = lightbox && lightbox.querySelector('.gallery-lightbox-stage');
         const lightboxHotspotsEl = document.getElementById('gallery-lightbox-hotspots');
+        const reviewPanel = document.getElementById('gallery-review');
+        const reviewFrame = document.getElementById('gallery-review-frame');
 
         if (mainImage && thumbButtons.length >= 1 && gallery) {
             const parseHighlights = (raw) => {
@@ -648,16 +650,19 @@
 
             const slides = thumbButtons.map((el, index) => {
                 const img = el.tagName === 'IMG' ? el : el.querySelector('img');
+                const kind = el.dataset.kind === 'review' ? 'review' : 'photo';
                 return {
                     el,
                     index,
+                    kind,
                     src: el.dataset.full || (img && (img.dataset.full || img.currentSrc || img.src)) || '',
                     srcset: el.dataset.srcset || '',
+                    embed: el.dataset.embed || '',
                     alt: (img && img.alt) || mainImage.alt || '',
-                    highlights: parseHighlights(el.dataset.highlights),
+                    highlights: kind === 'review' ? [] : parseHighlights(el.dataset.highlights),
                     imageId: el.dataset.imageId || null,
                 };
-            }).filter((s) => s.src);
+            }).filter((s) => s.kind === 'review' ? s.embed : s.src);
 
             if (slides.length >= 1) {
                 let currentIndex = Math.max(0, slides.findIndex((s) => s.el.classList.contains('active')));
@@ -666,7 +671,8 @@
                 const multi = slides.length > 1;
                 let lightboxOpen = false;
                 let lightboxLastFocus = null;
-                const spinReady = multi && gallery.dataset.spinReady === 'true' && slides.length >= 4;
+                const photoSlides = slides.filter((s) => s.kind !== 'review');
+                const spinReady = multi && gallery.dataset.spinReady === 'true' && photoSlides.length >= 4;
                 const highlightsEnabled = gallery.dataset.highlightsEnabled !== 'false';
                 let mode = 'photos'; // 'photos' | 'spin'
                 let spinOriginIndex = 0;
@@ -704,6 +710,28 @@
 
                 const hotspotRoots = () => [hotspotsEl, lightboxHotspotsEl].filter(Boolean);
 
+                const placeZoomImage = (image, x, y, scale) => {
+                    if (!image) return;
+                    const frame = image.closest('.gallery-hotspot-zoom, .gallery-hotspot-zoom-lightbox') || image.parentElement;
+                    const frameWidth = frame ? frame.clientWidth : 0;
+                    const frameHeight = frame ? frame.clientHeight : 0;
+                    const naturalWidth = image.naturalWidth || (mainImage && mainImage.naturalWidth) || 0;
+                    const naturalHeight = image.naturalHeight || (mainImage && mainImage.naturalHeight) || 0;
+                    if (!frameWidth || !frameHeight || !naturalWidth || !naturalHeight) {
+                        if (!image.complete) {
+                            image.addEventListener('load', () => placeZoomImage(image, x, y, scale), { once: true });
+                        }
+                        return;
+                    }
+                    const coverScale = Math.max(frameWidth / naturalWidth, frameHeight / naturalHeight);
+                    const width = naturalWidth * coverScale * scale;
+                    const height = naturalHeight * coverScale * scale;
+                    image.style.width = `${width}px`;
+                    image.style.height = `${height}px`;
+                    image.style.left = `${(frameWidth / 2) - (x / 100) * width}px`;
+                    image.style.top = `${(frameHeight / 2) - (y / 100) * height}px`;
+                };
+
                 const closeZoomLightbox = () => {
                     if (!hotspotZoomLightbox || hotspotZoomLightbox.hidden) return;
                     hotspotZoomLightbox.hidden = true;
@@ -712,22 +740,18 @@
 
                 const openZoomLightbox = () => {
                     if (!hotspotZoomLightbox || !hotspotZoomImage || !hotspotZoomImage.getAttribute('src')) return;
-                    if (hotspotZoomLightboxImage) {
-                        hotspotZoomLightboxImage.src = hotspotZoomImage.currentSrc || hotspotZoomImage.src;
-                        hotspotZoomLightboxImage.alt = hotspotCardTitle ? hotspotCardTitle.textContent : '';
-                        const scale = 2.4;
-                        const x = Math.max(0, Math.min(100, Number(hotspotZoomLightbox.dataset.x) || 50));
-                        const y = Math.max(0, Math.min(100, Number(hotspotZoomLightbox.dataset.y) || 50));
-                        hotspotZoomLightboxImage.style.width = `${scale * 100}%`;
-                        hotspotZoomLightboxImage.style.height = `${scale * 100}%`;
-                        hotspotZoomLightboxImage.style.left = `${50 - (x * scale)}%`;
-                        hotspotZoomLightboxImage.style.top = `${50 - (y * scale)}%`;
-                    }
                     if (hotspotZoomLightbox.parentElement !== document.body) {
                         document.body.appendChild(hotspotZoomLightbox);
                     }
                     hotspotZoomLightbox.hidden = false;
                     document.body.classList.add('hotspot-zoom-open');
+                    if (hotspotZoomLightboxImage) {
+                        hotspotZoomLightboxImage.src = hotspotZoomImage.currentSrc || hotspotZoomImage.src;
+                        hotspotZoomLightboxImage.alt = hotspotCardTitle ? hotspotCardTitle.textContent : '';
+                        const x = Math.max(0, Math.min(100, Number(hotspotZoomLightbox.dataset.x) || 50));
+                        const y = Math.max(0, Math.min(100, Number(hotspotZoomLightbox.dataset.y) || 50));
+                        placeZoomImage(hotspotZoomLightboxImage, x, y, 2.4);
+                    }
                 };
 
                 const closeHotspotCard = () => {
@@ -736,8 +760,8 @@
                     closeZoomLightbox();
                     if (hotspotCard) {
                         hotspotCard.hidden = true;
-                        if (gallery && hotspotCard.parentElement === document.body) {
-                            gallery.appendChild(hotspotCard);
+                        if (galleryStage && hotspotCard.parentElement !== galleryStage) {
+                            galleryStage.appendChild(hotspotCard);
                         }
                     }
                     hotspotRoots().forEach((root) => {
@@ -757,15 +781,12 @@
                     }
                     const x = Math.max(0, Math.min(100, Number(item.x_pct) || 50));
                     const y = Math.max(0, Math.min(100, Number(item.y_pct) || 50));
-                    const scale = 2.6;
-                    hotspotZoomImage.style.width = `${scale * 100}%`;
-                    hotspotZoomImage.style.height = `${scale * 100}%`;
-                    hotspotZoomImage.style.left = `${50 - (x * scale)}%`;
-                    hotspotZoomImage.style.top = `${50 - (y * scale)}%`;
+                    const visible = mapImagePctToStagePct(x, y);
+                    placeZoomImage(hotspotZoomImage, visible.left, visible.top, 3.2);
                     hotspotZoomImage.alt = '';
                     if (hotspotZoomLightbox) {
-                        hotspotZoomLightbox.dataset.x = String(x);
-                        hotspotZoomLightbox.dataset.y = String(y);
+                        hotspotZoomLightbox.dataset.x = String(visible.left);
+                        hotspotZoomLightbox.dataset.y = String(visible.top);
                     }
                 };
 
@@ -803,6 +824,38 @@
                     });
                 };
 
+                const stopReview = () => {
+                    if (!reviewFrame) return;
+                    if (reviewFrame.getAttribute('src')) reviewFrame.removeAttribute('src');
+                };
+
+                const showReview = (slide) => {
+                    if (!reviewPanel || !reviewFrame || !slide || !slide.embed) return;
+                    closeHotspotCard();
+                    closeLightbox();
+                    if (mode === 'spin') setMode('photos', 'review_exit_spin');
+                    const src = slide.embed;
+                    if (reviewFrame.getAttribute('src') !== src) reviewFrame.src = src;
+                    reviewPanel.hidden = false;
+                    gallery.classList.add('is-review-slide');
+                    if (mainImage) mainImage.hidden = true;
+                    if (hotspotsEl) hotspotsEl.hidden = true;
+                    if (maximizeBtn) maximizeBtn.hidden = true;
+                    if (highlightsBadge) highlightsBadge.hidden = true;
+                };
+
+                const hideReview = () => {
+                    if (reviewPanel) reviewPanel.hidden = true;
+                    gallery.classList.remove('is-review-slide');
+                    stopReview();
+                    if (mainImage) mainImage.hidden = false;
+                    if (hotspotsEl) hotspotsEl.hidden = false;
+                    if (maximizeBtn) maximizeBtn.hidden = false;
+                    if (highlightsBadge && highlightsBadge.dataset.available !== 'false') {
+                        highlightsBadge.hidden = false;
+                    }
+                };
+
                 const syncGalleryChrome = () => {
                     if (!gallery || !galleryStage) return;
                     const height = Math.round(galleryStage.getBoundingClientRect().height);
@@ -810,12 +863,23 @@
                 };
 
                 const placeHotspotCard = () => {
-                    if (!hotspotCard) return;
+                    if (!hotspotCard || !galleryStage) return;
                     hotspotCard.style.left = '';
                     hotspotCard.style.right = '';
                     hotspotCard.style.top = '';
                     hotspotCard.style.bottom = '';
                     hotspotCard.style.width = '';
+                    const stageHeight = galleryStage.getBoundingClientRect().height;
+                    if (stageHeight > 0) {
+                        const narrow = window.matchMedia('(max-width: 575.98px)').matches;
+                        const inset = narrow ? 12 : 24;
+                        const ratio = narrow ? 0.72 : 0.62;
+                        const cap = Math.min(
+                            Math.round(stageHeight * ratio),
+                            Math.round(stageHeight - inset),
+                        );
+                        hotspotCard.style.maxHeight = `${Math.max(0, cap)}px`;
+                    }
                 };
 
                 const openHotspotCard = (item, index) => {
@@ -838,19 +902,13 @@
                     if (hotspotCount) hotspotCount.textContent = `${resolved + 1} of ${total}`;
                     if (hotspotPrev) hotspotPrev.disabled = items.length < 2;
                     if (hotspotNext) hotspotNext.disabled = items.length < 2;
-                    positionZoom(item);
                     renderHotspotFacts(item, resolved, total);
                     hotspotCard.hidden = false;
-                    if (window.matchMedia('(max-width: 575.98px)').matches) {
-                        if (hotspotCard.parentElement !== document.body) document.body.appendChild(hotspotCard);
-                    } else if (gallery && hotspotCard.parentElement !== gallery) {
-                        gallery.appendChild(hotspotCard);
+                    if (galleryStage && hotspotCard.parentElement !== galleryStage) {
+                        galleryStage.appendChild(hotspotCard);
                     }
-                    requestAnimationFrame(() => {
-                        const top = hotspotCard.getBoundingClientRect().top + window.scrollY - 88;
-                        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-                    });
                     placeHotspotCard();
+                    positionZoom(item);
                     hotspotCard.dataset.severity = item.severity || 'info';
                     hotspotCard.dataset.category = item.category || 'detail';
                     markActiveHotspot(item.id);
@@ -962,6 +1020,7 @@
 
                 const renderHotspots = (index) => {
                     if (!hotspotsEl && !lightboxHotspotsEl) return;
+                    const keepOpen = openHighlightIndex;
                     closeHotspotCard();
                     if (hotspotsEl) hotspotsEl.replaceChildren();
                     if (lightboxHotspotsEl) lightboxHotspotsEl.replaceChildren();
@@ -997,6 +1056,7 @@
                             if (mapped.visible) appendHotspot(lightboxHotspotsEl, item, i, mapped);
                         }
                     });
+                    if (keepOpen >= 0 && items[keepOpen]) openHotspotCard(items[keepOpen], keepOpen);
                 };
 
                 const relayoutHotspots = () => {
@@ -1026,13 +1086,19 @@
                     if (lightboxCounter) {
                         lightboxCounter.textContent = `${index + 1} / ${slides.length}`;
                     }
+                    const slide = slides[index];
                     if (mode === 'spin') {
                         gallery.setAttribute(
                             'aria-label',
-                            `360 spin frame ${index + 1} of ${slides.length}. Drag left or right to rotate.`
+                            `360 spin frame ${index + 1} of ${photoSlides.length}. Drag left or right to rotate.`
+                        );
+                    } else if (slide && slide.kind === 'review') {
+                        gallery.setAttribute(
+                            'aria-label',
+                            `Model review video, item ${index + 1} of ${slides.length}. This reviews the model, not this specific vehicle.`
                         );
                     } else {
-                        const n = ((slides[index] && slides[index].highlights) || []).length;
+                        const n = ((slide && slide.highlights) || []).length;
                         const highlightHint = n > 0 ? ` ${n} highlight bubble${n === 1 ? '' : 's'} available.` : '';
                         gallery.setAttribute(
                             'aria-label',
@@ -1077,6 +1143,7 @@
 
                 const openLightbox = () => {
                     if (!lightbox || !lightboxImage) return;
+                    if (slides[currentIndex] && slides[currentIndex].kind === 'review') return;
                     if (mode === 'spin') {
                         setMode('photos', 'maximize_exit_spin');
                     }
@@ -1114,6 +1181,31 @@
                     }
 
                     currentIndex = normalized;
+                    if (slide.kind === 'review') {
+                        showReview(slide);
+                        slides.forEach((s) => {
+                            s.el.classList.toggle('active', s.index === normalized);
+                            if (s.el.hasAttribute('aria-current')) {
+                                s.el.setAttribute('aria-current', s.index === normalized ? 'true' : 'false');
+                            }
+                        });
+                        if (!opts.skipScroll && multi && !lightboxOpen) {
+                            try {
+                                slide.el.scrollIntoView({
+                                    behavior: reduceMotion ? 'auto' : 'smooth',
+                                    inline: 'center',
+                                    block: 'nearest',
+                                });
+                            } catch (_) { /* ignore */ }
+                        }
+                        updateCounter(normalized);
+                        if (!opts.quiet) {
+                            hideSwipeHint();
+                            Analytics.trackGallery(action || 'review_open', normalized, total);
+                        }
+                        return;
+                    }
+                    hideReview();
                     const useFade = mode !== 'spin' || !!opts.forceFade;
                     if (useFade) {
                         gallery.classList.add('is-changing');
@@ -1173,7 +1265,7 @@
                     if (multi) {
                         [normalized - 1, normalized + 1].forEach((i) => {
                             const n = slides[((i % total) + total) % total];
-                            if (!n) return;
+                            if (!n || n.kind === 'review' || !n.src) return;
                             const pre = new Image();
                             if (n.srcset) {
                                 pre.sizes = mainImage.sizes;
@@ -1525,8 +1617,15 @@
 
                 const pxPerFrame = () => {
                     const width = gallery.offsetWidth || 320;
-                    // ~full drag width ≈ one full rotation through all frames
-                    return Math.max(18, Math.min(56, width / Math.max(slides.length, 8)));
+                    // ~full drag width ≈ one full rotation through photo frames only
+                    return Math.max(18, Math.min(56, width / Math.max(photoSlides.length, 8)));
+                };
+
+                const photoIndexFor = (index) => {
+                    const slide = slides[((index % slides.length) + slides.length) % slides.length];
+                    if (!slide || slide.kind === 'review') return spinOriginIndex;
+                    const photoIndex = photoSlides.findIndex((s) => s.index === slide.index);
+                    return photoIndex >= 0 ? photoIndex : 0;
                 };
 
                 const resetDragStyles = () => {
@@ -1584,9 +1683,11 @@
 
                     if (mode === 'spin') {
                         spinAccumPx = dx;
-                        // Drag right → previous frames (car rotates with the drag)
+                        // Drag right → previous photo frames. Review slides are not spin frames.
                         const frames = Math.round(-spinAccumPx / pxPerFrame());
-                        const target = spinOriginIndex + frames;
+                        const photoTarget = (photoIndexFor(spinOriginIndex) + frames) % photoSlides.length;
+                        const wrapped = ((photoTarget % photoSlides.length) + photoSlides.length) % photoSlides.length;
+                        const target = photoSlides[wrapped] ? photoSlides[wrapped].index : spinOriginIndex;
                         if (target !== currentIndex) {
                             const now = Date.now();
                             const quiet = now - lastSpinTrackAt < 700;

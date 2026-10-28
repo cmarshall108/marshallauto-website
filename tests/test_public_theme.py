@@ -354,11 +354,56 @@ class PublicThemeTests(unittest.TestCase):
         css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()
         js = (Path(self.app.static_folder) / 'js' / 'main.js').read_text()
         self.assertIn('.gallery-hotspot-zoom-frame', css)
-        self.assertIn('env(safe-area-inset-bottom, 0)', css)
+        self.assertIn('backdrop-filter: blur(10px);', css)
+        self.assertIn('rgba(247, 248, 251, 0.84)', css)
+        card = detail.select_one('#gallery-hotspot-card')
+        stage = detail.select_one('#gallery-stage')
+        self.assertIsNotNone(card)
+        self.assertIsNotNone(stage)
+        self.assertEqual(card.parent.get('id'), 'gallery-stage')
         self.assertIn('positionZoom', js)
         self.assertIn('openZoomLightbox', js)
         self.assertIn('stepHotspot', js)
         self.assertIn('gallery-lightbox-hotspots', js)
+
+    def test_model_review_video_is_last_gallery_item_only_when_verified(self):
+        matched = Vehicle.query.filter_by(slug='theme-car').one()
+        matched.year = 2016
+        matched.make = 'Kia'
+        matched.model = 'Forte'
+        db.session.add(VehicleImage(
+            vehicle_id=matched.id,
+            filename='theme-car.jpg',
+            is_primary=True,
+            order_index=0,
+        ))
+        unmatched = Vehicle(
+            slug='unreviewed-car', year=1999, make='Geo', model='Metro',
+            price=1900, mileage=180000, status='available',
+        )
+        db.session.add(unmatched)
+        db.session.flush()
+        db.session.add(VehicleImage(
+            vehicle_id=unmatched.id,
+            filename='unreviewed-car.jpg',
+            is_primary=True,
+            order_index=0,
+        ))
+        db.session.commit()
+
+        detail = self.page('/inventory/theme-car')
+        thumbs = detail.select('#gallery-thumbs .thumbnail-btn')
+        self.assertGreaterEqual(len(thumbs), 2)
+        review = thumbs[-1]
+        self.assertEqual(review.get('data-kind'), 'review')
+        self.assertNotEqual(thumbs[0].get('data-kind'), 'review')
+        self.assertIn('youtube-nocookie.com/embed/IoYebZDP07U', review['data-embed'])
+        self.assertIn('Not a review of this specific vehicle.', detail.get_text(' ', strip=True))
+        self.assertIsNotNone(detail.select_one('#gallery-review[hidden]'))
+
+        missing = self.page('/inventory/unreviewed-car')
+        self.assertIsNone(missing.select_one('[data-kind="review"]'))
+        self.assertIsNone(missing.select_one('#gallery-review'))
 
     def test_fullscreen_gallery_blocks_page_swipe_while_preserving_pinch_zoom(self):
         css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()

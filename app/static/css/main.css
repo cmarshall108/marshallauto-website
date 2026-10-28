@@ -326,10 +326,6 @@ a:hover {
         bottom: calc(5.25rem + env(safe-area-inset-bottom));
     }
 
-    body.has-mobile-cta .gallery-hotspot-card {
-        bottom: calc(5.6rem + env(safe-area-inset-bottom));
-    }
-
     body.cookie-consent-visible .chat-widget,
     body.has-compare-bar .chat-widget {
         display: none;
@@ -619,6 +615,7 @@ a:hover {
 }
 
 .gallery-stage {
+    position: relative;
     width: 100%;
     touch-action: pan-y;
     overflow: hidden;
@@ -720,7 +717,7 @@ a:hover {
 
 .gallery-nav {
     position: absolute;
-    top: calc(var(--gallery-photo-height, 500px) / 2);
+    top: 50%;
     transform: translateY(-50%);
     z-index: 3;
     width: 44px;
@@ -1063,6 +1060,104 @@ body.gallery-lightbox-open {
     border-color: var(--primary);
 }
 
+.thumbnail-btn-review {
+    position: relative;
+}
+
+.thumbnail-review-badge {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    padding: 0.12rem 0.28rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.gallery-review {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding: 0.75rem;
+    background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.28), rgba(15, 23, 42, 0.78)),
+        #0f172a;
+}
+
+.gallery-review[hidden] {
+    display: none !important;
+}
+
+.gallery-review-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: min(100%, 920px);
+    margin: 0 auto;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.gallery-review-frame iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #000;
+}
+
+.gallery-review-note {
+    flex: 0 0 auto;
+    margin: 0 auto;
+    max-width: 920px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    text-align: center;
+}
+
+.vehicle-gallery.is-review-slide .gallery-hotspots,
+.vehicle-gallery.is-review-slide .gallery-highlights-badge,
+.vehicle-gallery.is-review-slide .gallery-maximize-btn,
+.vehicle-gallery.is-review-slide .gallery-spin-badge {
+    display: none;
+}
+
+@media (max-width: 575.98px) {
+    .gallery-review {
+        padding: 0.55rem;
+        gap: 0.35rem;
+    }
+
+    .gallery-review-frame {
+        border-radius: 10px;
+    }
+
+    .gallery-review-note {
+        font-size: 0.7rem;
+    }
+
+    .thumbnail-review-badge {
+        font-size: 0.58rem;
+    }
+}
+
 /* Carvana-style photo highlight hotspots */
 .gallery-stage {
     position: relative;
@@ -1158,20 +1253,28 @@ body.gallery-lightbox-open {
 }
 
 .gallery-hotspot-card {
-    position: relative;
-    z-index: 6;
+    position: absolute;
+    left: 0.75rem;
+    right: auto;
+    bottom: 0.75rem;
+    top: auto;
+    z-index: 5;
     display: flex;
     flex-direction: column;
-    width: 100%;
-    margin: 0.85rem 0 0;
-    padding: 1.15rem 1.2rem 0.85rem;
-    border: 1px solid #e6ebf2;
-    border-radius: 22px;
-    background: #f7f8fb;
+    width: min(360px, calc(100% - 1.5rem));
+    max-height: min(62%, 300px);
+    margin: 0;
+    padding: 0.85rem 0.95rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 18px;
+    background: rgba(247, 248, 251, 0.84);
     color: #1b2430;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     pointer-events: auto;
-    overflow: hidden;
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 .gallery-hotspot-card[hidden] {
@@ -1195,9 +1298,22 @@ body.gallery-lightbox-open {
 .gallery-hotspot-card-kicker[data-severity="caution"] { color: #b45309; }
 .gallery-hotspot-card-kicker[data-severity="issue"] { color: #be123c; }
 
+.gallery-hotspot-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 1.6rem 0.55rem 0;
+    min-width: 0;
+}
+
+.gallery-hotspot-card-heading {
+    min-width: 0;
+    flex: 1;
+}
+
 .gallery-hotspot-card-title {
-    margin: 0 2.5rem 0.35rem 0;
-    font-size: 1.55rem;
+    margin: 0;
+    font-size: 1.12rem;
     font-weight: 750;
     line-height: 1.15;
     letter-spacing: -0.02em;
@@ -1205,8 +1321,8 @@ body.gallery-lightbox-open {
 }
 
 .gallery-hotspot-card-text {
-    margin: 0 0 0.85rem;
-    font-size: 1rem;
+    margin: 0 0 0.6rem;
+    font-size: 0.92rem;
     line-height: 1.45;
     color: #667085;
 }
@@ -1214,31 +1330,36 @@ body.gallery-lightbox-open {
 .gallery-hotspot-zoom {
     position: relative;
     display: block;
-    width: 100%;
-    margin: 0 0 0.85rem;
+    flex: 0 0 auto;
+    width: 84px;
+    height: 84px;
+    margin: 0;
     padding: 0;
-    border: 0;
-    border-radius: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
     background: #fff;
     overflow: hidden;
     cursor: zoom-in;
     touch-action: manipulation;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
 }
 
 .gallery-hotspot-zoom-frame {
     position: relative;
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 10;
+    height: 100%;
     overflow: hidden;
-    border-radius: 16px;
+    border-radius: 50%;
     background: #e8edf3;
 }
 
 .gallery-hotspot-zoom-frame img,
 .gallery-hotspot-zoom-lightbox img {
     position: absolute;
+    display: block;
     max-width: none;
+    max-height: none;
     object-fit: fill;
     user-select: none;
     -webkit-user-drag: none;
@@ -1247,18 +1368,18 @@ body.gallery-lightbox-open {
 
 .gallery-hotspot-zoom-badge {
     position: absolute;
-    right: 0.7rem;
-    bottom: 0.7rem;
-    width: 42px;
-    height: 42px;
+    right: 2px;
+    bottom: 2px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.94);
     color: #172033;
-    font-size: 1.15rem;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+    font-size: 0.72rem;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
     pointer-events: none;
 }
 
@@ -1310,10 +1431,16 @@ body.gallery-lightbox-open {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    margin: 0.15rem -1.2rem -0.85rem;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid #e6ebf2;
-    background: #fff;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    flex: 0 0 auto;
+    margin: 0.15rem -0.95rem 0;
+    padding: 0.55rem 0.85rem;
+    border-top: 1px solid rgba(230, 235, 242, 0.8);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .gallery-hotspot-steps {
@@ -1354,13 +1481,13 @@ body.gallery-lightbox-open {
 
 .gallery-hotspot-card-close {
     position: absolute;
-    top: 0.7rem;
-    right: 0.7rem;
-    width: 40px;
-    height: 40px;
+    top: 0.55rem;
+    right: 0.55rem;
+    width: 36px;
+    height: 36px;
     border: 0;
     border-radius: 50%;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.88);
     color: #172033;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
     display: inline-flex;
@@ -1469,15 +1596,10 @@ body.hotspot-zoom-open {
 
 @media (min-width: 576px) {
     .gallery-hotspot-card {
-        position: relative;
-        top: auto;
-        right: auto;
-        left: auto;
-        width: 100%;
-        max-height: none;
-        margin: 0.85rem 0 0;
-        overflow: visible;
-        z-index: 6;
+        left: 0.85rem;
+        bottom: 0.85rem;
+        width: min(380px, calc(100% - 6.5rem));
+        max-height: min(58%, 300px);
     }
 }
 
@@ -1491,40 +1613,41 @@ body.hotspot-zoom-open {
         font-size: 0.85rem;
     }
     .gallery-hotspot-card {
-        position: fixed;
         left: 0.55rem;
         right: 0.55rem;
-        top: auto;
-        bottom: calc(5.6rem + env(safe-area-inset-bottom, 0));
-        z-index: 1045;
+        bottom: 0.55rem;
         width: auto;
-        max-height: min(62dvh, 520px);
-        margin: 0;
-        border-radius: 20px;
-        padding: 0.75rem 0.85rem 0;
-        overflow: auto;
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+        max-height: calc(100% - 1.1rem);
+        border-radius: 16px;
+        padding: 0.7rem 0.75rem 0;
+    }
+    .gallery-hotspot-card-head {
+        gap: 0.6rem;
+        margin-right: 1.4rem;
+    }
+    .gallery-hotspot-zoom {
+        width: 68px;
+        height: 68px;
+        margin-bottom: 0;
+    }
+    .gallery-hotspot-card-kicker {
+        font-size: 0.78rem;
     }
     .gallery-hotspot-card-title {
-        font-size: 1.25rem;
-        margin-bottom: 0.2rem;
+        font-size: 1.05rem;
+        margin: 0;
     }
     .gallery-hotspot-card-text {
         font-size: 0.92rem;
-        margin-bottom: 0.55rem;
-    }
-    .gallery-hotspot-zoom {
         margin-bottom: 0.55rem;
     }
     .gallery-hotspot-facts {
         margin-bottom: 0.45rem;
     }
     .gallery-hotspot-nav {
-        position: sticky;
-        bottom: 0;
-        margin-left: -0.85rem;
-        margin-right: -0.85rem;
-        padding: 0.55rem 0.85rem;
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        padding: 0.5rem 0.7rem;
     }
     body.has-mobile-cta:has(.gallery-hotspot-card:not([hidden])) .chat-widget {
         display: none;
@@ -1539,10 +1662,11 @@ body.hotspot-zoom-open {
 
 @media (max-width: 380px) {
     .gallery-hotspot-card-title {
-        font-size: 1.15rem;
+        font-size: 1rem;
     }
-    .gallery-hotspot-zoom-frame {
-        aspect-ratio: 16 / 9;
+    .gallery-hotspot-zoom {
+        width: 60px;
+        height: 60px;
     }
 }
 
@@ -2709,10 +2833,6 @@ body.hotspot-zoom-open {
 
     body.has-mobile-cta .chat-widget {
         bottom: calc(5.25rem + env(safe-area-inset-bottom));
-    }
-
-    body.has-mobile-cta .gallery-hotspot-card {
-        bottom: calc(5.6rem + env(safe-area-inset-bottom));
     }
 
     body.cookie-consent-visible .chat-widget,
