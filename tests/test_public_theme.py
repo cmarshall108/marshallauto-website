@@ -400,6 +400,7 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('youtube-nocookie.com/embed/IoYebZDP07U', review['data-embed'])
         self.assertIn('Not a review of this specific vehicle.', detail.get_text(' ', strip=True))
         self.assertIsNotNone(detail.select_one('#gallery-review[hidden]'))
+        self.assertIsNotNone(detail.select_one('#gallery-review-note[hidden]'))
 
         missing = self.page('/inventory/unreviewed-car')
         self.assertIsNone(missing.select_one('[data-kind="review"]'))

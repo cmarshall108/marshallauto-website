@@ -131,9 +131,6 @@ bi-check-circle
                                         allowfullscreen
                                         referrerpolicy="strict-origin-when-cross-origin"></iframe>
                             </div>
-                            <p class="gallery-review-note">
-                                Model review of the {{ model_review.year_label }} {{ vehicle.make }} {{ vehicle.model }} by {{ model_review.source }}. Not a review of this specific vehicle.
-                            </p>
                         </div>
                         {% endif %}
                         <div class="gallery-hotspot-card" id="gallery-hotspot-card" hidden role="dialog" aria-modal="false" aria-labelledby="gallery-hotspot-card-title">
@@ -260,6 +257,11 @@ bi-check-circle
                     </button>
                     {% endif %}
                 </div>
+                {% if model_review %}
+                <p class="gallery-review-note" id="gallery-review-note" hidden>
+                    Model review of the {{ model_review.year_label }} {{ vehicle.make }} {{ vehicle.model }} by {{ model_review.source }}. Not a review of this specific vehicle.
+                </p>
+                {% endif %}
                 {% if spin_ready %}
                 <p class="gallery-spin-help small text-muted mt-2 mb-0" id="gallery-spin-help" hidden>
                     <i class="bi bi-info-circle me-1" aria-hidden="true"></i>

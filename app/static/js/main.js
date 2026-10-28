@@ -640,6 +640,7 @@
         const lightboxHotspotsEl = document.getElementById('gallery-lightbox-hotspots');
         const reviewPanel = document.getElementById('gallery-review');
         const reviewFrame = document.getElementById('gallery-review-frame');
+        const reviewNote = document.getElementById('gallery-review-note');
 
         if (mainImage && thumbButtons.length >= 1 && gallery) {
             const parseHighlights = (raw) => {
@@ -837,8 +838,9 @@
                     const src = slide.embed;
                     if (reviewFrame.getAttribute('src') !== src) reviewFrame.src = src;
                     reviewPanel.hidden = false;
+                    if (reviewNote) reviewNote.hidden = false;
                     gallery.classList.add('is-review-slide');
-                    if (mainImage) mainImage.hidden = true;
+                    if (mainImage) mainImage.hidden = false;
                     if (hotspotsEl) hotspotsEl.hidden = true;
                     if (maximizeBtn) maximizeBtn.hidden = true;
                     if (highlightsBadge) highlightsBadge.hidden = true;
@@ -846,6 +848,7 @@
 
                 const hideReview = () => {
                     if (reviewPanel) reviewPanel.hidden = true;
+                    if (reviewNote) reviewNote.hidden = true;
                     gallery.classList.remove('is-review-slide');
                     stopReview();
                     if (mainImage) mainImage.hidden = false;
@@ -857,7 +860,7 @@
                 };
 
                 const syncGalleryChrome = () => {
-                    if (!gallery || !galleryStage) return;
+                    if (!gallery || !galleryStage || gallery.classList.contains('is-review-slide')) return;
                     const height = Math.round(galleryStage.getBoundingClientRect().height);
                     if (height > 0) gallery.style.setProperty('--gallery-photo-height', `${height}px`);
                 };
