@@ -366,7 +366,7 @@ def _ensure_default_settings():
     defaults = {
         'site_title': 'Marshall Auto, LLC',
         'site_tagline': 'Quality Used Cars You Can Trust',
-        'meta_description': 'Marshall Auto, LLC is a used car dealer in Sanford, NC offering quality pre-owned vehicles and dealership-arranged financing through Westlake Financial. Buyers may also try PenFed Credit Union for an auto loan; approval and terms vary.',
+        'meta_description': 'Marshall Auto, LLC is a used car dealer in Sanford, NC offering quality pre-owned vehicles and financing through Lendmark Financial Services. Visit us to apply for a vehicle you are interested in; approval and terms vary.',
         'meta_keywords': 'used cars Sanford NC, used car dealer Sanford, pre-owned vehicles, car dealership, auto sales, financing, CarFax, Marshall Auto LLC',
         'facebook_page_id': '',
         'facebook_page_access_token': '',
@@ -375,7 +375,7 @@ def _ensure_default_settings():
         'facebook_auto_post_on_edit': 'false',
         'about_text': 'Marshall Auto, LLC is a family-owned used car dealership in Sanford, NC committed to transparent pricing, quality vehicles, and exceptional customer service. Every vehicle on our lot is inspected, and CarFax history reports are available on qualifying vehicles.',
         'home_hero_title': 'Find Your Next Ride at Marshall Auto, LLC',
-        'home_hero_subtitle': 'Browse our hand-picked inventory of quality used cars, trucks, and SUVs in Sanford, NC. Ask us about dealership-arranged financing through Westlake Financial.',
+        'home_hero_subtitle': 'Browse our hand-picked inventory of quality used cars, trucks, and SUVs in Sanford, NC. Financing is available through Lendmark Financial Services.',
         'google_search_console': '',
         'google_analytics_id': '',
         'google_tag_id': '',

@@ -232,7 +232,7 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
     else:
         meta_description = (
             f"Browse {pagination.total}+ quality used cars, trucks, and SUVs for sale at {biz} "
-            f"in {city}. Ask about dealership-arranged financing through Westlake Financial or try PenFed Credit Union for an auto loan. Eligibility and terms vary."
+            f"in {city}. Financing is available through Lendmark Financial Services. Visit us to apply for a vehicle you are interested in. Eligibility and terms vary."
         )
 
     if landing_breadcrumb:
@@ -457,7 +457,7 @@ def index():
     ])
     home_faqs = [
         ("Do you offer financing for used cars?",
-         f"{current_app.config['BUSINESS_NAME']} works with Westlake Financial for dealership-arranged financing. You may also try PenFed Credit Union for an auto loan. Each lender separately determines eligibility, approval, and loan terms; approval is not guaranteed."),
+         f"Yes. {current_app.config['BUSINESS_NAME']} offers financing through Lendmark Financial Services. Visit us to complete an application for a vehicle you are interested in. The lender determines eligibility, approval, and loan terms; approval is not guaranteed."),
         ("Does every vehicle come with a CarFax report?",
          "CarFax history reports are available on qualifying vehicles. Contact us for details on a specific car."),
         ("Can I trade in my current vehicle?",
@@ -561,8 +561,8 @@ def _city_landing_faqs(city_name, state_name):
          f"{biz} in {home_city} serves {city_name} shoppers with inspected used cars, trucks, and SUVs. "
          f"Call {phone} to schedule a visit, test drive, or delivery options."),
         (f"Does {biz} offer financing for buyers in {city_name}?",
-         f"We work with Westlake Financial for dealership-arranged financing. Buyers may also try PenFed Credit Union for an auto loan. "
-         f"Eligibility, approval, and terms are determined by each lender and may depend on the applicant and vehicle. Call {phone} to ask about the dealership application process."),
+         f"Yes. We offer financing through Lendmark Financial Services. "
+         f"Visit our dealership to complete an application for a vehicle you are interested in. Eligibility, approval, and terms are determined by the lender and may depend on the applicant and vehicle. Call {phone} to arrange your visit."),
         (f"Can I get a rebuilt title car delivered near {city_name}?",
          f"Many customers from {city_name} purchase rebuilt title vehicles at a discount. Contact us to "
          f"confirm availability, inspection details, and pickup or delivery arrangements."),
@@ -587,13 +587,13 @@ def inventory_by_city(city, state):
     intro = (
         f"Looking for used cars for sale in {city_name}, {state_name}? {biz} in nearby {home_city} "
         f"helps {city_name} drivers find reliable pre-owned vehicles with transparent pricing, trade-ins, "
-        f"CarFax reports, and rebuilt title inventory. Ask about dealership-arranged financing through Westlake Financial or try PenFed Credit Union for an auto loan. Browse online or visit "
+        f"CarFax reports, and rebuilt title inventory. Financing is available through Lendmark Financial Services; visit us to apply for a vehicle you are interested in. Browse online or visit "
         f"our lot — we regularly work with customers throughout the {city_name} area."
     )
     meta_title = f"Used Cars for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
         f"Shop used cars, trucks, and SUVs for sale near {city_name}, {state_name}. "
-        f"Ask about dealership-arranged financing through Westlake Financial or try PenFed Credit Union for an auto loan. Eligibility, approval, and terms vary."
+        f"Financing is available through Lendmark Financial Services. Visit us to apply for a vehicle you are interested in. Eligibility, approval, and terms vary."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
@@ -695,12 +695,12 @@ def inventory_by_make_or_body_city(slug, city, state):
         intro = (
             f"Browse used {display_plural.lower()} for sale near {city_name}, {state_name}. "
             f"{biz} offers inspected pre-owned {display_plural.lower()}, trade-ins, CarFax reports, and rebuilt title deals when available. "
-            f"Ask about dealership-arranged financing through Westlake Financial or try PenFed Credit Union for an auto loan."
+            f"Financing is available through Lendmark Financial Services. Visit us to apply for a vehicle you are interested in."
         )
         meta_title = f"Used {display_plural} for Sale in {city_name}, {state_name} | {biz}"
         meta_description = (
             f"Shop used {display_plural.lower()} for sale near {city_name}, {state_name}. "
-            f"Ask {biz} about dealership-arranged financing through Westlake Financial, or try PenFed Credit Union for an auto loan. View photos and prices."
+            f"{biz} offers financing through Lendmark Financial Services. Visit us to apply for a vehicle you are interested in."
         )
         breadcrumb = structured_data_breadcrumb([
             ("Home", current_app.config['SITE_URL']),
@@ -736,7 +736,7 @@ def inventory_by_make_or_body_city(slug, city, state):
     intro = (
         f"Shop used {make_name} vehicles for sale near {city_name}, {state_name}. "
         f"{biz} stocks inspected {make_name} cars, trucks, and SUVs with competitive pricing, including rebuilt title {make_name} models at a discount when available. "
-        f"Ask about dealership-arranged financing through Westlake Financial or try PenFed Credit Union for an auto loan."
+        f"Financing is available through Lendmark Financial Services. Visit us to apply for a vehicle you are interested in."
     )
     meta_title = f"Used {make_name} for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
@@ -753,7 +753,7 @@ def inventory_by_make_or_body_city(slug, city, state):
          f"Yes. Browse our current {make_name} listings online or call {current_app.config['BUSINESS_PHONE']} "
          f"and we will help {city_name} shoppers find the right match."),
         (f"Can I finance a used {make_name} from {biz}?",
-         "Ask us about applying for dealership-arranged financing through Westlake Financial, or try PenFed Credit Union for an auto loan. The lender determines vehicle eligibility, approval, and loan terms; approval is not guaranteed."),
+         "Yes. Visit us to complete a Lendmark Financial Services application for a vehicle you are interested in. The lender determines vehicle eligibility, approval, and loan terms; approval is not guaranteed."),
     ]
     return _render_inventory(
         page=page, make=make_name, sort=sort,
@@ -786,7 +786,7 @@ def inventory_rebuilt_by_city(city, state):
     meta_title = f"Rebuilt Title Cars for Sale in {city_name}, {state_name} | {biz}"
     meta_description = (
         f"Huge discounts on rebuilt title cars for sale near {city_name}, {state_name}. "
-        f"Ask about trying PenFed Credit Union for an auto loan for a specific vehicle; eligibility, approval, and terms vary."
+        f"Financing is available through Lendmark Financial Services. Visit us to apply for a specific vehicle; eligibility, approval, and terms vary."
     )
     breadcrumb = structured_data_breadcrumb([
         ("Home", current_app.config['SITE_URL']),
@@ -829,7 +829,7 @@ def service_area():
         (f"Does {current_app.config['BUSINESS_NAME']} deliver vehicles?",
          f"Yes, we regularly serve customers throughout central North Carolina and can arrange delivery or meeting options for many areas. Call {current_app.config['BUSINESS_PHONE']} for details."),
         ("Do you offer financing for out-of-town buyers?",
-         "Marshall Auto works with Westlake Financial for dealership-arranged financing; buyers may also try PenFed Credit Union for an auto loan. Ask each lender about its application process and requirements. Eligibility, approval, and terms are determined by the lender."),
+         "Yes. Visit Marshall Auto to complete a Lendmark Financial Services application for a vehicle you are interested in. The lender determines eligibility, approval, and terms; approval is not guaranteed."),
         ("Can I buy a rebuilt title car in another city?",
          "Absolutely. Browse our rebuilt title inventory online and contact us to arrange a test drive or delivery near you.")
     ]
@@ -1061,7 +1061,7 @@ def vehicle_detail(slug):
     )
     meta_description = vehicle.seo_description or (
         f"Shop this {vehicle.title} with {vehicle.mileage:,} miles at {current_app.config['BUSINESS_NAME']}. "
-        f"{vehicle.condition.title()} condition, {title_phrase}. Ask about Westlake Financial or try PenFed Credit Union for an auto loan; vehicle eligibility varies."
+        f"{vehicle.condition.title()} condition, {title_phrase}. Financing is available through Lendmark Financial Services; visit us to apply for this vehicle."
     )
     if vehicle.status != 'available':
         meta_description = (
@@ -1452,7 +1452,7 @@ def about():
         meta_description=(
             f"Learn about {current_app.config['BUSINESS_NAME']}, a trusted used car dealership in "
             f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} offering quality "
-            f"pre-owned vehicles, dealership-arranged financing through Westlake Financial, and transparent pricing."
+            f"pre-owned vehicles, financing through Lendmark Financial Services, and transparent pricing."
         ),
         page_type='about',
     )
@@ -1466,15 +1466,15 @@ def financing():
     ])
     faqs = [
         (f"Can I get financing at {current_app.config['BUSINESS_NAME']} with bad credit?",
-         "Marshall Auto works with Westlake Financial for dealership-arranged financing. You may contact us to ask about its application process. The lender reviews each application under its underwriting criteria; approval is not guaranteed, and we cannot promise a particular APR, down payment, term, or payment."),
+         "Yes. Marshall Auto offers financing through Lendmark Financial Services. Visit us to complete an application for a vehicle you are interested in. The lender reviews each application under its underwriting criteria; approval is not guaranteed, and we cannot promise a particular APR, down payment, term, or payment."),
         ("What do I need to bring to apply for financing?",
-         "Requirements vary by lender and application. Ask us or the lender which information and documents are required. Review any credit-report authorization and application disclosures before submitting information, and do not send sensitive financial documents through our general contact form or email."),
+         "Visit our dealership with the information and documents requested for your Lendmark Financial Services application. Requirements can vary. Review any credit-report authorization and application disclosures before submitting information, and do not send sensitive financial documents through our general contact form or email."),
         ("Can I start a financing application before choosing a vehicle?",
-         "Contact us to ask about starting an application for dealership-arranged financing through Westlake Financial. Any preliminary indication is subject to lender review and is not a final approval or commitment to lend. You may also try PenFed Credit Union for an auto loan; that is a separate application decided by PenFed.")
+         "No. Financing applications are completed in person at Marshall Auto for a vehicle you are interested in. Lendmark Financial Services reviews the completed application; an application is not a final approval or commitment to lend.")
     ]
     steps = [
-        {"name": "Ask About Dealership Financing", "text": "Contact Marshall Auto to ask about the application process for dealership-arranged financing through Westlake Financial. Do not send sensitive financial information through the general contact form."},
-        {"name": "Submit an Application to the Lender", "text": "Review the lender's application and credit-report disclosures and use its authorized application process. Westlake Financial makes its own credit decision."},
+        {"name": "Choose a Vehicle", "text": "Select a vehicle you are interested in from our inventory, then visit Marshall Auto to begin a financing application. Do not send sensitive financial information through the general contact form."},
+        {"name": "Complete Your Application In Person", "text": "Complete a Lendmark Financial Services application at the dealership for that vehicle. Review the application and credit-report disclosures before you submit them. Lendmark Financial Services makes its own credit decision."},
         {"name": "Review the Vehicle and Written Terms", "text": "Confirm that the lender will consider the specific vehicle and review the APR, amount financed, finance charge, payment schedule, fees, and total of payments in the written disclosures."},
         {"name": "Proceed Only If the Terms Work for You", "text": "Approval and final terms are subject to lender underwriting and the signed agreement. Arrange required insurance and review all purchase and credit documents before signing."}
     ]
@@ -1488,15 +1488,15 @@ def financing():
             f"How to Finance a Used Car at {current_app.config['BUSINESS_NAME']}",
             steps,
             description=(
-                f"An overview of applying for dealership-arranged financing through Westlake Financial at "
+                f"An overview of applying in person for financing through Lendmark Financial Services at "
                 f"{current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']}, "
-                f"{current_app.config['BUSINESS_STATE']}, including the option to try PenFed Credit Union for an auto loan."
+                f"{current_app.config['BUSINESS_STATE']}, for a vehicle you are interested in."
             ),
         ),
         meta_title=f"Used Car Financing in {current_app.config['BUSINESS_CITY']} | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
-            f"Ask about dealership-arranged financing through Westlake Financial at {current_app.config['BUSINESS_NAME']} in "
-            f"{current_app.config['BUSINESS_CITY']}, or try PenFed Credit Union for an auto loan. Approval and terms are determined by each lender."
+            f"Yes, {current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']} offers financing through Lendmark Financial Services. "
+            f"Visit us to complete an application for a vehicle you are interested in. Approval and terms are determined by the lender."
         ),
         page_type='financing',
     )

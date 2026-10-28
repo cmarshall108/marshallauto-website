@@ -93,26 +93,17 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('.public-site .navbar .btn-primary:hover,', css)
         self.assertIn('background-color: #ffd27e;', css)
 
-    def test_financing_page_distinguishes_lenders_and_qualifies_terms(self):
+    def test_financing_page_explains_in_person_lendmark_application(self):
         html = self.page('/financing')
         page_text = html.get_text(' ', strip=True)
-        self.assertIn('Westlake Financial', page_text)
-        self.assertIn('PenFed Credit Union', page_text)
+        self.assertIn('Lendmark Financial Services', page_text)
+        self.assertIn('complete an application for a vehicle you are interested in', page_text)
         self.assertIn('not guaranteed', page_text)
         self.assertIn('final signed credit agreement', page_text)
         self.assertIn('Do not send account numbers', page_text)
-
-        penfed_link = html.select_one('a[href="https://www.penfed.org/auto"]')
-        self.assertIsNotNone(penfed_link)
-        self.assertEqual(penfed_link.get('target'), '_blank')
-        self.assertIn('noopener', penfed_link.get('rel', []))
-        self.assertIn('noreferrer', penfed_link.get('rel', []))
-        penfed_cta = html.select_one(
-            'a.btn[href="https://www.penfed.org/auto"]',
-        )
-        self.assertIsNotNone(penfed_cta)
-        self.assertIn('Explore PenFed Auto Loans', penfed_cta.get_text(' ', strip=True))
-        self.assertEqual(penfed_cta.get('target'), '_blank')
+        self.assertNotIn('Westlake Financial', page_text)
+        self.assertNotIn('PenFed', page_text)
+        self.assertIsNone(html.select_one('a[href="https://www.penfed.org/auto"]'))
 
         apr = html.select_one('#calc-rate')
         self.assertIsNotNone(apr)
@@ -156,10 +147,8 @@ class PublicThemeTests(unittest.TestCase):
         vehicle_cards = inventory.select('.vehicle-card')
         self.assertTrue(vehicle_cards)
         for card in vehicle_cards:
-            penfed_link = card.select_one('a[href="https://www.penfed.org/auto"]')
-            self.assertIsNotNone(penfed_link)
-            self.assertIn('try PenFed Credit Union for an auto loan',
-                          penfed_link.get_text(' ', strip=True))
+            self.assertIn('Lendmark Financial Services', card.get_text(' ', strip=True))
+            self.assertIsNone(card.select_one('a[href="https://www.penfed.org/auto"]'))
         low_mileage_banner = inventory.select_one(
             '.vehicle-card .card-img-wrapper .badge-low-miles',
         )
@@ -175,30 +164,24 @@ class PublicThemeTests(unittest.TestCase):
         self.assertTrue(summary['is_low_mileage'])
         self.assertEqual(summary['low_mileage_badge'], '42K Miles')
 
-    def test_vehicle_detail_offers_penfed_auto_loan_option(self):
+    def test_vehicle_detail_offers_in_person_lendmark_financing(self):
         detail = self.page('/inventory/theme-car')
-        penfed_link = detail.select_one(
-            '.sticky-lg-top a[href="https://www.penfed.org/auto"]',
-        )
-        self.assertIsNotNone(penfed_link)
-        self.assertIn('try PenFed Credit Union for an auto loan',
-                      penfed_link.get_text(' ', strip=True))
-        self.assertIn('vehicle eligibility, approval, and terms',
-                      detail.select_one('.sticky-lg-top').get_text(' ', strip=True))
+        sidebar = detail.select_one('.sticky-lg-top')
+        sidebar_text = sidebar.get_text(' ', strip=True)
+        self.assertIn('Lendmark Financial Services', sidebar_text)
+        self.assertIn('Visit us to complete', sidebar_text)
+        self.assertIn('eligibility, approval, and terms', sidebar_text)
+        self.assertIsNone(sidebar.select_one('a[href="https://www.penfed.org/auto"]'))
 
-    def test_home_and_inventory_vehicle_cards_offer_penfed_option(self):
+    def test_home_and_inventory_vehicle_cards_offer_lendmark_financing(self):
         for path in ('/', '/inventory'):
             with self.subTest(path=path):
                 html = self.page(path)
                 cards = html.select('.inventory-grid .vehicle-card')
                 self.assertTrue(cards)
                 for card in cards:
-                    penfed_link = card.select_one(
-                        'a[href="https://www.penfed.org/auto"]',
-                    )
-                    self.assertIsNotNone(penfed_link)
-                    self.assertIn('try PenFed Credit Union for an auto loan',
-                                  penfed_link.get_text(' ', strip=True))
+                    self.assertIn('Lendmark Financial Services', card.get_text(' ', strip=True))
+                    self.assertIsNone(card.select_one('a[href="https://www.penfed.org/auto"]'))
 
     def test_related_inventory_cards_show_actual_low_mileage(self):
         db.session.add(Vehicle(
@@ -220,10 +203,9 @@ class PublicThemeTests(unittest.TestCase):
             related_badges[0].select_one('.badge-low-miles-label').get_text(strip=True),
             'Low Mileage',
         )
-        self.assertIsNotNone(
-            detail.select_one(
-                '.inventory-grid .vehicle-card a[href="https://www.penfed.org/auto"]',
-            ),
+        self.assertIn(
+            'Lendmark Financial Services',
+            detail.select_one('.inventory-grid .vehicle-card').get_text(' ', strip=True),
         )
 
     def test_older_vehicle_under_100k_is_badged_on_inventory(self):
