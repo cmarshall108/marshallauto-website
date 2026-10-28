@@ -1,0 +1,11 @@
+[Unit]
+Description=Process inventory price and arrival alerts every 5 minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+RandomizedDelaySec=20
+Unit=marshallauto-alerts.service
+
+[Install]
+WantedBy=timers.target

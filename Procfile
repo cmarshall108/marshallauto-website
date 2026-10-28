@@ -1,2 +1,3 @@
 web: gunicorn -w 4 -b 0.0.0.0:$PORT "run:create_app()"
 worker: python -m app.highlight_worker
+alerts: python -m app.alert_worker

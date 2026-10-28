@@ -30,7 +30,8 @@ from app.forms import (
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
-    RebuildCostEntry, RebuildCostReceipt, SiteSetting, TestDrive, User, Vehicle, VehicleImage,
+    InventoryAlert, RebuildCostEntry, RebuildCostReceipt, SiteSetting, TestDrive, User, Vehicle,
+    VehicleHoldRequest, VehicleImage,
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
 )
 from app.highlight_jobs import (
@@ -838,6 +839,7 @@ def vehicle_edit(id):
         form.marketplace_sync_enabled.data = vehicle.marketplace_sync.enabled
     if form.validate_on_submit():
         was_sold = vehicle.status == 'sold'
+        previous_price = vehicle.display_price
         _apply_vehicle_form(vehicle, form)
         if vehicle.marketplace_sync:
             vehicle.marketplace_sync.enabled = form.marketplace_sync_enabled.data
@@ -855,6 +857,9 @@ def vehicle_edit(id):
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         db.session.commit()
         db.session.refresh(vehicle)
+        if vehicle.display_price != previous_price or (vehicle.status == 'sold') != was_sold:
+            from app.shopper import process_inventory_alerts
+            process_inventory_alerts()
         _enqueue_highlights_for_vehicle(vehicle)
         if not _deferred_vehicle_media():
             _maybe_publish_vehicle_to_facebook(
@@ -1791,7 +1796,7 @@ def test_drives():
     page = request.args.get('page', 1, type=int)
     status = (request.args.get('status') or '').strip()
     query = TestDrive.query
-    if status in ('out', 'returned', 'cancelled'):
+    if status in ('requested', 'out', 'returned', 'cancelled'):
         query = query.filter_by(status=status)
     pagination = query.order_by(TestDrive.started_at.desc()).paginate(page=page, per_page=25, error_out=False)
     return render_template(
@@ -1799,6 +1804,7 @@ def test_drives():
         pagination=pagination,
         status=status,
         active_count=TestDrive.query.filter_by(status='out').count(),
+        requested_count=TestDrive.query.filter_by(status='requested').count(),
     )
 
 
@@ -1837,6 +1843,51 @@ def test_drive_new():
         flash('Test drive checked out.', 'success')
         return redirect(url_for('admin.test_drives'))
     return render_template('admin/test_drive_form.html', form=form, test_drive=None, title='Check Out Test Drive')
+
+
+@admin_bp.route('/holds')
+@login_required
+def hold_requests():
+    status = (request.args.get('status') or '').strip()
+    query = VehicleHoldRequest.query
+    if status:
+        query = query.filter_by(status=status)
+    holds = query.order_by(VehicleHoldRequest.created_at.desc()).limit(100).all()
+    return render_template('admin/hold_requests.html', holds=holds, status=status)
+
+
+@admin_bp.route('/holds/<int:id>/confirm', methods=['POST'])
+@login_required
+def hold_request_confirm(id):
+    hold = db.session.get(VehicleHoldRequest, id) or abort(404)
+    from app.shopper import ShopperRequestError, confirm_hold
+    try:
+        confirm_hold(hold)
+    except ShopperRequestError as exc:
+        flash(str(exc), 'warning')
+    else:
+        flash(
+            'Hold confirmed for 72 hours. Confirm only after the customer signs in person and pays '
+            'with cash or a cashier\'s check plus the issuing bank-branch receipt.',
+            'success',
+        )
+    return redirect(url_for('admin.hold_requests'))
+
+
+@admin_bp.route('/alerts')
+@login_required
+def inventory_alerts():
+    alerts = InventoryAlert.query.order_by(InventoryAlert.created_at.desc()).limit(100).all()
+    return render_template('admin/inventory_alerts.html', alerts=alerts)
+
+
+@admin_bp.route('/alerts/send-due', methods=['POST'])
+@login_required
+def inventory_alerts_send_due():
+    from app.shopper import process_inventory_alerts
+    sent = process_inventory_alerts()
+    flash(f'{sent} inventory alert(s) processed.', 'success')
+    return redirect(url_for('admin.inventory_alerts'))
 
 
 @admin_bp.route('/test-drives/<int:id>/edit', methods=['GET', 'POST'])

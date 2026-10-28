@@ -73,6 +73,8 @@ def create_app(config_class=None):
 
     if hasattr(config_class, 'init_app'):
         config_class.init_app(app)
+    from app.platform import init_error_tracking
+    init_error_tracking(app)
 
     # Trust X-Forwarded-* headers behind reverse proxies (Heroku, nginx, etc.)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)

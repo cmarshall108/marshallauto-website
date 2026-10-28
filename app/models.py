@@ -221,6 +221,17 @@ class Vehicle(db.Model):
         cascade='all, delete-orphan',
         order_by='CarfaxReport.created_at.desc()',
     )
+    hold_requests = db.relationship(
+        'VehicleHoldRequest',
+        backref='vehicle',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+    )
+    inventory_alerts = db.relationship(
+        'InventoryAlert',
+        backref='vehicle',
+        lazy='dynamic',
+    )
     sale_images = db.relationship(
         'VehicleSaleImage',
         backref='vehicle',
@@ -422,11 +433,12 @@ class VehicleImage(db.Model):
 
     def variant_url(self, label):
         """URL for a resized variant, or the original when that variant was not written."""
+        from app.platform import cdn_url
         target = (current_app.config.get('IMAGE_WIDTHS') or {}).get(label)
         if not target or not self.width or self.width <= target or '.' not in self.filename:
-            return self.url
+            return cdn_url(self.url)
         name, ext = self.filename.rsplit('.', 1)
-        return f'/static/uploads/vehicles/{name}_{label}.{ext}'
+        return cdn_url(f'/static/uploads/vehicles/{name}_{label}.{ext}')
 
     @property
     def srcset(self):
@@ -660,6 +672,7 @@ class TestDrive(db.Model):
     end_mileage = db.Column(db.Integer, nullable=True)
     started_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     returned_at = db.Column(db.DateTime, nullable=True)
+    # requested = public appointment request; out/returned/cancelled = lot checkout log
     status = db.Column(db.String(20), default='out', nullable=False, index=True)  # out, returned, cancelled
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
@@ -795,6 +808,48 @@ class Review(db.Model):
             "name": self.title or f"Review by {self.author_name}",
             "itemReviewed": item_reviewed,
         }
+
+
+class VehicleHoldRequest(db.Model):
+    """A shopper's request to place a 72-hour hold. It is not a reservation until confirmed."""
+    __tablename__ = 'vehicle_hold_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, index=True)
+    lead_id = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=True, index=True)
+    customer_name = db.Column(db.String(128), nullable=False)
+    customer_email = db.Column(db.String(120), nullable=False)
+    customer_phone = db.Column(db.String(32), nullable=True)
+    deposit_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    status = db.Column(db.String(20), default='requested', nullable=False, index=True)
+    terms_acknowledged_at = db.Column(db.DateTime, nullable=False)
+    confirmed_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    @property
+    def is_active(self):
+        return self.status == 'active' and self.expires_at and self.expires_at > utcnow()
+
+
+class InventoryAlert(db.Model):
+    """Price-drop or new-match notice. No customer account is created."""
+    __tablename__ = 'inventory_alerts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    lead_id = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=True, index=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True, index=True)
+    customer_name = db.Column(db.String(128), nullable=False)
+    customer_email = db.Column(db.String(120), nullable=False, index=True)
+    customer_phone = db.Column(db.String(32), nullable=True)
+    alert_type = db.Column(db.String(20), nullable=False)
+    make = db.Column(db.String(64), nullable=True, index=True)
+    body_style = db.Column(db.String(64), nullable=True, index=True)
+    max_price = db.Column(db.Numeric(10, 2), nullable=True)
+    last_seen_price = db.Column(db.Numeric(10, 2), nullable=True)
+    status = db.Column(db.String(20), default='active', nullable=False, index=True)
+    last_notified_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
 
 class Lead(db.Model):

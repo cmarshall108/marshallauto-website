@@ -13,6 +13,8 @@ email-validator==2.2.0
 blinker==1.8.2
 gunicorn==23.0.0
 psycopg[binary]==3.2.3
+redis==5.2.1
+sentry-sdk[flask]==2.22.0
 certifi>=2024.2.2
 # Lead spam filtering
 phonenumbers>=9.0,<10

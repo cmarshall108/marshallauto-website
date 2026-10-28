@@ -181,6 +181,23 @@ class Config:
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('BUSINESS_EMAIL') or ''
 
+    # Shopping estimates. Highway-use tax is calculated; these fees vary by county and transaction.
+    ESTIMATE_TITLE_FEE = float(os.environ.get('ESTIMATE_TITLE_FEE', '66.75'))
+    ESTIMATE_LICENSE_PLATE_FEE = float(os.environ.get('ESTIMATE_LICENSE_PLATE_FEE', '46.25'))
+    ESTIMATE_NOTARY_FEE = float(os.environ.get('ESTIMATE_NOTARY_FEE', '15.00'))
+    ESTIMATE_DOC_FEE = float(os.environ.get('ESTIMATE_DOC_FEE', '0'))
+    ESTIMATE_PROPERTY_TAX = float(os.environ.get('ESTIMATE_PROPERTY_TAX', '0'))
+
+    # Optional production services. Empty values preserve local SQLite behavior.
+    REDIS_URL = os.environ.get('REDIS_URL', '')
+    PUBLIC_CACHE_ENABLED = os.environ.get('PUBLIC_CACHE_ENABLED', 'false').lower() in ('1', 'true', 'yes')
+    PUBLIC_CACHE_SECONDS = int(os.environ.get('PUBLIC_CACHE_SECONDS', '60'))
+    IMAGE_CDN_BASE_URL = os.environ.get('IMAGE_CDN_BASE_URL', '').rstrip('/')
+    SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+    SENTRY_ENVIRONMENT = os.environ.get('SENTRY_ENVIRONMENT', 'production')
+    SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0'))
+    ALERT_WORKER_INTERVAL_SECONDS = int(os.environ.get('ALERT_WORKER_INTERVAL_SECONDS', '300'))
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

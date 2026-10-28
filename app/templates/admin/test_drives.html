@@ -11,6 +11,9 @@
 <div class="table-card p-3 p-md-4">
     <div class="d-flex flex-wrap gap-2 mb-3">
         <a href="{{ url_for('admin.test_drives') }}" class="btn btn-sm {% if not status %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+        <a href="{{ url_for('admin.test_drives', status='requested') }}" class="btn btn-sm {% if status == 'requested' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+            Requested {% if requested_count %}<span class="badge bg-warning text-dark ms-1">{{ requested_count }}</span>{% endif %}
+        </a>
         <a href="{{ url_for('admin.test_drives', status='out') }}" class="btn btn-sm {% if status == 'out' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
             Out {% if active_count %}<span class="badge bg-danger ms-1">{{ active_count }}</span>{% endif %}
         </a>
@@ -37,7 +40,8 @@
                 {% for td in pagination.items %}
                 <tr>
                     <td>
-                        {% if td.status == 'out' %}<span class="badge bg-danger">Out</span>
+                        {% if td.status == 'requested' %}<span class="badge bg-warning text-dark">Requested</span>
+                        {% elif td.status == 'out' %}<span class="badge bg-danger">Out</span>
                         {% elif td.status == 'returned' %}<span class="badge bg-success">Returned</span>
                         {% else %}<span class="badge bg-secondary">Cancelled</span>{% endif %}
                     </td>

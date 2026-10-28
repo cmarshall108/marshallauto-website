@@ -1,0 +1,29 @@
+{% extends "admin/base.html" %}
+{% block title %}Inventory Alerts{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">Inventory Alerts</h2>
+    <form method="POST" action="{{ url_for('admin.inventory_alerts_send_due') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-primary">Send due alerts</button>
+    </form>
+</div>
+<div class="table-card p-3 p-md-4">
+    <table class="table align-middle">
+        <thead><tr><th>Customer</th><th>Alert</th><th>Max price</th><th>Last notice</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for alert in alerts %}
+            <tr>
+                <td>{{ alert.customer_name }}<div class="small text-muted">{{ alert.customer_email }}</div></td>
+                <td>{{ alert.alert_type | replace('_', ' ') | title }}{% if alert.make %}: {{ alert.make }}{% elif alert.body_style %}: {{ alert.body_style }}{% elif alert.vehicle %}: {{ alert.vehicle.title }}{% endif %}</td>
+                <td>{{ alert.max_price | format_currency if alert.max_price else 'Any' }}</td>
+                <td>{{ alert.last_notified_at.strftime('%m/%d %I:%M %p') if alert.last_notified_at else 'Not sent' }}</td>
+                <td>{{ alert.status | title }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">No alerts.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

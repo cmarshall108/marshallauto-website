@@ -359,6 +359,29 @@ class SiteSettingForm(FlaskForm):
     submit = SubmitField('Save Settings')
 
 
+class ShopperRequestForm(FlaskForm):
+    name = StringField('Full Name *', validators=[DataRequired(), Length(max=128)])
+    email = StringField('Email *', validators=[DataRequired(), Email(), Length(max=120)])
+    phone = StringField('Phone *', validators=[DataRequired(), Length(min=7, max=32)])
+    honeypot = StringField('Website', validators=[Optional(), Length(max=100)])
+
+
+class TestDriveRequestForm(ShopperRequestForm):
+    appointment_at = SelectField('Requested time *', validators=[DataRequired()])
+    notes = TextAreaField('Notes', validators=[Optional(), Length(max=1000)])
+    submit = SubmitField('Request Test Drive')
+
+
+class InventoryAlertForm(ShopperRequestForm):
+    alert_type = SelectField('Alert me about *', validators=[DataRequired()])
+    max_price = DecimalField(
+        'Maximum price',
+        places=2,
+        validators=[Optional(), NumberRange(min=1, max=1000000)],
+    )
+    submit = SubmitField('Create Alert')
+
+
 class ContactForm(FlaskForm):
     name = StringField('Full Name *', validators=[DataRequired(), Length(max=128)])
     email = StringField('Email *', validators=[DataRequired(), Email(), Length(max=128)])

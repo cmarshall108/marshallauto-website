@@ -7,6 +7,7 @@
 #   marshallauto.service              - the site, Restart=always
 #   marshallauto-deploy.timer         - polls GitHub every minute, deploys + rolls back
 #   marshallauto-healthcheck.timer    - restarts the site if /healthz stops answering
+#   marshallauto-alerts.timer         - sends due price and arrival alerts
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -21,11 +22,13 @@ if ! bash "$ROOT/deploy/ensure_ffmpeg.sh"; then
   echo "WARNING: system ffmpeg unavailable; the imageio-ffmpeg Python dependency supplies a fallback on supported platforms." >&2
 fi
 
-chmod +x "$ROOT/start_ubuntu_prod.sh" "$ROOT/deploy/auto_deploy.sh" "$ROOT/deploy/healthcheck.sh"
+chmod +x "$ROOT/start_ubuntu_prod.sh" "$ROOT/deploy/auto_deploy.sh" "$ROOT/deploy/healthcheck.sh" \
+  "$ROOT/deploy/process_alerts.sh" "$ROOT/deploy/sync_marketplace.sh"
 
 for unit in marshallauto.service marshallauto-deploy.service marshallauto-deploy.timer \
             marshallauto-healthcheck.service marshallauto-healthcheck.timer \
-            marshallauto-marketplace-sync.service marshallauto-marketplace-sync.timer; do
+            marshallauto-marketplace-sync.service marshallauto-marketplace-sync.timer \
+            marshallauto-alerts.service marshallauto-alerts.timer; do
   sed "s#/opt/marshallauto-website#$ROOT#g" "$ROOT/deploy/$unit" > "$UNIT_DIR/$unit"
 done
 
@@ -38,6 +41,7 @@ systemctl enable --now marshallauto.service
 systemctl enable --now marshallauto-deploy.timer
 systemctl enable --now marshallauto-healthcheck.timer
 systemctl enable --now marshallauto-marketplace-sync.timer
+systemctl enable --now marshallauto-alerts.timer
 
 systemctl --no-pager status marshallauto.service | head -n 12
 systemctl list-timers --no-pager | grep marshallauto || true

@@ -215,12 +215,41 @@ require_strong_admin_password() {
 }
 require_strong_admin_password
 
-# Optional: start photo-highlight worker alongside web (set START_HIGHLIGHT_WORKER=0 to disable)
+# Optional production services. Persist safe defaults so a fresh .env starts
+# with every shopper feature configured; existing values are left unchanged.
+ensure_env_default() {
+  local key="$1" value="$2"
+  if [[ -z "${!key:-}" ]]; then
+    printf -v "$key" '%s' "$value"
+    export "$key"
+    upsert_env_var "$key" "$value"
+  fi
+}
+ensure_env_default PUBLIC_CACHE_ENABLED true
+ensure_env_default PUBLIC_CACHE_SECONDS 60
+ensure_env_default SENTRY_ENVIRONMENT production
+ensure_env_default SENTRY_TRACES_SAMPLE_RATE 0
+ensure_env_default ESTIMATE_TITLE_FEE 66.75
+ensure_env_default ESTIMATE_LICENSE_PLATE_FEE 46.25
+ensure_env_default ESTIMATE_NOTARY_FEE 15.00
+ensure_env_default ESTIMATE_DOC_FEE 0
+ensure_env_default ESTIMATE_PROPERTY_TAX 0
+ensure_env_default ALERT_WORKER_INTERVAL_SECONDS 300
+# REDIS_URL, IMAGE_CDN_BASE_URL, and SENTRY_DSN stay blank until those services exist.
+
+# Optional: start photo-highlight and inventory-alert workers alongside web.
+# Set either variable to 0 to disable that worker.
 START_HIGHLIGHT_WORKER="${START_HIGHLIGHT_WORKER:-1}"
+START_ALERT_WORKER="${START_ALERT_WORKER:-1}"
 web_pid=
 worker_pid=
+alert_pid=
 
 cleanup() {
+  if [[ -n "${alert_pid:-}" ]] && kill -0 "$alert_pid" 2>/dev/null; then
+    kill "$alert_pid" 2>/dev/null || true
+    wait "$alert_pid" 2>/dev/null || true
+  fi
   if [[ -n "${worker_pid:-}" ]] && kill -0 "$worker_pid" 2>/dev/null; then
     kill "$worker_pid" 2>/dev/null || true
     wait "$worker_pid" 2>/dev/null || true
@@ -243,11 +272,25 @@ start_worker() {
   echo "Highlight worker started (pid $worker_pid)"
 }
 
+start_alert_worker() {
+  if [[ "$START_ALERT_WORKER" != "1" ]]; then
+    return 0
+  fi
+  "$PYTHON" -m app.alert_worker --loop &
+  alert_pid=$!
+  echo "Inventory alert worker started (pid $alert_pid)"
+}
+
 while true; do
-  # Restart worker if it died
+  # Restart workers if they died
   if [[ "$START_HIGHLIGHT_WORKER" == "1" ]]; then
     if [[ -z "${worker_pid:-}" ]] || ! kill -0 "$worker_pid" 2>/dev/null; then
       start_worker
+    fi
+  fi
+  if [[ "$START_ALERT_WORKER" == "1" ]]; then
+    if [[ -z "${alert_pid:-}" ]] || ! kill -0 "$alert_pid" 2>/dev/null; then
+      start_alert_worker
     fi
   fi
 

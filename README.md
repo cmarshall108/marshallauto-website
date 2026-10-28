@@ -373,8 +373,14 @@ filename, HTTP status, and a Cloudflare Ray ID when present.
 Video compression runs as a durable database job in the existing
 `python -m app.highlight_worker` process, not inside the web request. The Ubuntu launcher
 starts this worker by default (`START_HIGHLIGHT_WORKER=1`); other deployments must run
-it separately, even if photo highlights are disabled. Install ffmpeg and run
-`flask db upgrade` before deployment. Queued/running/failed video status appears on the
+it separately, even if photo highlights are disabled. The same launcher starts the
+inventory alert worker (`START_ALERT_WORKER=1`, every `ALERT_WORKER_INTERVAL_SECONDS`,
+default 300). `deploy/install.sh` also enables `marshallauto-alerts.timer` as a
+five-minute backup. Redis, Sentry, and the image CDN remain optional: startup writes
+safe cache and fee defaults into `.env` only when those keys are missing, and leaves
+`REDIS_URL`, `SENTRY_DSN`, and `IMAGE_CDN_BASE_URL` blank. Install ffmpeg and run
+`flask db upgrade` before deployment. The automatic deploy script already runs that
+migration. Queued/running/failed video status appears on the
 vehicle edit page; refresh to check it. The previous video stays available until the
 replacement succeeds. Removing/replacing a video, selling, or deleting the vehicle
 prevents older jobs from publishing.
@@ -447,6 +453,19 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PHOTO_HIGHLIGHTS_GROK_REQUIRED` | If `true`, fail the job instead of OpenCV fallback when Grok errors |
 | `HIGHLIGHT_WORKER_POLL` | Worker idle poll seconds (default `2`) |
 | `HIGHLIGHT_WORKER_LEASE` | Job lease seconds (default `300`) |
+| `START_HIGHLIGHT_WORKER` | Ubuntu launcher starts the highlight worker (`1`/`0`, default `1`) |
+| `START_ALERT_WORKER` | Ubuntu launcher starts the inventory alert worker (`1`/`0`, default `1`) |
+| `ALERT_WORKER_INTERVAL_SECONDS` | Seconds between alert checks (default `300`) |
+| `REDIS_URL` | Optional Redis URL for shared rate limits and cache |
+| `PUBLIC_CACHE_ENABLED` | Cache public home/inventory HTML (`true`/`false`; Ubuntu startup defaults to `true`) |
+| `PUBLIC_CACHE_SECONDS` | Public HTML cache lifetime (default `60`) |
+| `IMAGE_CDN_BASE_URL` | Optional CDN origin for uploaded images |
+| `SENTRY_DSN` | Optional Sentry error-tracking DSN |
+| `ESTIMATE_TITLE_FEE` | Estimated title fee in out-the-door examples (default `66.75`) |
+| `ESTIMATE_LICENSE_PLATE_FEE` | Estimated plate fee (default `46.25`) |
+| `ESTIMATE_NOTARY_FEE` | Estimated notary fee (default `15.00`) |
+| `ESTIMATE_DOC_FEE` | Estimated documentation fee (default `0`) |
+| `ESTIMATE_PROPERTY_TAX` | Estimated county property tax (default `0`) |
 
 Analytics and Facebook posting credentials can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`, Page ID, Page access token), which override env defaults when present.
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Marshall Auto website (Flask + highlight worker)
+Description=Marshall Auto website (Flask, highlight worker, and alert worker)
 After=network-online.target
 Wants=network-online.target
 

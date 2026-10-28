@@ -28,12 +28,12 @@
         <p class="hold-subtitle">Temporary reservation only &mdash; not a bill of sale and not a contract to buy</p>
 
         <p class="hold-body">
-            This agreement is made in Lee County, North Carolina, between <strong>{{ dealer_name }}</strong>
-            (&ldquo;Dealer&rdquo;) and the person identified below (&ldquo;Depositor&rdquo;). Depositor pays the
-            deposit stated below solely to ask Dealer to hold the identified vehicle and not accept another
-            buyer&rsquo;s offer for it during the hold period. <strong>This deposit does not buy the vehicle,
-            transfer any ownership or title interest, create a security interest, or require either party to
-            complete a sale.</strong>
+            This agreement is made in person at Dealer&rsquo;s place of business in Lee County, North Carolina,
+            between <strong>{{ dealer_name }}</strong> (&ldquo;Dealer&rdquo;) and the person identified below
+            (&ldquo;Depositor&rdquo;). Depositor pays the deposit stated below solely to ask Dealer to hold the
+            identified vehicle and not accept another buyer&rsquo;s offer for it during the hold period.
+            <strong>This deposit does not buy the vehicle, transfer any ownership or title interest, create a
+            security interest, or require either party to complete a sale.</strong>
         </p>
 
         <h2>1. Vehicle</h2>
@@ -52,11 +52,13 @@
 
         <h2>2. Deposit and {{ hold_hours }}-hour hold</h2>
         <p class="hold-body">
-            Deposit amount: <span class="hold-blank hold-blank-money"></span>, paid by
+            Deposit amount: <span class="hold-blank hold-blank-money"></span>, paid in person at Dealer&rsquo;s
+            place of business by
             <span class="hold-check"></span> cash
-            <span class="hold-check"></span> card
-            <span class="hold-check"></span> other: <span class="hold-blank hold-blank-short"></span>.
-            Receipt / reference no.: <span class="hold-blank hold-blank-short"></span>.
+            <span class="hold-check"></span> cashier&rsquo;s check.
+            No other form of payment is accepted. A cashier&rsquo;s check is accepted only with the original
+            receipt from the issuing bank branch. Issuing bank: <span class="hold-blank hold-blank-short"></span>.
+            Bank-branch receipt no.: <span class="hold-blank hold-blank-short"></span>.
         </p>
         <p class="hold-body">
             Hold starts: Date <span class="hold-blank hold-blank-date"></span>
@@ -65,10 +67,14 @@
             (Dealer&rsquo;s local time).
         </p>
         <p class="hold-body">
-            <strong>The hold ends exactly {{ hold_hours }} hours after the start time above, and in no event
-            later than {{ hold_hours }} hours after Dealer receives this deposit. {{ hold_hours }} hours is the
-            maximum hold. Dealer has no authority to extend it, and any requested extension is void unless both
-            parties sign a new hold agreement and Depositor pays a new deposit.</strong>
+            <strong>The hold starts only when Depositor is physically present at Dealer&rsquo;s place of
+            business, both parties sign this agreement, and Dealer receives the deposit in cash or by a
+            cashier&rsquo;s check accompanied by the original receipt from the issuing bank branch. A phone,
+            text, email, or website request does not start a hold and does not reserve the vehicle.</strong>
+            The hold ends exactly {{ hold_hours }} hours after the start time above, and in no event later than
+            {{ hold_hours }} hours after Dealer receives this deposit. {{ hold_hours }} hours is the maximum
+            hold. Dealer has no authority to extend it, and any requested extension is void unless both parties
+            sign a new hold agreement in person and Depositor pays a new deposit on these same terms.
         </p>
         <p class="hold-body">
             During the hold, Dealer will not accept another person&rsquo;s offer to buy this vehicle. Dealer may
@@ -126,18 +132,21 @@
 
         <h2>6. Other terms</h2>
         <ul class="hold-terms">
-            <li>Depositor is at least 18 years old and is the person paying the deposit, or is authorized to bind the payer.</li>
-            <li>A card chargeback or reversed payment cancels the hold immediately, and Depositor remains responsible for the unpaid deposit.</li>
-            <li>Dealer may require a government-issued photo ID before accepting the deposit or releasing the vehicle.</li>
+            <li>Depositor is at least 18 years old, is physically present at Dealer&rsquo;s place of business, and is the person paying the deposit.</li>
+            <li>Dealer accepts only cash or a cashier&rsquo;s check. A cashier&rsquo;s check must be delivered with the original receipt issued by the bank branch that issued the check. Personal checks, cards, wires, electronic transfers, mobile payments, and promises to pay are not accepted and do not start a hold.</li>
+            <li>If a cashier&rsquo;s check is returned, dishonored, counterfeit, or not supported by the issuing bank-branch receipt, the hold ends immediately and Depositor remains responsible for the unpaid deposit.</li>
+            <li>Dealer requires a government-issued photo ID before accepting the deposit. Dealer keeps the bank-branch receipt with this agreement.</li>
             <li>This agreement is the entire agreement about the hold. It can be changed only by a written instrument signed by both parties. North Carolina law governs it. Venue lies in the state courts of Lee County, North Carolina.</li>
             <li>If any provision is unenforceable, the rest remains in effect. In particular, if a court limits the amount Dealer may retain, Dealer may retain the greatest amount a court of competent jurisdiction allows.</li>
             <li>Depositor may not assign this agreement. Dealer may assign it to a successor of the dealership.</li>
         </ul>
 
         <p class="hold-ack">
-            <strong>Depositor acknowledges:</strong> I have read this agreement, including the {{ hold_hours }}-hour
-            maximum and the deposit terms in Section 4. I understand that paying this deposit does not buy the
-            vehicle, does not lock the price, and does not give me a refund if I decide not to complete the purchase.
+            <strong>Depositor acknowledges:</strong> I am signing this agreement in person at the dealership. I
+            have paid the deposit here in cash or by cashier&rsquo;s check with the original receipt from the
+            issuing bank branch. I have read this agreement, including the {{ hold_hours }}-hour maximum and the
+            deposit terms in Section 4. I understand that paying this deposit does not buy the vehicle, does not
+            lock the price, and does not give me a refund if I decide not to complete the purchase.
         </p>
 
         <div class="hold-signatures">
@@ -159,13 +168,15 @@
                 <p class="hold-line"><span>Date and time signed</span></p>
                 <p class="hold-received">Deposit received by Dealer</p>
                 <p class="hold-line"><span>Amount received</span></p>
+                <p class="hold-line"><span>Cash or cashier&rsquo;s check</span></p>
+                <p class="hold-line"><span>Issuing bank and branch receipt no.</span></p>
                 <p class="hold-line"><span>Received by (print and sign)</span></p>
                 <p class="hold-line"><span>Date and time received</span></p>
             </div>
         </div>
 
         <p class="hold-footer">
-            Give one signed copy to Depositor and keep one with the deposit receipt.
+            Give one signed copy to Depositor and keep one with the cash count or the cashier&rsquo;s-check and bank-branch receipt.
             Hold expires {{ hold_hours }} hours after the start time in Section 2.
         </p>
     </article>

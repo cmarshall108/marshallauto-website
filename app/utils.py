@@ -54,7 +54,12 @@ def client_ip():
 
 
 def rate_limit_exceeded(bucket_key, limit, window_seconds):
-    """Simple sliding-window rate limiter (per process/worker)."""
+    """Shared sliding-window limiter when Redis is configured; otherwise per process."""
+    from app.platform import rate_limit_exceeded as shared_rate_limit
+    return shared_rate_limit(bucket_key, limit, window_seconds)
+
+
+def _memory_rate_limit_exceeded(bucket_key, limit, window_seconds):
     now = time.time()
     bucket = _rate_buckets[bucket_key]
     cutoff = now - window_seconds
@@ -279,7 +284,7 @@ def convert_heic_vehicle_images(dry_run=False):
 
 
 def _save_image_variants(img, upload_path, filename):
-    """Write smaller variants used by listing cards."""
+    """Write resized and modern-format variants used by listing cards."""
     name, ext = filename.rsplit('.', 1)
     widths = current_app.config.get('IMAGE_WIDTHS', {})
     quality = current_app.config.get('IMAGE_QUALITY', 85)
@@ -297,6 +302,11 @@ def _save_image_variants(img, upload_path, filename):
             kwargs['quality'] = quality
         try:
             variant.save(os.path.join(upload_path, variant_name), **kwargs)
+            if ext in ('jpg', 'jpeg'):
+                variant.save(
+                    os.path.join(upload_path, f'{name}_{label}.webp'),
+                    format='WEBP', quality=quality, method=4,
+                )
         except Exception as e:
             current_app.logger.warning('Variant save failed (%s): %s', label, e)
         finally:

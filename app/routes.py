@@ -12,10 +12,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app import db
-from app.forms import ContactForm
+from app.forms import ContactForm, InventoryAlertForm, TestDriveRequestForm
 from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, VehicleImage
 from app.models import BlogPost
 from app.buyer_guides import published_buyer_guides
+from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
@@ -432,6 +433,7 @@ def inject_globals():
 
 
 @main.route('/')
+@cached_public_response(ttl=60)
 def index():
     featured = (
         _vehicle_list_query()
@@ -530,6 +532,7 @@ def coming_soon():
 
 
 @main.route('/inventory')
+@cached_public_response(ttl=45)
 def inventory():
     page = request.args.get('page', 1, type=int)
     make = request.args.get('make', '').strip()
@@ -916,6 +919,87 @@ def vehicle_vin_record(vin):
     )
 
 
+def _shopper_submission(form, vehicle, creator):
+    if form.honeypot.data:
+        return True
+    if rate_limit_exceeded(f"shopper:{client_ip()}", 8, 600):
+        flash('Too many requests. Please call the dealership or try again shortly.', 'warning')
+        return False
+    spam = check_lead_spam_for_request(
+        current_app.config,
+        name=form.name.data,
+        email=form.email.data,
+        phone=form.phone.data,
+        message=request.form.get('notes', ''),
+    )
+    if spam.is_spam:
+        flash('We could not accept that request. Please call the dealership.', 'warning')
+        return False
+    try:
+        creator()
+    except Exception as exc:
+        from app.shopper import ShopperRequestError
+        db.session.rollback()
+        if isinstance(exc, ShopperRequestError):
+            flash(str(exc), 'warning')
+            return False
+        current_app.logger.exception('Shopper request failed')
+        flash('We could not save that request. Please call the dealership.', 'danger')
+        return False
+    flash('Request received. It is not confirmed until our team contacts you.', 'success')
+    return True
+
+
+@main.route('/inventory/<slug>/test-drive', methods=['POST'])
+def request_test_drive(slug):
+    vehicle = Vehicle.query.filter_by(slug=slug, status='available').first_or_404()
+    form = TestDriveRequestForm()
+    from app.shopper import appointment_slots, create_test_drive_request
+    slots = {slot.strftime('%Y-%m-%dT%H:%M'): slot for slot in appointment_slots()}
+    form.appointment_at.choices = list(slots)
+    if form.validate_on_submit():
+        _shopper_submission(
+            form, vehicle,
+            lambda: create_test_drive_request(
+                vehicle, name=form.name.data, email=form.email.data, phone=form.phone.data,
+                appointment_at=slots[form.appointment_at.data], notes=form.notes.data or '',
+            ),
+        )
+    else:
+        flash('Check the test-drive form and try again.', 'warning')
+    return redirect(url_for('main.vehicle_detail', slug=slug) + '#shopper-tools')
+
+
+@main.route('/inventory/<slug>/hold', methods=['POST'])
+def request_hold(slug):
+    Vehicle.query.filter_by(slug=slug, status='available').first_or_404()
+    flash(
+        'A hold cannot be requested online. Come to the dealership in person and pay the deposit '
+        'in cash or by cashier\'s check with the original receipt from the issuing bank branch.',
+        'warning',
+    )
+    return redirect(url_for('main.vehicle_detail', slug=slug) + '#shopper-tools')
+
+
+@main.route('/inventory/<slug>/alert', methods=['POST'])
+def request_alert(slug):
+    vehicle = Vehicle.query.filter_by(slug=slug).first_or_404()
+    form = InventoryAlertForm()
+    form.alert_type.choices = ['vehicle', 'make', 'body_style']
+    if form.validate_on_submit():
+        from app.shopper import create_inventory_alert
+        _shopper_submission(
+            form, vehicle,
+            lambda: create_inventory_alert(
+                vehicle, name=form.name.data, email=form.email.data, phone=form.phone.data,
+                alert_type=form.alert_type.data, max_price=form.max_price.data,
+            ),
+        )
+    else:
+        flash('Check the alert form and try again.', 'warning')
+    return redirect(url_for('main.vehicle_detail', slug=slug) + '#shopper-tools')
+
+
 @main.route('/inventory/<slug>')
 def vehicle_detail(slug):
     vehicle = (
@@ -935,18 +1019,26 @@ def vehicle_detail(slug):
     if vehicle.status != 'available':
         flash('This vehicle is no longer available.', 'info')
 
-    related = (
-        _vehicle_list_query()
-        .filter(
-            Vehicle.id != vehicle.id,
-            or_(Vehicle.make == vehicle.make, Vehicle.body_style == vehicle.body_style)
-        )
-        .order_by(Vehicle.created_at.desc())
-        .limit(4)
-        .all()
-    )
+    from app.pricing import out_the_door_estimate, payment_examples
+    from app.shopper import appointment_slots, similar_vehicles
+
+    related = similar_vehicles(vehicle)
+    estimate = out_the_door_estimate(vehicle.display_price)
+    payments = payment_examples(vehicle.display_price)
+    slots = appointment_slots()
 
     form = ContactForm(vehicle_id=vehicle.id)
+    test_drive_form = TestDriveRequestForm()
+    test_drive_form.appointment_at.choices = [
+        (slot.strftime('%Y-%m-%dT%H:%M'), slot.strftime('%A, %B %-d at %-I:%M %p'))
+        for slot in slots
+    ]
+    alert_form = InventoryAlertForm()
+    alert_form.alert_type.choices = [('vehicle', f'Price drop on this {vehicle.title}')]
+    if vehicle.make:
+        alert_form.alert_type.choices.append(('make', f'New {vehicle.make} arrivals'))
+    if vehicle.body_style:
+        alert_form.alert_type.choices.append(('body_style', f'New {vehicle.body_style} arrivals'))
     structured_vehicle = structured_data_vehicle(vehicle)
 
     breadcrumbs = structured_data_breadcrumb([
@@ -1011,6 +1103,10 @@ def vehicle_detail(slug):
         buyer_guides=published_buyer_guides(),
         related=related,
         form=form,
+        estimate=estimate,
+        payment_examples=payments,
+        test_drive_form=test_drive_form,
+        alert_form=alert_form,
         structured_vehicle=structured_vehicle,
         structured_local=structured_data_local_business(),
         breadcrumbs=breadcrumbs,
