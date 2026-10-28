@@ -7,7 +7,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from app import create_app, db
-from app.models import Vehicle
+from app.models import Vehicle, VehicleImage, VehicleImageHighlight
 from config import TestingConfig
 
 
@@ -294,6 +294,71 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('body.has-mobile-cta.has-compare-bar .cookie-consent-banner', shared_css)
         self.assertIn('bottom: calc(6rem + env(safe-area-inset-bottom));', shared_css)
         self.assertIn('bottom: calc(12rem + env(safe-area-inset-bottom));', shared_css)
+
+    def test_photo_highlights_include_magnified_feature_viewer(self):
+        vehicle = Vehicle.query.filter_by(slug='theme-car').one()
+        image = VehicleImage(
+            vehicle_id=vehicle.id,
+            filename='theme-car.jpg',
+            is_primary=True,
+            order_index=2,
+            highlight_status='ready',
+        )
+        db.session.add(image)
+        db.session.flush()
+        db.session.add_all([
+            VehicleImageHighlight(
+                vehicle_image_id=image.id,
+                x_pct=28,
+                y_pct=64,
+                label='Alloy Wheels',
+                category='feature',
+                description='Clean multi-spoke wheels.',
+                icon='circle',
+                severity='positive',
+                confidence=0.91,
+                source='auto',
+                order_index=0,
+            ),
+            VehicleImageHighlight(
+                vehicle_image_id=image.id,
+                x_pct=72,
+                y_pct=40,
+                label='Door Ding',
+                category='imperfection',
+                description='Small mark on the driver door.',
+                icon='exclamation-circle',
+                severity='caution',
+                confidence=0.74,
+                source='manual',
+                order_index=1,
+            ),
+        ])
+        db.session.commit()
+
+        detail = self.page('/inventory/theme-car')
+        zoom = detail.select_one('#gallery-hotspot-zoom-image')
+        self.assertIsNotNone(zoom)
+        self.assertIsNotNone(detail.select_one('#gallery-hotspot-facts'))
+        self.assertIsNotNone(detail.select_one('#gallery-hotspot-zoom'))
+        self.assertIsNotNone(detail.select_one('#gallery-hotspot-zoom-lightbox'))
+        self.assertIsNotNone(detail.select_one('#gallery-hotspot-prev'))
+        self.assertIsNotNone(detail.select_one('#gallery-hotspot-next'))
+        self.assertIsNotNone(detail.select_one('#gallery-lightbox-hotspots'))
+        thumb = detail.select_one('.thumbnail-btn[data-highlights]')
+        payload = json.loads(thumb['data-highlights'])
+        self.assertEqual([item['label'] for item in payload], ['Alloy Wheels', 'Door Ding'])
+        self.assertEqual(payload[0]['photo_index'], 3)
+        self.assertEqual(payload[1]['source'], 'manual')
+
+        css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()
+        js = (Path(self.app.static_folder) / 'js' / 'main.js').read_text()
+        self.assertIn('.gallery-hotspot-zoom-frame', css)
+        self.assertIn('env(safe-area-inset-bottom, 0)', css)
+        self.assertIn('positionZoom', js)
+        self.assertIn('openZoomLightbox', js)
+        self.assertIn('stepHotspot', js)
+        self.assertIn('gallery-lightbox-hotspots', js)
 
     def test_fullscreen_gallery_blocks_page_swipe_while_preserving_pinch_zoom(self):
         css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()

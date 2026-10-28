@@ -505,6 +505,7 @@ class VehicleImageHighlight(db.Model):
             'severity': self.severity or 'info',
             'confidence': float(self.confidence) if self.confidence is not None else None,
             'source': self.source or 'auto',
+            'photo_index': (self.image.order_index + 1) if self.image and self.image.order_index is not None else None,
         }
 
 

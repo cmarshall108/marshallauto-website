@@ -615,10 +615,18 @@
         const hotspotsEl = document.getElementById('gallery-hotspots');
         const hotspotCard = document.getElementById('gallery-hotspot-card');
         const hotspotCardClose = document.getElementById('gallery-hotspot-card-close');
-        const hotspotCardIcon = document.getElementById('gallery-hotspot-card-icon');
         const hotspotCardKicker = document.getElementById('gallery-hotspot-card-kicker');
         const hotspotCardTitle = document.getElementById('gallery-hotspot-card-title');
         const hotspotCardText = document.getElementById('gallery-hotspot-card-text');
+        const hotspotZoom = document.getElementById('gallery-hotspot-zoom');
+        const hotspotZoomImage = document.getElementById('gallery-hotspot-zoom-image');
+        const hotspotZoomLightbox = document.getElementById('gallery-hotspot-zoom-lightbox');
+        const hotspotZoomLightboxImage = document.getElementById('gallery-hotspot-zoom-lightbox-image');
+        const hotspotZoomLightboxClose = document.getElementById('gallery-hotspot-zoom-lightbox-close');
+        const hotspotFacts = document.getElementById('gallery-hotspot-facts');
+        const hotspotCount = document.getElementById('gallery-hotspot-count');
+        const hotspotPrev = document.getElementById('gallery-hotspot-prev');
+        const hotspotNext = document.getElementById('gallery-hotspot-next');
         const highlightsBadge = document.getElementById('gallery-highlights-badge');
         const highlightsBadgeText = document.getElementById('gallery-highlights-badge-text');
         const maximizeBtn = document.getElementById('gallery-maximize');
@@ -629,6 +637,7 @@
         const lightboxNext = document.getElementById('gallery-lightbox-next');
         const lightboxCounter = document.getElementById('gallery-lightbox-counter');
         const lightboxStage = lightbox && lightbox.querySelector('.gallery-lightbox-stage');
+        const lightboxHotspotsEl = document.getElementById('gallery-lightbox-hotspots');
 
         if (mainImage && thumbButtons.length >= 1 && gallery) {
             const parseHighlights = (raw) => {
@@ -663,6 +672,7 @@
                 let spinOriginIndex = 0;
                 let spinAccumPx = 0;
                 let openHighlightId = null;
+                let openHighlightIndex = -1;
                 let suppressClickUntil = 0;
 
                 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -671,135 +681,288 @@
                     swipeHint.classList.add('is-hidden');
                 };
 
-                const severityLabel = (severity) => {
+                const categoryLabel = (item) => {
+                    const category = (item && item.category) || '';
+                    if (category === 'feature') return 'Feature';
+                    if (category === 'imperfection') return 'Imperfection';
+                    if (category === 'detail') return 'Detail';
+                    const severity = (item && item.severity) || 'info';
                     if (severity === 'positive') return 'Feature';
                     if (severity === 'caution') return 'Condition note';
                     if (severity === 'issue') return 'Needs attention';
                     return 'Highlight';
                 };
 
+                const conditionLabel = (severity) => ({
+                    positive: 'Looks good',
+                    info: 'Noted',
+                    caution: 'Worth a look',
+                    issue: 'Visible wear',
+                })[severity || 'info'] || 'Noted';
+
+                const currentHighlights = () => ((slides[currentIndex] && slides[currentIndex].highlights) || []);
+
+                const hotspotRoots = () => [hotspotsEl, lightboxHotspotsEl].filter(Boolean);
+
+                const closeZoomLightbox = () => {
+                    if (!hotspotZoomLightbox || hotspotZoomLightbox.hidden) return;
+                    hotspotZoomLightbox.hidden = true;
+                    document.body.classList.remove('hotspot-zoom-open');
+                };
+
+                const openZoomLightbox = () => {
+                    if (!hotspotZoomLightbox || !hotspotZoomImage || !hotspotZoomImage.getAttribute('src')) return;
+                    if (hotspotZoomLightboxImage) {
+                        hotspotZoomLightboxImage.src = hotspotZoomImage.currentSrc || hotspotZoomImage.src;
+                        hotspotZoomLightboxImage.alt = hotspotCardTitle ? hotspotCardTitle.textContent : '';
+                        const scale = 2.4;
+                        const x = Math.max(0, Math.min(100, Number(hotspotZoomLightbox.dataset.x) || 50));
+                        const y = Math.max(0, Math.min(100, Number(hotspotZoomLightbox.dataset.y) || 50));
+                        hotspotZoomLightboxImage.style.width = `${scale * 100}%`;
+                        hotspotZoomLightboxImage.style.height = `${scale * 100}%`;
+                        hotspotZoomLightboxImage.style.left = `${50 - (x * scale)}%`;
+                        hotspotZoomLightboxImage.style.top = `${50 - (y * scale)}%`;
+                    }
+                    if (hotspotZoomLightbox.parentElement !== document.body) {
+                        document.body.appendChild(hotspotZoomLightbox);
+                    }
+                    hotspotZoomLightbox.hidden = false;
+                    document.body.classList.add('hotspot-zoom-open');
+                };
+
                 const closeHotspotCard = () => {
                     openHighlightId = null;
-                    if (hotspotCard) hotspotCard.hidden = true;
-                    if (hotspotsEl) {
-                        hotspotsEl.querySelectorAll('.gallery-hotspot.is-active').forEach((btn) => {
+                    openHighlightIndex = -1;
+                    closeZoomLightbox();
+                    if (hotspotCard) {
+                        hotspotCard.hidden = true;
+                        if (galleryStage && hotspotCard.parentElement === document.body) {
+                            galleryStage.appendChild(hotspotCard);
+                        }
+                    }
+                    hotspotRoots().forEach((root) => {
+                        root.querySelectorAll('.gallery-hotspot.is-active').forEach((btn) => {
                             btn.classList.remove('is-active');
                             btn.setAttribute('aria-expanded', 'false');
                         });
+                    });
+                };
+
+                const positionZoom = (item) => {
+                    if (!hotspotZoomImage) return;
+                    const slide = slides[currentIndex];
+                    const src = (slide && slide.src) || mainImage.getAttribute('src') || '';
+                    if (src && hotspotZoomImage.getAttribute('src') !== src) {
+                        hotspotZoomImage.src = src;
+                    }
+                    const x = Math.max(0, Math.min(100, Number(item.x_pct) || 50));
+                    const y = Math.max(0, Math.min(100, Number(item.y_pct) || 50));
+                    const scale = 2.6;
+                    hotspotZoomImage.style.width = `${scale * 100}%`;
+                    hotspotZoomImage.style.height = `${scale * 100}%`;
+                    hotspotZoomImage.style.left = `${50 - (x * scale)}%`;
+                    hotspotZoomImage.style.top = `${50 - (y * scale)}%`;
+                    hotspotZoomImage.alt = '';
+                    if (hotspotZoomLightbox) {
+                        hotspotZoomLightbox.dataset.x = String(x);
+                        hotspotZoomLightbox.dataset.y = String(y);
                     }
                 };
 
-                const openHotspotCard = (item, bubbleBtn) => {
+                const renderHotspotFacts = (item, index, total) => {
+                    if (!hotspotFacts) return;
+                    const facts = [
+                        ['Type', categoryLabel(item)],
+                        ['Condition', conditionLabel(item.severity)],
+                    ];
+                    if (item.confidence != null && !Number.isNaN(Number(item.confidence))) {
+                        facts.push(['Match', `${Math.round(Number(item.confidence) * 100)}%`]);
+                    }
+                    if (item.source === 'manual') facts.push(['Reviewed', 'Staff confirmed']);
+                    else if (item.source === 'auto') facts.push(['Reviewed', 'Photo analysis']);
+                    if (item.photo_index) facts.push(['Photo', String(item.photo_index)]);
+                    facts.push(['Spot', `${index + 1} of ${total}`]);
+                    hotspotFacts.replaceChildren(...facts.map(([label, value]) => {
+                        const wrap = document.createElement('div');
+                        const dt = document.createElement('dt');
+                        const dd = document.createElement('dd');
+                        dt.textContent = label;
+                        dd.textContent = value;
+                        wrap.append(dt, dd);
+                        return wrap;
+                    }));
+                };
+
+                const markActiveHotspot = (id) => {
+                    hotspotRoots().forEach((root) => {
+                        root.querySelectorAll('.gallery-hotspot').forEach((btn) => {
+                            const active = id != null && String(btn.dataset.highlightId) === String(id);
+                            btn.classList.toggle('is-active', active);
+                            btn.setAttribute('aria-expanded', active ? 'true' : 'false');
+                        });
+                    });
+                };
+
+                const placeHotspotCard = () => {
+                    if (!hotspotCard) return;
+                    hotspotCard.style.left = '';
+                    hotspotCard.style.right = '';
+                    hotspotCard.style.top = '';
+                    hotspotCard.style.bottom = '';
+                    hotspotCard.style.width = '';
+                };
+
+                const openHotspotCard = (item, index) => {
                     if (!hotspotCard || !item) return;
+                    const items = currentHighlights();
+                    const resolved = Number.isInteger(index) && index >= 0
+                        ? index
+                        : Math.max(0, items.findIndex((row) => String(row.id) === String(item.id)));
+                    const total = Math.max(items.length, 1);
                     openHighlightId = item.id;
+                    openHighlightIndex = resolved;
                     if (hotspotCardKicker) {
-                        hotspotCardKicker.textContent = severityLabel(item.severity);
+                        hotspotCardKicker.textContent = categoryLabel(item);
                         hotspotCardKicker.dataset.severity = item.severity || 'info';
                     }
                     if (hotspotCardTitle) hotspotCardTitle.textContent = item.label || 'Detail';
                     if (hotspotCardText) {
                         hotspotCardText.textContent = item.description || 'Tap another bubble to explore this photo.';
                     }
-                    if (hotspotCardIcon) {
-                        const icon = (item.icon || 'info-circle').replace(/[^a-z0-9-]/gi, '');
-                        hotspotCardIcon.innerHTML = `<i class="bi bi-${icon}" aria-hidden="true"></i>`;
-                        hotspotCardIcon.dataset.severity = item.severity || 'info';
-                    }
+                    if (hotspotCount) hotspotCount.textContent = `${resolved + 1} of ${total}`;
+                    if (hotspotPrev) hotspotPrev.disabled = items.length < 2;
+                    if (hotspotNext) hotspotNext.disabled = items.length < 2;
+                    positionZoom(item);
+                    renderHotspotFacts(item, resolved, total);
                     hotspotCard.hidden = false;
-                    hotspotCard.dataset.severity = item.severity || 'info';
-                    if (hotspotsEl) {
-                        hotspotsEl.querySelectorAll('.gallery-hotspot').forEach((btn) => {
-                            const active = btn === bubbleBtn;
-                            btn.classList.toggle('is-active', active);
-                            btn.setAttribute('aria-expanded', active ? 'true' : 'false');
-                        });
+                    if (window.matchMedia('(max-width: 575.98px)').matches) {
+                        if (hotspotCard.parentElement !== document.body) document.body.appendChild(hotspotCard);
+                    } else if (gallery && hotspotCard.parentElement !== gallery) {
+                        gallery.appendChild(hotspotCard);
                     }
+                    requestAnimationFrame(() => {
+                        const top = hotspotCard.getBoundingClientRect().top + window.scrollY - 88;
+                        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+                    });
+                    placeHotspotCard();
+                    hotspotCard.dataset.severity = item.severity || 'info';
+                    hotspotCard.dataset.category = item.category || 'detail';
+                    markActiveHotspot(item.id);
                     Analytics.trackGallery('highlight_open', currentIndex, slides.length);
                 };
 
-                /**
-                 * Map image-space % (0-100 of natural image) into the painted
-                 * content box under object-fit: cover | contain | fill.
-                 * Hotspot layer is inset:0 over the full stage, so we convert
-                 * to % of the stage (hotspotsEl) box.
-                 */
-                const mapImagePctToStagePct = (xPct, yPct) => {
-                    const stage = hotspotsEl || galleryStage || gallery;
-                    if (!stage || !mainImage) {
-                        return { left: xPct, top: yPct, visible: true };
-                    }
+                const stepHotspot = (delta) => {
+                    const items = currentHighlights();
+                    if (items.length < 2) return;
+                    const base = openHighlightIndex >= 0 ? openHighlightIndex : 0;
+                    const next = (base + delta + items.length) % items.length;
+                    openHotspotCard(items[next], next);
+                };
+
+                const mapPctForImage = (imageEl, stageEl, xPct, yPct) => {
+                    const stage = stageEl || hotspotsEl || galleryStage || gallery;
+                    if (!stage || !imageEl) return { left: xPct, top: yPct, visible: true };
                     const stageRect = stage.getBoundingClientRect();
                     const stageW = stageRect.width || stage.clientWidth || 1;
                     const stageH = stageRect.height || stage.clientHeight || 1;
-                    const natW = mainImage.naturalWidth || 0;
-                    const natH = mainImage.naturalHeight || 0;
+                    const natW = imageEl.naturalWidth || 0;
+                    const natH = imageEl.naturalHeight || 0;
                     if (!natW || !natH || stageW < 2 || stageH < 2) {
                         return { left: xPct, top: yPct, visible: true };
                     }
-
-                    const fit = (window.getComputedStyle(mainImage).objectFit || 'fill').toLowerCase();
+                    const fit = (window.getComputedStyle(imageEl).objectFit || 'fill').toLowerCase();
                     const imgRatio = natW / natH;
                     const stageRatio = stageW / stageH;
                     let contentW = stageW;
                     let contentH = stageH;
                     let offsetX = 0;
                     let offsetY = 0;
-
-                    if (fit === 'cover') {
-                        if (imgRatio > stageRatio) {
+                    if (fit === 'cover' || fit === 'contain') {
+                        const cover = fit === 'cover';
+                        const imageWider = imgRatio > stageRatio;
+                        if (cover === imageWider) {
                             contentH = stageH;
                             contentW = stageH * imgRatio;
                             offsetX = (stageW - contentW) / 2;
-                            offsetY = 0;
                         } else {
                             contentW = stageW;
                             contentH = stageW / imgRatio;
-                            offsetX = 0;
                             offsetY = (stageH - contentH) / 2;
                         }
-                    } else if (fit === 'contain') {
-                        if (imgRatio > stageRatio) {
-                            contentW = stageW;
-                            contentH = stageW / imgRatio;
-                            offsetX = 0;
-                            offsetY = (stageH - contentH) / 2;
-                        } else {
-                            contentH = stageH;
-                            contentW = stageH * imgRatio;
-                            offsetX = (stageW - contentW) / 2;
-                            offsetY = 0;
-                        }
-                    } else {
-                        // fill / none / scale-down → treat as stretch to stage
-                        contentW = stageW;
-                        contentH = stageH;
-                        offsetX = 0;
-                        offsetY = 0;
                     }
-
                     const px = offsetX + (Number(xPct) / 100) * contentW;
                     const py = offsetY + (Number(yPct) / 100) * contentH;
                     const left = (px / stageW) * 100;
                     const top = (py / stageH) * 100;
                     const pad = 1.5;
-                    const visible = left >= -pad && left <= 100 + pad && top >= -pad && top <= 100 + pad;
                     return {
                         left: Math.max(-5, Math.min(105, left)),
                         top: Math.max(-5, Math.min(105, top)),
-                        visible,
+                        visible: left >= -pad && left <= 100 + pad && top >= -pad && top <= 100 + pad,
                     };
                 };
 
+                const mapImagePctToStagePct = (xPct, yPct) => mapPctForImage(mainImage, hotspotsEl || galleryStage || gallery, xPct, yPct);
+
+                const syncLightboxHotspotLayer = () => {
+                    if (!lightboxHotspotsEl || !lightboxImage) return;
+                    const stage = lightboxImage.parentElement;
+                    if (!stage) return;
+                    const stageRect = stage.getBoundingClientRect();
+                    const imageRect = lightboxImage.getBoundingClientRect();
+                    if (stageRect.width < 2 || stageRect.height < 2 || imageRect.width < 2) return;
+                    lightboxHotspotsEl.style.left = `${imageRect.left - stageRect.left}px`;
+                    lightboxHotspotsEl.style.top = `${imageRect.top - stageRect.top}px`;
+                    lightboxHotspotsEl.style.right = 'auto';
+                    lightboxHotspotsEl.style.bottom = 'auto';
+                    lightboxHotspotsEl.style.width = `${imageRect.width}px`;
+                    lightboxHotspotsEl.style.height = `${imageRect.height}px`;
+                };
+
+                const appendHotspot = (root, item, index, mapped) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = `gallery-hotspot severity-${item.severity || 'info'}`;
+                    btn.style.left = `${mapped.left}%`;
+                    btn.style.top = `${mapped.top}%`;
+                    btn.dataset.xPct = String(Math.max(0, Math.min(100, Number(item.x_pct) || 50)));
+                    btn.dataset.yPct = String(Math.max(0, Math.min(100, Number(item.y_pct) || 50)));
+                    btn.dataset.highlightId = item.id != null ? String(item.id) : String(index);
+                    btn.setAttribute('aria-label', `${item.label || 'Highlight'}. ${item.description || ''}`.trim());
+                    btn.setAttribute('aria-expanded', 'false');
+                    const pulse = document.createElement('span');
+                    pulse.className = 'gallery-hotspot-pulse';
+                    pulse.setAttribute('aria-hidden', 'true');
+                    const core = document.createElement('span');
+                    core.className = 'gallery-hotspot-core';
+                    core.setAttribute('aria-hidden', 'true');
+                    const icon = document.createElement('i');
+                    icon.className = `bi bi-${(item.icon || 'info-circle').replace(/[^a-z0-9-]/gi, '')}`;
+                    core.appendChild(icon);
+                    btn.append(pulse, core);
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (Date.now() < suppressClickUntil) return;
+                        if (openHighlightId != null && String(openHighlightId) === String(item.id) && openHighlightIndex === index) {
+                            closeHotspotCard();
+                            return;
+                        }
+                        openHotspotCard(item, index);
+                    });
+                    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+                    root.appendChild(btn);
+                };
+
                 const renderHotspots = (index) => {
-                    if (!hotspotsEl) return;
+                    if (!hotspotsEl && !lightboxHotspotsEl) return;
                     closeHotspotCard();
-                    hotspotsEl.innerHTML = '';
+                    if (hotspotsEl) hotspotsEl.replaceChildren();
+                    if (lightboxHotspotsEl) lightboxHotspotsEl.replaceChildren();
 
                     const hideForSpin = mode === 'spin';
                     gallery.classList.toggle('has-hotspots', false);
-                    if (highlightsBadge) {
-                        highlightsBadge.hidden = hideForSpin;
-                    }
+                    if (highlightsBadge) highlightsBadge.hidden = hideForSpin;
                     if (!highlightsEnabled || hideForSpin) return;
 
                     const slide = slides[index];
@@ -815,55 +978,38 @@
                     if (!items.length) return;
 
                     gallery.classList.add('has-hotspots');
+                    syncLightboxHotspotLayer();
                     items.forEach((item, i) => {
                         const xImg = Math.max(0, Math.min(100, Number(item.x_pct) || 50));
                         const yImg = Math.max(0, Math.min(100, Number(item.y_pct) || 50));
-                        const mapped = mapImagePctToStagePct(xImg, yImg);
-                        if (!mapped.visible) return;
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = `gallery-hotspot severity-${item.severity || 'info'}`;
-                        btn.style.left = `${mapped.left}%`;
-                        btn.style.top = `${mapped.top}%`;
-                        btn.dataset.xPct = String(xImg);
-                        btn.dataset.yPct = String(yImg);
-                        btn.dataset.highlightId = item.id != null ? String(item.id) : String(i);
-                        btn.setAttribute('aria-label', `${item.label || 'Highlight'}. ${item.description || ''}`.trim());
-                        btn.setAttribute('aria-expanded', 'false');
-                        btn.innerHTML = `
-                            <span class="gallery-hotspot-pulse" aria-hidden="true"></span>
-                            <span class="gallery-hotspot-core" aria-hidden="true">
-                                <i class="bi bi-${(item.icon || 'info-circle').replace(/[^a-z0-9-]/gi, '')}"></i>
-                            </span>
-                        `;
-                        btn.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (Date.now() < suppressClickUntil) return;
-                            if (openHighlightId != null && String(openHighlightId) === String(item.id)) {
-                                closeHotspotCard();
-                                return;
-                            }
-                            openHotspotCard(item, btn);
-                        });
-                        btn.addEventListener('pointerdown', (e) => {
-                            // Keep swipe/spin gestures from starting on a bubble
-                            e.stopPropagation();
-                        });
-                        hotspotsEl.appendChild(btn);
+                        if (hotspotsEl) {
+                            const mapped = mapImagePctToStagePct(xImg, yImg);
+                            if (mapped.visible) appendHotspot(hotspotsEl, item, i, mapped);
+                        }
+                        if (lightboxHotspotsEl && lightboxImage) {
+                            const mapped = mapPctForImage(lightboxImage, lightboxHotspotsEl, xImg, yImg);
+                            if (mapped.visible) appendHotspot(lightboxHotspotsEl, item, i, mapped);
+                        }
                     });
                 };
 
                 const relayoutHotspots = () => {
-                    if (!hotspotsEl || !gallery.classList.contains('has-hotspots')) return;
-                    hotspotsEl.querySelectorAll('.gallery-hotspot').forEach((btn) => {
-                        const xImg = Number(btn.dataset.xPct);
-                        const yImg = Number(btn.dataset.yPct);
-                        if (Number.isNaN(xImg) || Number.isNaN(yImg)) return;
-                        const mapped = mapImagePctToStagePct(xImg, yImg);
-                        btn.style.left = `${mapped.left}%`;
-                        btn.style.top = `${mapped.top}%`;
-                        btn.hidden = !mapped.visible;
+                    syncLightboxHotspotLayer();
+                    const layers = [
+                        [hotspotsEl, mainImage],
+                        [lightboxHotspotsEl, lightboxImage],
+                    ];
+                    layers.forEach(([root, imageEl]) => {
+                        if (!root) return;
+                        root.querySelectorAll('.gallery-hotspot').forEach((btn) => {
+                            const xImg = Number(btn.dataset.xPct);
+                            const yImg = Number(btn.dataset.yPct);
+                            if (Number.isNaN(xImg) || Number.isNaN(yImg)) return;
+                            const mapped = mapPctForImage(imageEl, root, xImg, yImg);
+                            btn.style.left = `${mapped.left}%`;
+                            btn.style.top = `${mapped.top}%`;
+                            btn.hidden = !mapped.visible;
+                        });
                     });
                 };
 
@@ -937,6 +1083,7 @@
                     syncLightboxImage(currentIndex);
                     lightbox.hidden = false;
                     document.body.classList.add('gallery-lightbox-open');
+                    window.requestAnimationFrame(() => relayoutHotspots());
                     if (maximizeBtn) {
                         maximizeBtn.setAttribute('aria-expanded', 'true');
                     }
@@ -1106,19 +1253,72 @@
                         closeHotspotCard();
                     });
                 }
+                if (hotspotPrev) {
+                    hotspotPrev.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        stepHotspot(-1);
+                    });
+                }
+                if (hotspotNext) {
+                    hotspotNext.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        stepHotspot(1);
+                    });
+                }
                 if (hotspotCard) {
                     hotspotCard.addEventListener('pointerdown', (e) => e.stopPropagation());
                     hotspotCard.addEventListener('click', (e) => e.stopPropagation());
                 }
+                if (hotspotZoom) {
+                    hotspotZoom.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openZoomLightbox();
+                    });
+                }
+                if (hotspotZoomLightboxClose) {
+                    hotspotZoomLightboxClose.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeZoomLightbox();
+                    });
+                }
+                if (hotspotZoomLightbox) {
+                    hotspotZoomLightbox.addEventListener('click', (e) => {
+                        if (e.target === hotspotZoomLightbox) closeZoomLightbox();
+                    });
+                }
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
+                        if (hotspotZoomLightbox && !hotspotZoomLightbox.hidden) {
+                            e.preventDefault();
+                            closeZoomLightbox();
+                            return;
+                        }
+                        if (hotspotCard && !hotspotCard.hidden) {
+                            e.preventDefault();
+                            closeHotspotCard();
+                            return;
+                        }
                         if (lightboxOpen) {
                             e.preventDefault();
                             closeLightbox();
+                        }
+                        return;
+                    }
+                    if (hotspotCard && !hotspotCard.hidden && !e.altKey && !e.metaKey && !e.ctrlKey) {
+                        if (e.key === 'ArrowDown' || (e.key === 'ArrowRight' && e.shiftKey)) {
+                            e.preventDefault();
+                            stepHotspot(1);
                             return;
                         }
-                        closeHotspotCard();
-                        return;
+                        if (e.key === 'ArrowUp' || (e.key === 'ArrowLeft' && e.shiftKey)) {
+                            e.preventDefault();
+                            stepHotspot(-1);
+                            return;
+                        }
                     }
                     if (!lightboxOpen) return;
                     if (e.key === 'ArrowRight' && multi) {
@@ -1236,13 +1436,13 @@
                 let lastStageTapAt = 0;
                 if (galleryStage) {
                     galleryStage.addEventListener('dblclick', (e) => {
-                        if (e.target.closest('.gallery-hotspot, .gallery-hotspot-card, .gallery-nav, .gallery-maximize-btn')) return;
+                        if (e.target.closest('.gallery-hotspot, .gallery-hotspot-card, .gallery-hotspot-zoom-lightbox, .gallery-nav, .gallery-maximize-btn')) return;
                         if (mode === 'spin') return;
                         e.preventDefault();
                         openLightbox();
                     });
                     galleryStage.addEventListener('click', (e) => {
-                        if (e.target.closest('.gallery-hotspot, .gallery-hotspot-card, .gallery-nav, .gallery-maximize-btn')) return;
+                        if (e.target.closest('.gallery-hotspot, .gallery-hotspot-card, .gallery-hotspot-zoom-lightbox, .gallery-nav, .gallery-maximize-btn')) return;
                         if (mode === 'spin' || Date.now() < suppressClickUntil) return;
                         const now = Date.now();
                         if (now - lastStageTapAt < 320) {
@@ -1326,7 +1526,7 @@
                 };
 
                 const onPointerDown = (e) => {
-                    if (e.target.closest('.gallery-nav, .gallery-hotspot, .gallery-hotspot-card, .gallery-maximize-btn')) return;
+                    if (e.target.closest('.gallery-nav, .gallery-hotspot, .gallery-hotspot-card, .gallery-hotspot-zoom-lightbox, .gallery-maximize-btn, .gallery-highlights-badge')) return;
                     if (e.pointerType === 'mouse' && e.button !== 0) return;
                     if (!multi && mode !== 'spin') return;
 
