@@ -59,7 +59,7 @@ class Config:
     PHOTO_HIGHLIGHTS_AUTO_ENQUEUE = os.environ.get('PHOTO_HIGHLIGHTS_AUTO_ENQUEUE', 'true').lower() in (
         '1', 'true', 'yes', 'on',
     )
-    PHOTO_HIGHLIGHTS_MAX = int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '5'))
+    PHOTO_HIGHLIGHTS_MAX = int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '12'))
     PHOTO_HIGHLIGHTS_ENGINE = (os.environ.get('PHOTO_HIGHLIGHTS_ENGINE') or 'grok').strip().lower()
     PHOTO_HIGHLIGHTS_GROK_MODEL = (os.environ.get('PHOTO_HIGHLIGHTS_GROK_MODEL') or 'grok-4.7').strip()
     XAI_API_KEY = (os.environ.get('XAI_API_KEY') or os.environ.get('GROK_API_KEY') or '').strip()

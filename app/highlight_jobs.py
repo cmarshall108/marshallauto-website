@@ -31,6 +31,16 @@ def _worker_name() -> str:
     return f'{socket.gethostname()}:{os.getpid()}'
 
 
+def _highlights_are_stale(image) -> bool:
+    """True when a finished photo was analyzed with an older catalog/prompt."""
+    from app.photo_highlights import ANALYSIS_VERSION
+
+    if image.highlight_status != 'ready':
+        return False
+    version = image.highlight_version
+    return version is None or int(version) < int(ANALYSIS_VERSION)
+
+
 def enqueue_image_highlight_job(image_id: int, force: bool = False, priority: int = 100):
     """Queue analysis for a single VehicleImage. Returns job or None."""
     from app import db
@@ -39,7 +49,8 @@ def enqueue_image_highlight_job(image_id: int, force: bool = False, priority: in
     image = db.session.get(VehicleImage, image_id)
     if not image:
         return None
-    if not force and (
+    stale = _highlights_are_stale(image)
+    if not force and not stale and (
         image.highlight_status in ('ready', 'failed', 'skipped')
         or image.highlight_analyzed_at is not None
     ):
@@ -99,7 +110,7 @@ def enqueue_vehicle_highlight_jobs(vehicle_id: int, force: bool = False, only_mi
     count = 0
     for image in vehicle.ordered_images():
         if only_missing and not force:
-            if image.highlight_status == 'ready':
+            if image.highlight_status == 'ready' and not _highlights_are_stale(image):
                 continue
             if image.highlight_status == 'processing':
                 # Ensure a job exists
@@ -235,7 +246,7 @@ def process_job(job) -> bool:
             path,
             features_text=features_text,
             vehicle_context=context,
-            max_highlights=int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '5')),
+            max_highlights=int(os.environ.get('PHOTO_HIGHLIGHTS_MAX', '12')),
         )
         # Replace auto-generated highlights; keep manual ones
         existing = list(image.highlights or [])

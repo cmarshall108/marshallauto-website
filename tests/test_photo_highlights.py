@@ -51,6 +51,114 @@ class NmsTests(unittest.TestCase):
         self.assertEqual(len(kept), 3)
 
 
+class ShopperCopyTests(unittest.TestCase):
+    def test_catalog_descriptions_are_useful(self):
+        from app.photo_highlights import _GENERIC_DESC
+
+        for key, meta in FEATURE_CATALOG.items():
+            desc = meta['description']
+            self.assertGreaterEqual(len(desc), 40, key)
+            self.assertIsNone(_GENERIC_DESC.search(desc), f'{key}: {desc}')
+            self.assertNotIn('listed on this vehicle', desc.lower())
+
+    def test_generic_grok_note_is_replaced(self):
+        from app.photo_highlights import _normalize_grok_highlights
+
+        payload = {
+            'scene': 'interior_dash',
+            'highlights': [
+                {
+                    'label': 'Apple CarPlay',
+                    'category': 'feature',
+                    'severity': 'positive',
+                    'x_pct': 50,
+                    'y_pct': 40,
+                    'confidence': 0.9,
+                    'description': 'Apple CarPlay is listed on this vehicle.',
+                    'icon': 'phone',
+                },
+                {
+                    'label': 'Tow Hitch',
+                    'category': 'feature',
+                    'severity': 'positive',
+                    'x_pct': 50,
+                    'y_pct': 78,
+                    'confidence': 0.8,
+                    'description': '',
+                    'icon': 'truck',
+                },
+            ],
+        }
+        result = _normalize_grok_highlights(payload, max_highlights=5)
+        by_label = {h['label']: h['description'] for h in result['highlights']}
+        self.assertIn('iPhone', by_label['Apple CarPlay'])
+        self.assertNotIn('listed on this vehicle', by_label['Apple CarPlay'].lower())
+        self.assertGreaterEqual(len(by_label['Tow Hitch']), 40)
+        self.assertNotIn('listed', by_label['Tow Hitch'].lower())
+
+    def test_specific_note_is_kept(self):
+        from app.photo_highlights import _shopper_description
+
+        note = (
+            'Factory hitch receiver is visible under the bumper. Confirm the hitch class '
+            'and the door-jamb tow rating before you hook up a trailer.'
+        )
+        self.assertEqual(_shopper_description('Tow Package', 'feature', note), note)
+
+    def test_catalog_covers_common_equipment_without_duplicate_labels(self):
+        from app.photo_highlights import ICON_ALLOWLIST
+
+        labels = [meta['label'] for meta in FEATURE_CATALOG.values()]
+        self.assertGreaterEqual(len(FEATURE_CATALOG), 200)
+        self.assertEqual(len(labels), len(set(labels)), 'duplicate display labels collapse in matching')
+        for key, meta in FEATURE_CATALOG.items():
+            self.assertIn(meta['icon'], ICON_ALLOWLIST, key)
+            self.assertTrue(meta.get('scenes'), key)
+
+        text = (
+            'Apple CarPlay, Wireless Apple CarPlay, Android Auto, Heated and Ventilated Seats, '
+            'Panoramic Sunroof, Tow Package, LED Headlights, Blind Spot Monitor, Adaptive Cruise, '
+            'Power Liftgate, Running Boards, Remote Start, Backup Camera, Leather Seats, '
+            'Third Row, All-Wheel Drive, Premium Audio'
+        )
+        matched = {m[1]['label'] for m in match_feature_catalog(text)}
+        for expected in (
+            'Apple CarPlay', 'Wireless Apple CarPlay', 'Android Auto', 'Ventilated Seats',
+            'Ventilated Seats', 'Panoramic Roof', 'Tow Package', 'LED Headlights',
+            'Blind Spot Monitor', 'Adaptive Cruise', 'Power Liftgate',
+            'Running Boards', 'Remote Start', 'Backup Camera', 'Third Row Seating',
+        ):
+            self.assertIn(expected, matched)
+
+        # Common listing aliases should still resolve without duplicate labels.
+        aliases = {
+            'carplay': 'Apple CarPlay',
+            '4x4': 'Four-Wheel Drive',
+            'cooled seats': 'Ventilated Seats',
+            'rearview camera': 'Backup Camera',
+            'siriusxm': 'Satellite Radio',
+        }
+        for needle, label in aliases.items():
+            got = {item[1]['label'] for item in match_feature_catalog(needle)}
+            self.assertIn(label, got, needle)
+        # A payload number must not become a surround-view camera.
+        self.assertFalse(match_feature_catalog('3600 pound payload'))
+
+    def test_prompt_asks_for_thorough_visible_features(self):
+        from app.photo_highlights import _build_grok_prompt
+
+        _system, user = _build_grok_prompt(
+            'LED Headlights, Tow Package, Apple CarPlay',
+            {'year': 2021, 'make': 'Ford', 'model': 'F-150'},
+            max_highlights=12,
+        )
+        self.assertIn('Be thorough', user)
+        self.assertIn('up to 12', user)
+        self.assertIn('LED Headlights', user)
+        self.assertIn('Tow Package', user)
+        self.assertNotIn('Prefer 2-4', user)
+
+
 class GrokNormalizeTests(unittest.TestCase):
     def test_normalize_grok_payload(self):
         from app.photo_highlights import _normalize_grok_highlights
@@ -82,7 +190,7 @@ class GrokNormalizeTests(unittest.TestCase):
         result = _normalize_grok_highlights(payload, max_highlights=5)
         self.assertEqual(result['scene'], 'exterior_side')
         self.assertEqual(result['engine'], 'grok')
-        self.assertEqual(result['analysis_version'], 3)
+        self.assertEqual(result['analysis_version'], 5)
         labels = {h['label'] for h in result['highlights']}
         self.assertIn('Alloy Wheels', labels)
         self.assertNotIn('Too weak', labels)
@@ -127,7 +235,7 @@ class AnalyzeSmokeTests(unittest.TestCase):
         self.assertIn('scene', result)
         self.assertIn('highlights', result)
         self.assertIsInstance(result['highlights'], list)
-        self.assertEqual(result['analysis_version'], 3)
+        self.assertEqual(result['analysis_version'], 5)
         self.assertEqual(result.get('engine'), 'opencv')
         for h in result['highlights']:
             self.assertIn('x_pct', h)
@@ -210,13 +318,33 @@ class HighlightQueueTests(unittest.TestCase):
         from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
         from app.models import PhotoHighlightJob
 
+        from app.photo_highlights import ANALYSIS_VERSION
+
         for state in ('ready', 'failed', 'skipped'):
             with self.subTest(state=state):
                 self.image.highlight_status = state
+                self.image.highlight_version = ANALYSIS_VERSION
                 db.session.commit()
                 self.assertIsNone(enqueue_image_highlight_job(self.image.id))
                 self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 0)
                 self.assertEqual(PhotoHighlightJob.query.count(), 0)
+
+    def test_stale_ready_photos_requeue_after_catalog_change(self):
+        from app import db
+        from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
+        from app.models import PhotoHighlightJob
+        from app.photo_highlights import ANALYSIS_VERSION
+
+        self.image.highlight_status = 'ready'
+        self.image.highlight_version = ANALYSIS_VERSION - 1
+        db.session.commit()
+        job = enqueue_image_highlight_job(self.image.id)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.status, 'queued')
+        self.assertEqual(PhotoHighlightJob.query.count(), 1)
+        # A second pass keeps the active job instead of stacking another.
+        self.assertEqual(enqueue_vehicle_highlight_jobs(self.vehicle.id), 1)
+        self.assertEqual(PhotoHighlightJob.query.count(), 1)
 
     def test_updates_do_not_reset_terminal_job_retry_budget(self):
         from app import db
@@ -248,7 +376,10 @@ class HighlightQueueTests(unittest.TestCase):
         from app.highlight_jobs import enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs
         from app.models import PhotoHighlightJob, VehicleImage
 
+        from app.photo_highlights import ANALYSIS_VERSION
+
         self.image.highlight_status = 'ready'
+        self.image.highlight_version = ANALYSIS_VERSION
         new_image = VehicleImage(filename='new.jpg')
         self.vehicle.images.append(new_image)
         db.session.commit()
