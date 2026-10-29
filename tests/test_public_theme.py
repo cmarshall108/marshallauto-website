@@ -256,8 +256,13 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIsNotNone(html.select_one('.hero-actions a[href^="tel:"]'))
         self.assertIsNotNone(html.select_one('.search-box form'))
         self.assertIsNotNone(html.select_one('.cookie-consent-banner'))
+        banner = html.select_one('a.financing-banner')
+        self.assertIsNotNone(banner)
+        self.assertEqual(banner['href'], '/financing')
+        self.assertIn('We Now Offer Financing', banner.get_text(' ', strip=True))
 
         css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
+        self.assertIn('.public-site .financing-banner {', css)
         self.assertIn('.hero-actions .btn-primary', css)
         self.assertIn('mobile-cta-bar) .btn-primary', css)
         self.assertIn('prefers-reduced-motion: reduce', css)
