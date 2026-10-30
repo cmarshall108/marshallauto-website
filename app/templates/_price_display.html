@@ -1,0 +1,28 @@
+{% set drop = vehicle.price_drop_info %}
+{% set savings = none if hide_retail else vehicle.savings_info() %}
+{% if drop %}
+<div class="price-drop-deal{% if large %} price-drop-deal-lg{% endif %}" role="status">
+    <span class="price-drop-badge"><i class="bi bi-arrow-down-circle-fill" aria-hidden="true"></i> Price Drop</span>
+    <span class="price-drop-save">Save {{ drop.savings | format_price }}{% if drop.percent %} <span class="price-drop-pct">({{ drop.percent }}% off)</span>{% endif %}</span>
+</div>
+{% endif %}
+{% if savings %}
+<div class="savings-callout">
+    <i class="bi bi-tags-fill" aria-hidden="true"></i>
+    Save {{ savings.savings | format_price }} <span class="savings-callout-pct">({{ savings.percent }}% below retail)</span>
+</div>
+{% endif %}
+<p class="price mb-0{% if large %} vehicle-price{% endif %}"{% if schema %} itemprop="offers" itemscope itemtype="https://schema.org/Offer"{% endif %}>
+    {% if schema %}<span itemprop="priceCurrency" content="USD"></span>{% endif %}
+    {% if large and vehicle.status != 'available' %}<span class="small text-muted">Last listed price: </span>{% endif %}
+    {% if drop %}
+    <span class="price-drop-was"><span class="visually-hidden">Was </span><s>{{ drop.original | format_price }}</s></span>
+    {% elif savings %}
+    <span class="retail-price-strike">{{ savings.retail | format_price }}</span>
+    {% endif %}
+    {% if schema %}
+    <span class="price-drop-now" itemprop="price" content="{{ vehicle.display_price }}">{{ vehicle.display_price | format_price }}</span>
+    {% else %}
+    <span class="price-drop-now">{{ vehicle.display_price | format_price }}</span>
+    {% endif %}
+</p>

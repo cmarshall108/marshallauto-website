@@ -364,7 +364,9 @@ bi-check-circle
                         <div class="h4 fw-bold mb-0">{{ vehicle.market_value | format_price }}</div>
                     </div>
                     {% endif %}
-                    <p class="vehicle-price mb-2">{% if vehicle.status != 'available' %}<span class="small text-muted">Last listed price: </span>{% endif %}{{ vehicle.display_price | format_price }}</p>
+                    {% set large = true %}
+                    {% set hide_retail = true %}
+                    {% include "_price_display.html" %}
                     {% if savings %}
                     <div class="savings-banner mb-3">
                         <div class="savings-banner-icon"><i class="bi bi-piggy-bank-fill" aria-hidden="true"></i></div>
@@ -834,17 +836,9 @@ bi-check-circle
                             <p class="quick-specs mb-2">
                                 <i class="bi bi-speedometer2 me-1"></i> {{ rv.mileage | format_mileage }}
                             </p>
-                            {% set rv_savings = rv.savings_info() %}
-                            {% if rv_savings %}
-                            <div class="savings-callout">
-                                <i class="bi bi-tags-fill" aria-hidden="true"></i>
-                                Save {{ rv_savings.savings | format_price }} <span class="savings-callout-pct">({{ rv_savings.percent }}% below retail)</span>
-                            </div>
-                            {% endif %}
-                            <p class="price mb-0">
-                                {% if rv_savings %}<span class="retail-price-strike">{{ rv_savings.retail | format_price }}</span>{% endif %}
-                                {{ rv.display_price | format_price }}
-                            </p>
+                            {% with vehicle=rv %}
+                            {% include "_price_display.html" %}
+                            {% endwith %}
                         </div>
                     </a>
                     <p class="px-4 pb-3 mb-0 small text-muted">Interested in this vehicle? Visit us to complete a Lendmark Financial Services financing application. Approval and terms are determined by the lender.</p>

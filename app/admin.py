@@ -775,6 +775,7 @@ def vehicle_new():
             if snapshot:
                 photos, created_photos = stage_photos(snapshot)
             vehicle = _vehicle_from_form(form)
+            vehicle.note_price_change(None)
             db.session.add(vehicle)
             db.session.flush()
             vehicle.ensure_slug()
@@ -841,6 +842,7 @@ def vehicle_edit(id):
         was_sold = vehicle.status == 'sold'
         previous_price = vehicle.display_price
         _apply_vehicle_form(vehicle, form)
+        vehicle.note_price_change(previous_price)
         if vehicle.marketplace_sync:
             vehicle.marketplace_sync.enabled = form.marketplace_sync_enabled.data
         vehicle.ensure_slug()

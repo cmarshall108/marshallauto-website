@@ -392,6 +392,7 @@ def refresh_source(source):
             discard_photos(created)
             return False
         vehicle = source.vehicle
+        previous_price = vehicle.display_price
         old_fields = source.snapshot['fields']
         for field, value in snapshot['fields'].items():
             if value != old_fields.get(field):
@@ -401,6 +402,7 @@ def refresh_source(source):
                     if value == 'sold':
                         old_video = vehicle.video_url
                         vehicle.video_url = None
+        vehicle.note_price_change(previous_price)
         removed = apply_photos(vehicle, photos, source.photo_files)
         source.snapshot = snapshot
         source.photo_files = photos

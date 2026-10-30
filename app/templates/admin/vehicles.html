@@ -44,7 +44,11 @@
                         <strong>{{ vehicle.title }}</strong><br>
                         <small class="text-muted">VIN: {{ vehicle.vin or 'N/A' }}</small>
                     </td>
-                    <td data-label="Price">{{ vehicle.display_price | format_price }}</td>
+                    <td data-label="Price">
+                        {{ vehicle.display_price | format_price }}
+                        {% set drop = vehicle.price_drop_info %}
+                        {% if drop %}<div class="small text-danger fw-semibold">Dropped from {{ drop.original | format_price }}</div>{% endif %}
+                    </td>
                     <td data-label="Mileage">{{ vehicle.mileage | format_mileage }}</td>
                     <td data-label="Status">
                         <span class="badge badge-status bg-{{ 'success' if vehicle.status == 'available' else 'warning' if vehicle.status == 'pending' else 'secondary' }}">{{ vehicle.status | title }}</span>

@@ -135,6 +135,10 @@ class Vehicle(db.Model):
     # Pricing & status
     price = db.Column(db.Numeric(10, 2), nullable=False)
     sale_price = db.Column(db.Numeric(10, 2), nullable=True)
+    # Highest advertised price since the current drop started. Cleared when the
+    # asking price returns to that amount or higher.
+    previous_price = db.Column(db.Numeric(10, 2), nullable=True)
+    price_dropped_at = db.Column(db.DateTime, nullable=True)
     acquisition_cost = db.Column(db.Numeric(10, 2), nullable=True)
     mileage = db.Column(db.Integer, nullable=False)
     condition = db.Column(db.String(20), default='used', nullable=False)  # used, certified, rebuilt
@@ -302,6 +306,58 @@ class Vehicle(db.Model):
             'price': ours,
             'savings': savings,
             'percent': round(percent),
+        }
+
+    def note_price_change(self, previous_advertised):
+        """Remember a higher advertised price so a drop can be shown as a deal.
+
+        ``previous_advertised`` is the asking price before this change. The stored
+        original stays at the highest price since the drop started, and is cleared
+        only when the new asking price meets or exceeds it.
+        """
+        current = self.display_price
+        if current is None:
+            return
+        current_amount = Decimal(current)
+        candidates = [current_amount]
+        if previous_advertised is not None:
+            candidates.append(Decimal(previous_advertised))
+        if self.previous_price is not None:
+            candidates.append(Decimal(self.previous_price))
+        original = max(candidates)
+        if original - current_amount >= Decimal('1'):
+            self.previous_price = original
+            self.price_dropped_at = self.price_dropped_at or utcnow()
+        else:
+            self.previous_price = None
+            self.price_dropped_at = None
+
+    @property
+    def price_drop_info(self):
+        """Advertised-price reduction for available inventory, or None.
+
+        A sale price below the list price counts even when no previous price was
+        stored, so existing markdowns show immediately.
+        """
+        if self.status != 'available' or self.display_price is None:
+            return None
+        current = Decimal(self.display_price)
+        candidates = []
+        if self.previous_price is not None:
+            candidates.append(Decimal(self.previous_price))
+        if self.sale_price is not None and self.price is not None:
+            candidates.append(Decimal(self.price))
+        if not candidates:
+            return None
+        original = max(candidates)
+        savings = original - current
+        if savings < Decimal('1') or original <= 0 or current <= 0:
+            return None
+        return {
+            'original': original,
+            'price': current,
+            'savings': savings,
+            'percent': round((savings / original) * 100),
         }
 
     @property

@@ -140,6 +140,9 @@
             <label class="form-label" for="price">Price *</label>
             {{ form.price(class="form-control", id="price", step="0.01") }}
             {% if form.price.errors %}<div class="text-danger small">{{ form.price.errors[0] }}</div>{% endif %}
+            {% if vehicle and vehicle.price_drop_info %}
+            <div class="form-text text-danger fw-semibold">Price drop is showing: was {{ vehicle.price_drop_info.original | format_price }}, now {{ vehicle.display_price | format_price }}.</div>
+            {% endif %}
         </div>
         <div class="col-md-4">
             <label class="form-label" for="sale_price">Sale Price (optional)</label>

@@ -1677,6 +1677,81 @@ body.hotspot-zoom-open {
     color: var(--primary);
 }
 
+.price-drop-deal {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+    margin-bottom: 0.45rem;
+}
+
+.price-drop-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: linear-gradient(135deg, #9f1239 0%, #e11d48 55%, #f59e0b 140%);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    box-shadow: 0 6px 16px rgba(225, 29, 72, 0.35);
+    animation: price-drop-pulse 1.8s ease-in-out infinite;
+}
+
+.price-drop-save {
+    color: #be123c;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.price-drop-pct {
+    font-weight: 700;
+}
+
+.price-drop-was {
+    color: #9ca3af;
+    font-size: 0.92em;
+    font-weight: 600;
+    margin-right: 0.35rem;
+}
+
+.price-drop-was s {
+    text-decoration-thickness: 2px;
+}
+
+.price-drop-now {
+    color: #be123c;
+    font-weight: 800;
+}
+
+.price-drop-deal-lg {
+    margin-bottom: 0.65rem;
+}
+
+.price-drop-deal-lg .price-drop-badge {
+    font-size: 0.95rem;
+    padding: 0.45rem 0.85rem;
+}
+
+p.vehicle-price .price-drop-now {
+    font-size: 2.35rem;
+    letter-spacing: -0.03em;
+}
+
+@keyframes price-drop-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 6px 16px rgba(225, 29, 72, 0.35); }
+    50% { transform: scale(1.04); box-shadow: 0 8px 22px rgba(225, 29, 72, 0.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .price-drop-badge {
+        animation: none;
+    }
+}
+
 /* Retail value savings comparison (eye-catching "below retail" callouts) */
 .savings-callout {
     display: inline-flex;

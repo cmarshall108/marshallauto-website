@@ -452,6 +452,56 @@
 .public-site .ownership-section .col-md-4 { padding-block: 1rem; }
 .public-site .feature-tag { background: #edf1f5; color: var(--dark); }
 .public-site .vehicle-price { color: var(--dark); font-weight: 700; letter-spacing: -0.04em; }
+.public-site .price-drop-deal {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.7rem;
+    margin-bottom: 0.45rem;
+}
+.public-site .price-drop-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #8a1d12 0%, #c2410c 70%, #f2bc58 140%);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    box-shadow: 0 8px 18px rgba(138, 29, 18, 0.28);
+    animation: price-drop-pop 1.8s ease-in-out infinite;
+}
+.public-site .price-drop-save {
+    color: #8a1d12;
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+.public-site .price-drop-was {
+    color: #8b95a3;
+    font-size: 0.95em;
+    font-weight: 600;
+    margin-right: 0.35rem;
+}
+.public-site .price-drop-was s { text-decoration-thickness: 2px; }
+.public-site .price-drop-now { color: #8a1d12; font-weight: 800; }
+.public-site .price-drop-deal-lg .price-drop-badge {
+    font-size: 0.95rem;
+    padding: 0.42rem 0.9rem;
+}
+.public-site p.vehicle-price .price-drop-now {
+    font-size: 2.4rem;
+    letter-spacing: -0.04em;
+}
+@keyframes price-drop-pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .public-site .price-drop-badge { animation: none; }
+}
 .public-site .gallery-toolbar { background: #edf1f5; border-color: var(--line); }
 .public-site .gallery-mode-btn { color: #465366; }
 .public-site .gallery-mode-btn.active,

@@ -321,6 +321,10 @@ def _ensure_schema_columns(app):
                             'ALTER TABLE vehicles ADD COLUMN facebook_last_error VARCHAR(500)')
                 _add_column(conn, 'vehicles', 'facebook_last_status',
                             'ALTER TABLE vehicles ADD COLUMN facebook_last_status VARCHAR(32)')
+                _add_column(conn, 'vehicles', 'previous_price',
+                            'ALTER TABLE vehicles ADD COLUMN previous_price NUMERIC(10, 2)')
+                _add_column(conn, 'vehicles', 'price_dropped_at',
+                            'ALTER TABLE vehicles ADD COLUMN price_dropped_at DATETIME')
         if 'reviews' in tables:
             with db.engine.begin() as conn:
                 _add_column(conn, 'reviews', 'source',

@@ -213,6 +213,8 @@ class MarketplaceSyncTests(unittest.TestCase):
             self.assertEqual(sync_due(), {'checked': 1, 'updated': 1, 'failed': 0})
             download.assert_not_called()
         self.assertEqual(self.vehicle.price, 11900)
+        self.assertEqual(self.vehicle.previous_price, 12500)
+        self.assertIsNotNone(self.vehicle.price_dropped_at)
         self.assertEqual(self.vehicle.description, 'Staff correction')
         self.assertEqual(len(self.vehicle.images), 2)
         self.assertGreater(self.source.next_check_at, utcnow())
