@@ -416,19 +416,20 @@ bi-check-circle
 
                     {% if vehicle.status == 'available' %}
                     <div id="shopper-tools" class="mt-4">
-                        <h2 class="h5 fw-bold">Estimate, visit, or hold it in person</h2>
-                        <p class="small text-muted">Estimates are shopping aids, not credit offers. A test drive is confirmed only when our team contacts you. A hold cannot be started online.</p>
+                        <h2 class="h5 fw-bold">Visit or hold it in person</h2>
+                        <p class="small text-muted">Payment examples are shopping aids, not credit offers. A test drive is confirmed only when our team contacts you. A hold cannot be started online.</p>
+                        <div class="otd-price-callout mb-3" role="note">
+                            <div class="otd-price-callout-kicker"><i class="bi bi-patch-check-fill" aria-hidden="true"></i> No extra fees</div>
+                            <p class="otd-price-callout-title mb-2">The advertised price is your out-the-door price.</p>
+                            <p class="mb-2">Marshall Auto does not add dealer, documentation, or other extra fees. The price shown for this vehicle, <strong>{{ vehicle.display_price | format_price }}</strong>, is the price you pay.</p>
+                            <p class="small mb-0">A trade-in can lower what you owe us. If you finance, the lender — not Marshall Auto — sets the loan terms. Payment examples below are illustrations, not approvals.</p>
+                        </div>
                         <div class="border rounded p-3 mb-3">
-                            <div class="d-flex justify-content-between"><span>Advertised price</span><strong>{{ estimate.selling_price | format_currency }}</strong></div>
-                            <div class="d-flex justify-content-between"><span>NC highway use tax (3% of bill of sale)</span><span>{{ estimate.highway_use_tax | format_currency }}</span></div>
-                            <div class="d-flex justify-content-between"><span>Estimated title, tag, and notary</span><span>{{ estimate.fees_subtotal | format_currency }}</span></div>
-                            {% if estimate.estimated_property_tax %}<div class="d-flex justify-content-between"><span>Estimated property tax</span><span>{{ estimate.estimated_property_tax | format_currency }}</span></div>{% endif %}
-                            <hr>
-                            <div class="d-flex justify-content-between"><span>Estimated out the door</span><strong>{{ estimate.estimated_total | format_currency }}</strong></div>
-                            <p class="small text-muted mb-2 mt-2">{{ estimate.tax_rate_label }}. County property tax, a trade-in, and lender fees can change the amount due.</p>
+                            <div class="d-flex justify-content-between"><span>Out-the-door price</span><strong>{{ vehicle.display_price | format_currency }}</strong></div>
+                            <p class="small text-muted mb-2 mt-2">No dealer fees are added to this price.</p>
                             <div class="small">
                                 {% for example in payment_examples %}
-                                <div>{{ example.months }} months at {{ example.rate }}% APR: about {{ example.payment | format_currency }}/mo, before tax and fees.</div>
+                                <div>{{ example.months }} months at {{ example.rate }}% APR: about {{ example.payment | format_currency }}/mo if this out-the-door price is financed.</div>
                                 {% endfor %}
                             </div>
                             <p class="small text-muted mb-0 mt-2">Payment examples assume the advertised price is financed, with no down payment. They are not approvals from Lendmark Financial Services or any other lender.</p>
@@ -787,7 +788,7 @@ bi-check-circle
                     <div class="border rounded p-3 mb-3 bg-light">
                         <h3 class="h6 fw-bold">Before you decide</h3>
                         <ul class="small mb-0">
-                            <li>The advertised price is not an out-the-door price. Use the estimate above, then confirm tax and fees in person.</li>
+                            <li>The advertised price is the out-the-door price. Marshall Auto does not charge any extra fees.</li>
                             <li>Title status is {{ vehicle.title_status | replace('_', ' ') | title if vehicle.title_status else 'listed on this page' }}. Ask to review the title and history before you buy.</li>
                             <li>North Carolina requires liability insurance before a vehicle can be legally driven on public roads.</li>
                             <li>Pickup is at {{ business_address }}. Ask us about delivery options and cost before planning a trip.</li>

@@ -461,11 +461,11 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PUBLIC_CACHE_SECONDS` | Public HTML cache lifetime (default `60`) |
 | `IMAGE_CDN_BASE_URL` | Optional CDN origin for uploaded images |
 | `SENTRY_DSN` | Optional Sentry error-tracking DSN |
-| `ESTIMATE_TITLE_FEE` | Estimated title fee in out-the-door examples (default `66.75`) |
-| `ESTIMATE_LICENSE_PLATE_FEE` | Estimated plate fee (default `46.25`) |
-| `ESTIMATE_NOTARY_FEE` | Estimated notary fee (default `15.00`) |
-| `ESTIMATE_DOC_FEE` | Estimated documentation fee (default `0`) |
-| `ESTIMATE_PROPERTY_TAX` | Estimated county property tax (default `0`) |
+| `ESTIMATE_TITLE_FEE` | Unused by public pages. Kept for the legacy estimate helper (default `66.75`) |
+| `ESTIMATE_LICENSE_PLATE_FEE` | Unused by public pages. Legacy plate-fee default `46.25` |
+| `ESTIMATE_NOTARY_FEE` | Unused by public pages. Legacy notary-fee default `15.00` |
+| `ESTIMATE_DOC_FEE` | Unused by public pages. Legacy documentation-fee default `0` |
+| `ESTIMATE_PROPERTY_TAX` | Unused by public pages. Legacy property-tax default `0` |
 
 Analytics and Facebook posting credentials can also be set in **Admin → Settings** (`google_tag_id`, `google_analytics_id`, `facebook_pixel_id`, Page ID, Page access token), which override env defaults when present.
 

@@ -23,7 +23,7 @@
                 </div>
                 <h1>{{ site_setting.get('home_hero_title') }}</h1>
                 <p class="mb-4">{{ site_setting.get('home_hero_subtitle') }}</p>
-                <p class="lead text-white-50 mb-4">We also offer rebuilt title vehicles at huge discounts — fully inspected and ready for the road.</p>
+                <p class="lead text-white-50 mb-4">We also offer rebuilt title vehicles at huge discounts — fully inspected and ready for the road. The advertised price is the out-the-door price. We do not charge any extra fees.</p>
                 <div class="hero-actions d-flex flex-wrap gap-3 justify-content-lg-start justify-content-center">
                     <a href="{{ url_for('main.inventory') }}" class="btn btn-primary btn-lg">
                         <i class="bi bi-search me-2"></i>Browse Inventory
@@ -80,6 +80,8 @@
 
 <div class="hero-assurances">
     <div class="container">
+        <div><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Advertised price is the out-the-door price</div>
+        <div><i class="bi bi-cash-stack" aria-hidden="true"></i> No extra fees</div>
         <div><i class="bi bi-file-earmark-text" aria-hidden="true"></i> History reports on qualifying vehicles</div>
         <div><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Trade-ins welcome</div>
         <div><i class="bi bi-calendar-check" aria-hidden="true"></i> Test drives on your schedule</div>
@@ -215,6 +217,11 @@
             <p class="section-subtitle mx-auto">We make car buying simple, transparent, and stress-free.</p>
         </div>
         <div class="row g-4">
+            <div class="col-md-4 text-center">
+                <div class="feature-icon"><i class="bi bi-patch-check-fill"></i></div>
+                <h5 class="fw-bold">No Extra Fees</h5>
+                <p class="text-muted">The price on the vehicle is the out-the-door price. Marshall Auto does not add dealer, documentation, or other extra fees.</p>
+            </div>
             <div class="col-md-4 text-center">
                 <div class="feature-icon"><i class="bi bi-file-earmark-text"></i></div>
                 <h5 class="fw-bold">CarFax Available</h5>
@@ -377,7 +384,7 @@
                             <strong id="calc-interest"></strong>
                         </div>
                     </div>
-                    <p class="small text-muted mt-3">Illustration only, not a credit decision, offer, or quote. It assumes a fixed APR and equal monthly payments and uses only the vehicle price less the down payment you enter as the amount financed. It excludes taxes, title and registration charges, dealer or lender fees, optional products, insurance, and other amounts that may be included in a transaction. Actual approval and terms are determined by the lender and final contract.</p>
+                    <p class="small text-muted mt-3">Illustration only, not a credit decision, offer, or quote. It assumes a fixed APR and equal monthly payments and uses only the advertised out-the-door price less the down payment you enter as the amount financed. Marshall Auto does not add dealer or other extra fees to that price. A lender may still charge its own fees, and insurance is separate. Actual approval and terms are determined by the lender and final contract.</p>
                 </div>
             </div>
         </div>

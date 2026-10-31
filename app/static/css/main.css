@@ -1752,6 +1752,61 @@ p.vehicle-price .price-drop-now {
     }
 }
 
+.otd-price-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+    color: #166534;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.otd-price-note .bi {
+    margin-top: 0.1rem;
+    flex: 0 0 auto;
+}
+
+.otd-price-note-lg {
+    margin-top: 0.55rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #86efac;
+    border-radius: 12px;
+    background: #f0fdf4;
+    color: #14532d;
+    font-size: 0.95rem;
+}
+
+.otd-price-callout {
+    padding: 1rem 1.05rem;
+    border: 2px solid #16a34a;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #f0fdf4 0%, #fff 70%);
+    color: #14532d;
+}
+
+.otd-price-callout-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.4rem;
+    color: #fff;
+    background: #15803d;
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.otd-price-callout-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
 /* Retail value savings comparison (eye-catching "below retail" callouts) */
 .savings-callout {
     display: inline-flex;

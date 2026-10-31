@@ -1,9 +1,9 @@
-"""Payment and out-the-door estimates.
+"""Payment illustrations.
 
 These figures are shopping aids, not credit offers, approvals, or quotes.
-North Carolina highway-use tax is 3% of the total value on the bill of sale.
-County and municipal property tax,
-tag, title, and notary amounts vary and are shown as configurable estimates.
+The public advertised price is the out-the-door price. Marshall Auto does not
+add dealer or other extra fees to it. The highway-use tax helper remains for
+internal calculations and is not added to the customer price.
 """
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -27,7 +27,11 @@ def highway_use_tax(price):
 
 
 def out_the_door_estimate(price):
-    """Estimated cash due before any trade, down payment, or lender fees."""
+    """Legacy government-charge breakdown. Not shown as the customer price.
+
+    The advertised price is the out-the-door price. Do not add this total on
+    public vehicle pages.
+    """
     selling_price = money(price)
     tax = highway_use_tax(selling_price)
     title = _config_money('ESTIMATE_TITLE_FEE', '66.75')

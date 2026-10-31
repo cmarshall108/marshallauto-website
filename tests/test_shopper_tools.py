@@ -5,7 +5,7 @@ from decimal import Decimal
 from app import create_app, db
 from app.models import InventoryAlert, TestDrive, Vehicle, VehicleHoldRequest, utcnow
 from app.platform import rate_limit_exceeded
-from app.pricing import highway_use_tax, monthly_payment, out_the_door_estimate
+from app.pricing import highway_use_tax, monthly_payment
 from app.shopper import confirm_hold, create_hold_request, create_inventory_alert, process_inventory_alerts
 from config import TestingConfig
 
@@ -33,11 +33,9 @@ class ShopperToolTests(unittest.TestCase):
         db.drop_all()
         self.ctx.pop()
 
-    def test_north_carolina_tax_is_three_percent_of_bill_of_sale(self):
+    def test_north_carolina_tax_helper_is_three_percent(self):
         self.assertEqual(highway_use_tax(10000), Decimal('300.00'))
         self.assertEqual(highway_use_tax(100000), Decimal('3000.00'))
-        estimate = out_the_door_estimate(10000)
-        self.assertEqual(estimate['estimated_total'], Decimal('10428.00'))
 
     def test_payment_example_is_an_estimate(self):
         self.assertEqual(monthly_payment(10000, 0, 50), Decimal('200.00'))
@@ -46,7 +44,10 @@ class ShopperToolTests(unittest.TestCase):
         response = self.client.get('/inventory/shopper-civic')
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn('Estimated out the door', text)
+        self.assertIn('The advertised price is your out-the-door price.', text)
+        self.assertIn('does not add dealer, documentation, or other extra fees', text)
+        self.assertNotIn('Estimated out the door', text)
+        self.assertNotIn('not an out-the-door price', text)
         self.assertIn('Request a test drive', text)
         self.assertIn('72-hour hold — in person only', text)
         self.assertIn("cashier", text)

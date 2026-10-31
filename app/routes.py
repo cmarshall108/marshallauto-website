@@ -1019,11 +1019,10 @@ def vehicle_detail(slug):
     if vehicle.status != 'available':
         flash('This vehicle is no longer available.', 'info')
 
-    from app.pricing import out_the_door_estimate, payment_examples
+    from app.pricing import payment_examples
     from app.shopper import appointment_slots, similar_vehicles
 
     related = similar_vehicles(vehicle)
-    estimate = out_the_door_estimate(vehicle.display_price)
     payments = payment_examples(vehicle.display_price)
     slots = appointment_slots()
 
@@ -1103,7 +1102,6 @@ def vehicle_detail(slug):
         buyer_guides=published_buyer_guides(),
         related=related,
         form=form,
-        estimate=estimate,
         payment_examples=payments,
         test_drive_form=test_drive_form,
         alert_form=alert_form,

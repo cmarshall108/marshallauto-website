@@ -26,3 +26,13 @@
     <span class="price-drop-now">{{ vehicle.display_price | format_price }}</span>
     {% endif %}
 </p>
+{% if vehicle.status == 'available' and vehicle.display_price is not none %}
+<p class="otd-price-note{% if large %} otd-price-note-lg{% endif %} mb-0">
+    <i class="bi bi-patch-check-fill" aria-hidden="true"></i>
+    {% if large %}
+    <span><strong>Out-the-door price.</strong> We do not charge any extra fees. {{ vehicle.display_price | format_price }} is the price you pay.</span>
+    {% else %}
+    <span>Out-the-door price. No extra fees.</span>
+    {% endif %}
+</p>
+{% endif %}
