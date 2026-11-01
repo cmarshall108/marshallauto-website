@@ -41,6 +41,71 @@ class TwoFactorRecoveryForm(TwoFactorForm):
     submit = SubmitField('Replace Recovery Codes')
 
 
+class SalesmanCreateForm(FlaskForm):
+    username = StringField('Username *', validators=[DataRequired(), Length(min=3, max=64)])
+    temporary_password = PasswordField(
+        'Temporary Password *',
+        validators=[DataRequired(), Length(min=10, max=128)],
+        description='Shared once. The salesman must change it on first login.',
+    )
+    full_name = StringField('Full Name', validators=[Optional(), Length(max=128)])
+    email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
+    phone = StringField('Phone', validators=[Optional(), Length(max=32)])
+    dealer_tag = StringField(
+        'Dealer Tag',
+        validators=[Optional(), Length(max=64)],
+        description='Short name badge for quick-select on test drives (e.g. "J. Smith").',
+    )
+    is_active = BooleanField('Active', default=True)
+    submit = SubmitField('Create Salesman')
+
+
+class SalesmanEditForm(FlaskForm):
+    full_name = StringField('Full Name', validators=[Optional(), Length(max=128)])
+    email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
+    phone = StringField('Phone', validators=[Optional(), Length(max=32)])
+    dealer_tag = StringField('Dealer Tag', validators=[Optional(), Length(max=64)])
+    is_active = BooleanField('Active')
+    reset_temporary_password = PasswordField(
+        'Reset Temporary Password',
+        validators=[Optional(), Length(min=10, max=128)],
+        description='Leave blank to keep the current password. Setting a value forces a password change on next login.',
+    )
+    submit = SubmitField('Save Salesman')
+
+
+class ProfileSetupForm(FlaskForm):
+    full_name = StringField('Full Name *', validators=[DataRequired(), Length(max=128)])
+    email = StringField('Email *', validators=[DataRequired(), Email(), Length(max=120)])
+    phone = StringField('Phone *', validators=[DataRequired(), Length(max=32)])
+    dealer_tag = StringField(
+        'Dealer Tag *',
+        validators=[DataRequired(), Length(max=64)],
+        description='How your name appears on test drives and sale paperwork.',
+    )
+    new_password = PasswordField(
+        'New Password',
+        validators=[Optional(), Length(min=10, max=128)],
+        description='Required when a temporary password was assigned.',
+    )
+    confirm_password = PasswordField(
+        'Confirm New Password',
+        validators=[Optional(), EqualTo('new_password', message='Passwords must match.')],
+    )
+    submit = SubmitField('Save and Continue')
+
+    def validate_new_password(self, field):
+        # Enforced in the view when must_change_password is set.
+        pass
+
+
+class DealerTagForm(FlaskForm):
+    name = StringField('Dealer Tag *', validators=[DataRequired(), Length(max=64)])
+    sort_order = IntegerField('Sort Order', validators=[Optional(), NumberRange(min=0, max=9999)], default=0)
+    is_active = BooleanField('Active', default=True)
+    submit = SubmitField('Save Tag')
+
+
 class VehicleForm(FlaskForm):
     marketplace_url = StringField('Craigslist or Facebook listing', validators=[Optional(), Length(max=512)])
     marketplace_token = HiddenField()
@@ -171,6 +236,7 @@ class VehicleSaleForm(FlaskForm):
         ('wire', 'Wire / Bank Transfer'),
         ('other', 'Other / Mixed Payment'),
     ], validators=[Optional()])
+    salesperson = StringField('Salesperson', validators=[Optional(), Length(max=128)])
     sale_notes = TextAreaField('Sale Notes', validators=[Optional(), Length(max=20000)])
     buyer_id_images = FileField('Buyer ID Photos', render_kw={'multiple': True})
     scanned_documents = FileField('Scanned Documents', render_kw={'multiple': True})

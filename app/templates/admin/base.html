@@ -32,8 +32,14 @@
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.lead') %}active{% endif %}" href="{{ url_for('admin.leads') }}"><i class="bi bi-envelope me-2"></i> Leads</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'chat.inbox' %}active{% endif %}" href="{{ url_for('chat.inbox') }}"><i class="bi bi-chat-dots me-2"></i> Live Chat</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.analytics' %}active{% endif %}" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i> Analytics</a></li>
+            {% if current_user.is_admin %}
+            <li class="nav-item"><a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.salesman') or 'dealer_tag' in request.endpoint) %}active{% endif %}" href="{{ url_for('admin.salesmen') }}"><i class="bi bi-people me-2"></i> Salesmen</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i> Settings</a></li>
-            <li class="nav-item mt-4"><a class="nav-link text-danger" href="{{ url_for('admin.logout') }}"><i class="bi bi-box-arrow-right me-2"></i> Log Out</a></li>
+            {% endif %}
+            <li class="nav-item mt-4">
+                <div class="text-white-50 small px-3 mb-1">{{ current_user.display_name }}{% if current_user.is_salesman %} · Sales{% endif %}</div>
+                <a class="nav-link text-danger" href="{{ url_for('admin.logout') }}"><i class="bi bi-box-arrow-right me-2"></i> Log Out</a>
+            </li>
         </ul>
     </div>
 
@@ -58,7 +64,10 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.leads') }}"><i class="bi bi-envelope me-2"></i>Leads</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('chat.inbox') }}"><i class="bi bi-chat-dots me-2"></i>Live Chat</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i>Analytics</a></li>
+                    {% if current_user.is_admin %}
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.salesmen') }}"><i class="bi bi-people me-2"></i>Salesmen</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                    {% endif %}
                     <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('admin.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Log Out</a></li>
                 </ul>
             </div>

@@ -253,13 +253,25 @@ responsive preloads and gallery navigation. Blog covers reserve a 16:9 display
 area without cropping the article image. Measure mobile performance and organic
 inquiries in production; these changes do not guarantee rankings.
 
+## Salesman accounts and dealer tags
+
+Administrators can create **salesman** logins under **Admin → Salesmen**:
+
+1. Add a username and temporary password (optionally pre-fill name, email, phone, and dealer tag).
+2. The salesman signs in at `/admin/login`.
+3. **Two-factor authentication is always required for salesmen** (even when site-wide admin 2FA is off). On first login they enroll an authenticator and save recovery codes.
+4. They then complete **profile setup**: full name, email, phone, dealer tag, and a new password replacing the temporary one.
+5. After onboarding, the panel prefills their **dealer tag / salesperson name** on test drives, vehicle sale details, and the bill of sale. Saved **dealer tags** appear as quick-select chips on those forms.
+
+Only administrators can open Settings or manage salesman accounts and dealer tags. Deactivating a salesman blocks further logins and invalidates their sessions. Resetting a temporary password from the edit screen also clears 2FA so they re-enroll on the next login.
+
 ## Admin two-factor authentication
 
-Two-factor authentication is **off by default**, including for accounts that
-previously enrolled. Sign in with your password and use **Settings → Require
-two-factor authentication for every admin → Save Settings** when ready to enable it.
-This switch applies site-wide and requires a fresh sign-in when enabled. Existing
-password-only sessions no longer grant access; each admin enters their password
+Two-factor authentication is **off by default for administrator accounts**, including for accounts that
+previously enrolled. **Salesman accounts always require 2FA** (see above). Sign in with your password and use **Settings → Require
+two-factor authentication for every admin → Save Settings** when ready to enable it for admins.
+This switch applies site-wide to admins and requires a fresh sign-in when enabled. Existing
+password-only admin sessions no longer grant access; each admin enters their password
 and verifies their authenticator or enrolls before the panel is accessible.
 Scan the locally generated QR code with Google Authenticator, Microsoft
 Authenticator, 1Password, or another standard TOTP app (or enter the manual key).

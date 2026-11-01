@@ -23,13 +23,14 @@ from sqlalchemy.orm import selectinload
 
 from app import db
 from app.forms import (
-    BlogPostForm, CarfaxReportForm, ChangePasswordForm, LoginForm, ReviewForm,
-    RebuildCostEntryForm, ServiceRecordForm, SiteSettingForm, TestDriveEditForm,
+    BlogPostForm, CarfaxReportForm, ChangePasswordForm, DealerTagForm, LoginForm,
+    ProfileSetupForm, RebuildCostEntryForm, ReviewForm, SalesmanCreateForm,
+    SalesmanEditForm, ServiceRecordForm, SiteSettingForm, TestDriveEditForm,
     TestDriveForm, TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm,
     VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm,
 )
 from app.models import (
-    AnalyticsEvent, BlogPost, CarfaxReport, Lead, PageView, Review, ServiceRecord,
+    AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, Lead, PageView, Review, ServiceRecord,
     InventoryAlert, RebuildCostEntry, RebuildCostReceipt, SiteSetting, TestDrive, User, Vehicle,
     VehicleHoldRequest, VehicleImage,
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
@@ -71,6 +72,26 @@ from app.two_factor import (
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 
+_ONBOARDING_EXEMPT_ENDPOINTS = frozenset({
+    'admin.login', 'admin.logout', 'admin.profile_setup',
+    'admin.two_factor_setup', 'admin.two_factor_qr', 'admin.two_factor_verify',
+    'admin.two_factor_recovery',
+})
+
+
+@admin_bp.before_request
+def _enforce_staff_onboarding():
+    """Force incomplete salesman profiles through first-login setup before the panel."""
+    if request.endpoint in _ONBOARDING_EXEMPT_ENDPOINTS:
+        return None
+    if (
+        current_user.is_authenticated
+        and current_user.is_active
+        and current_user.needs_onboarding
+    ):
+        return redirect(url_for('admin.profile_setup', next=request.full_path if request.method == 'GET' else None))
+    return None
+
 
 @admin_bp.after_request
 def _admin_no_index(response):
@@ -87,11 +108,27 @@ def _admin_no_index(response):
 
 
 def admin_required(f):
-    """Decorator requiring an authenticated active admin user."""
+    """Decorator requiring an authenticated active staff user (admin or salesman)."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_active:
             return redirect(url_for('admin.login', next=request.path))
+        if current_user.needs_onboarding and request.endpoint not in (
+            'admin.profile_setup', 'admin.logout',
+        ):
+            return redirect(url_for('admin.profile_setup', next=request.path))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_role_required(f):
+    """Decorator requiring the admin role (not salesman)."""
+    @wraps(f)
+    @admin_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_admin:
+            flash('Only administrators can access that page.', 'warning')
+            return redirect(url_for('admin.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -101,6 +138,36 @@ def _vehicle_choices():
         (v.id, v.title)
         for v in Vehicle.query.order_by(Vehicle.year.desc(), Vehicle.make).all()
     ]
+
+
+def _dealer_tag_choices():
+    """Active dealer tags plus signed-in user label for quick-select lists."""
+    names = DealerTag.active_names()
+    if current_user.is_authenticated:
+        label = current_user.salesperson_label
+        if label and label not in names:
+            names = [label] + names
+    return names
+
+
+def _prefill_salesperson(form):
+    """Prefill salesperson from the signed-in staff profile when empty."""
+    if getattr(form, 'salesperson', None) is None:
+        return
+    if form.salesperson.data:
+        return
+    if current_user.is_authenticated:
+        label = current_user.salesperson_label
+        if label:
+            form.salesperson.data = label
+
+
+def _post_login_destination(user, next_page=None):
+    if user.needs_onboarding:
+        return url_for('admin.profile_setup', next=next_page if is_safe_redirect(next_page) else None)
+    if next_page and is_safe_redirect(next_page):
+        return next_page
+    return url_for('admin.dashboard')
 
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
@@ -145,9 +212,7 @@ def login():
             db.session.commit()
             current_app.logger.info('Admin login succeeded: %s from %s', username, client_ip())
             login_user(user, remember=bool(form.remember.data))
-            if next_page and is_safe_redirect(next_page):
-                return redirect(next_page)
-            return redirect(url_for('admin.dashboard'))
+            return redirect(_post_login_destination(user, next_page))
 
         if user:
             record_failure(user)
@@ -177,7 +242,7 @@ def _finish_two_factor_login(user):
     login_user(user, remember=False)
     mark_session_verified(user)
     current_app.logger.info('Admin two-factor login succeeded for user %s', user.id)
-    return next_page if is_safe_redirect(next_page) else url_for('admin.dashboard')
+    return _post_login_destination(user, next_page)
 
 
 @admin_bp.route('/login/verify', methods=['GET', 'POST'])
@@ -306,9 +371,56 @@ def logout():
     return redirect(url_for('admin.login'))
 
 
+@admin_bp.route('/profile/setup', methods=['GET', 'POST'])
+@login_required
+def profile_setup():
+    """First-login onboarding: collect salesman info and replace temporary password."""
+    if not current_user.needs_onboarding and request.method == 'GET':
+        next_page = request.args.get('next')
+        return redirect(next_page if is_safe_redirect(next_page) else url_for('admin.dashboard'))
+
+    form = ProfileSetupForm(obj=current_user)
+    require_password = bool(current_user.must_change_password)
+    if form.validate_on_submit():
+        if require_password and not (form.new_password.data or '').strip():
+            form.new_password.errors.append('Choose a new password to replace the temporary one.')
+            return render_template(
+                'admin/profile_setup.html', form=form, require_password=require_password,
+            ), 422
+        if form.new_password.data:
+            if form.new_password.data != form.confirm_password.data:
+                form.confirm_password.errors.append('Passwords must match.')
+                return render_template(
+                    'admin/profile_setup.html', form=form, require_password=require_password,
+                ), 422
+            current_user.set_password(form.new_password.data)
+            current_user.must_change_password = False
+            mark_session_verified(current_user)
+        current_user.full_name = form.full_name.data.strip()
+        current_user.email = form.email.data.strip()
+        current_user.phone = form.phone.data.strip()
+        current_user.dealer_tag = form.dealer_tag.data.strip()
+        current_user.profile_complete = True
+        DealerTag.upsert_for_user(current_user)
+        db.session.commit()
+        flash('Profile saved. Welcome aboard.', 'success')
+        next_page = request.args.get('next') or request.form.get('next')
+        return redirect(next_page if is_safe_redirect(next_page) else url_for('admin.dashboard'))
+
+    if request.method == 'GET':
+        if not form.dealer_tag.data and current_user.full_name:
+            form.dealer_tag.data = current_user.full_name
+        if not form.full_name.data and current_user.dealer_tag:
+            form.full_name.data = current_user.dealer_tag
+
+    return render_template(
+        'admin/profile_setup.html', form=form, require_password=require_password,
+    )
+
+
 @admin_bp.route('/')
 @admin_bp.route('/dashboard')
-@login_required
+@admin_required
 def dashboard():
     stats = {
         'total_vehicles': Vehicle.query.count(),
@@ -594,10 +706,16 @@ def vehicle_hold_deposit(id):
 def vehicle_bill_of_sale(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
     amount = vehicle.sold_price if vehicle.sold_price is not None else vehicle.display_price
+    salesperson = (
+        vehicle.salesperson
+        or (current_user.salesperson_label if current_user.is_authenticated else '')
+        or ''
+    )
     return render_template(
         'admin/bill_of_sale_print.html',
         vehicle=vehicle,
         sale_amount=format_currency(amount) if amount is not None else '',
+        salesperson=salesperson,
         seller_name=current_app.config['BUSINESS_NAME'],
         seller_address=(
             f"{current_app.config['BUSINESS_ADDRESS']}, "
@@ -1183,6 +1301,9 @@ def vehicle_sale(id):
         flash('Mark this vehicle as sold before editing sale details.', 'warning')
         return redirect(url_for('admin.vehicle_edit', id=id))
     form = VehicleSaleForm(obj=vehicle)
+    dealer_tags = _dealer_tag_choices()
+    if request.method == 'GET' and not form.salesperson.data:
+        _prefill_salesperson(form)
     if form.validate_on_submit():
         uploads = [file for file in request.files.getlist('buyer_id_images') if file.filename]
         filenames = []
@@ -1203,6 +1324,7 @@ def vehicle_sale(id):
             documents = _save_sale_documents(form)
             vehicle.sold_price = form.sold_price.data
             vehicle.payment_method = form.payment_method.data or None
+            vehicle.salesperson = (form.salesperson.data or '').strip() or None
             vehicle.sale_notes = (form.sale_notes.data or '').strip() or None
             for filename in filenames:
                 vehicle.sale_images.append(VehicleSaleImage(filename=filename))
@@ -1220,7 +1342,9 @@ def vehicle_sale(id):
                 form.buyer_id_images.errors.append(message)
             else:
                 form.scanned_documents.errors.append(message)
-            return render_template('admin/vehicle_sale.html', form=form, vehicle=vehicle), 422
+            return render_template(
+                'admin/vehicle_sale.html', form=form, vehicle=vehicle, dealer_tags=dealer_tags,
+            ), 422
         except Exception:
             db.session.rollback()
             for filename in filenames:
@@ -1230,7 +1354,9 @@ def vehicle_sale(id):
             raise
         flash('Sale details saved.', 'success')
         return redirect(url_for('admin.vehicle_sale', id=id))
-    return render_template('admin/vehicle_sale.html', form=form, vehicle=vehicle)
+    return render_template(
+        'admin/vehicle_sale.html', form=form, vehicle=vehicle, dealer_tags=dealer_tags,
+    )
 
 
 @admin_bp.get('/vehicles/<int:id>/sale/images/<int:image_id>')
@@ -1815,9 +1941,12 @@ def test_drives():
 def test_drive_new():
     form = TestDriveForm()
     form.vehicle_id.choices = _vehicle_choices()
+    dealer_tags = _dealer_tag_choices()
     preselect_vehicle_id = request.args.get('vehicle_id', type=int)
-    if request.method == 'GET' and preselect_vehicle_id:
-        form.vehicle_id.data = preselect_vehicle_id
+    if request.method == 'GET':
+        if preselect_vehicle_id:
+            form.vehicle_id.data = preselect_vehicle_id
+        _prefill_salesperson(form)
     if form.validate_on_submit():
         test_drive = TestDrive(
             vehicle_id=form.vehicle_id.data,
@@ -1839,12 +1968,18 @@ def test_drive_new():
             _apply_test_drive_license(test_drive, form)
         except ValueError as exc:
             form.license_image.errors.append(str(exc))
-            return render_template('admin/test_drive_form.html', form=form, test_drive=None, title='Check Out Test Drive'), 422
+            return render_template(
+                'admin/test_drive_form.html', form=form, test_drive=None,
+                title='Check Out Test Drive', dealer_tags=dealer_tags,
+            ), 422
         db.session.add(test_drive)
         db.session.commit()
         flash('Test drive checked out.', 'success')
         return redirect(url_for('admin.test_drives'))
-    return render_template('admin/test_drive_form.html', form=form, test_drive=None, title='Check Out Test Drive')
+    return render_template(
+        'admin/test_drive_form.html', form=form, test_drive=None,
+        title='Check Out Test Drive', dealer_tags=dealer_tags,
+    )
 
 
 @admin_bp.route('/holds')
@@ -1897,6 +2032,9 @@ def inventory_alerts_send_due():
 def test_drive_edit(id):
     test_drive = db.session.get(TestDrive, id) or abort(404)
     form = TestDriveEditForm(obj=test_drive)
+    dealer_tags = _dealer_tag_choices()
+    if request.method == 'GET' and not form.salesperson.data:
+        _prefill_salesperson(form)
     if form.validate_on_submit():
         was_out = test_drive.status == 'out'
         test_drive.customer_name = form.customer_name.data.strip()
@@ -1916,7 +2054,10 @@ def test_drive_edit(id):
             _apply_test_drive_license(test_drive, form)
         except ValueError as exc:
             form.license_image.errors.append(str(exc))
-            return render_template('admin/test_drive_form.html', form=form, test_drive=test_drive, title='Edit Test Drive'), 422
+            return render_template(
+                'admin/test_drive_form.html', form=form, test_drive=test_drive,
+                title='Edit Test Drive', dealer_tags=dealer_tags,
+            ), 422
         if test_drive.status == 'returned' and was_out and not test_drive.returned_at:
             test_drive.returned_at = utcnow()
         elif test_drive.status == 'out':
@@ -1924,7 +2065,10 @@ def test_drive_edit(id):
         db.session.commit()
         flash('Test drive updated.', 'success')
         return redirect(url_for('admin.test_drives'))
-    return render_template('admin/test_drive_form.html', form=form, test_drive=test_drive, title='Edit Test Drive')
+    return render_template(
+        'admin/test_drive_form.html', form=form, test_drive=test_drive,
+        title='Edit Test Drive', dealer_tags=dealer_tags,
+    )
 
 
 @admin_bp.route('/test-drives/<int:id>/return', methods=['GET', 'POST'])
@@ -2078,7 +2222,7 @@ def lead_delete(id):
 # ------------------------------ SETTINGS ------------------------------
 
 @admin_bp.route('/settings', methods=['GET', 'POST'])
-@login_required
+@admin_role_required
 def settings():
     form = SiteSettingForm()
     was_required = requires_two_factor(current_user)
@@ -2198,7 +2342,7 @@ def settings():
 
 
 @admin_bp.route('/settings/password', methods=['POST'])
-@login_required
+@admin_role_required
 def change_password():
     form = ChangePasswordForm()
     if form.validate_on_submit():
@@ -2221,6 +2365,170 @@ def change_password():
             for err in errors:
                 flash(err, 'danger')
     return redirect(url_for('admin.settings'))
+
+
+# ------------------------------ SALESMEN & DEALER TAGS ------------------------------
+
+@admin_bp.route('/salesmen')
+@admin_role_required
+def salesmen():
+    users = (
+        User.query.filter(User.role == User.ROLE_SALESMAN)
+        .order_by(User.is_active_user.desc(), User.full_name.asc(), User.username.asc())
+        .all()
+    )
+    tags = DealerTag.query.order_by(DealerTag.sort_order.asc(), DealerTag.name.asc()).all()
+    return render_template(
+        'admin/salesmen.html',
+        salesmen=users,
+        dealer_tags=tags,
+        create_form=SalesmanCreateForm(),
+        tag_form=DealerTagForm(),
+    )
+
+
+@admin_bp.route('/salesmen/new', methods=['GET', 'POST'])
+@admin_role_required
+def salesman_new():
+    form = SalesmanCreateForm()
+    if form.validate_on_submit():
+        username = form.username.data.strip()
+        if User.query.filter(db.func.lower(User.username) == username.lower()).first():
+            form.username.errors.append('That username is already taken.')
+            return render_template('admin/salesman_form.html', form=form, salesman=None, title='Add Salesman'), 422
+        user = User(
+            username=username,
+            role=User.ROLE_SALESMAN,
+            full_name=(form.full_name.data or '').strip() or None,
+            email=(form.email.data or '').strip() or None,
+            phone=(form.phone.data or '').strip() or None,
+            dealer_tag=(form.dealer_tag.data or '').strip() or None,
+            is_active_user=bool(form.is_active.data),
+            profile_complete=False,
+            must_change_password=True,
+        )
+        user.set_password(form.temporary_password.data)
+        db.session.add(user)
+        db.session.flush()
+        if user.dealer_tag or user.full_name:
+            DealerTag.upsert_for_user(user)
+        db.session.commit()
+        current_app.logger.info('Salesman account created: %s by %s', user.username, current_user.username)
+        flash(
+            f'Salesman "{user.username}" created. Share the temporary password securely; '
+            'they must complete profile setup and two-factor authentication on first login.',
+            'success',
+        )
+        return redirect(url_for('admin.salesmen'))
+    return render_template('admin/salesman_form.html', form=form, salesman=None, title='Add Salesman')
+
+
+@admin_bp.route('/salesmen/<int:id>/edit', methods=['GET', 'POST'])
+@admin_role_required
+def salesman_edit(id):
+    salesman = db.session.get(User, id) or abort(404)
+    if not salesman.is_salesman:
+        abort(404)
+    form = SalesmanEditForm(obj=salesman)
+    if form.validate_on_submit():
+        salesman.full_name = (form.full_name.data or '').strip() or None
+        salesman.email = (form.email.data or '').strip() or None
+        salesman.phone = (form.phone.data or '').strip() or None
+        salesman.dealer_tag = (form.dealer_tag.data or '').strip() or None
+        salesman.is_active_user = bool(form.is_active.data)
+        if form.reset_temporary_password.data:
+            salesman.set_password(form.reset_temporary_password.data)
+            salesman.must_change_password = True
+            salesman.totp_enabled = False
+            salesman.totp_secret_encrypted = None
+            salesman.totp_last_counter = None
+            from app.models import AdminRecoveryCode
+            AdminRecoveryCode.query.filter_by(user_id=salesman.id).delete(synchronize_session=False)
+        if salesman.dealer_tag or salesman.full_name:
+            DealerTag.upsert_for_user(salesman)
+        db.session.commit()
+        flash('Salesman updated.', 'success')
+        return redirect(url_for('admin.salesmen'))
+    if request.method == 'GET':
+        form.is_active.data = salesman.is_active_user
+    return render_template(
+        'admin/salesman_form.html', form=form, salesman=salesman, title='Edit Salesman',
+    )
+
+
+@admin_bp.route('/salesmen/<int:id>/deactivate', methods=['POST'])
+@admin_role_required
+def salesman_deactivate(id):
+    salesman = db.session.get(User, id) or abort(404)
+    if not salesman.is_salesman:
+        abort(404)
+    salesman.is_active_user = False
+    salesman.auth_version = secrets.token_hex(16)
+    db.session.commit()
+    flash(f'Salesman "{salesman.username}" deactivated.', 'success')
+    return redirect(url_for('admin.salesmen'))
+
+
+@admin_bp.route('/salesmen/<int:id>/activate', methods=['POST'])
+@admin_role_required
+def salesman_activate(id):
+    salesman = db.session.get(User, id) or abort(404)
+    if not salesman.is_salesman:
+        abort(404)
+    salesman.is_active_user = True
+    salesman.failed_login_attempts = 0
+    salesman.locked_until = None
+    db.session.commit()
+    flash(f'Salesman "{salesman.username}" activated.', 'success')
+    return redirect(url_for('admin.salesmen'))
+
+
+@admin_bp.route('/dealer-tags', methods=['POST'])
+@admin_role_required
+def dealer_tag_create():
+    form = DealerTagForm()
+    if form.validate_on_submit():
+        name = form.name.data.strip()
+        existing = DealerTag.query.filter(db.func.lower(DealerTag.name) == name.lower()).first()
+        if existing:
+            existing.name = name
+            existing.is_active = bool(form.is_active.data)
+            existing.sort_order = form.sort_order.data or 0
+            flash('Dealer tag updated.', 'success')
+        else:
+            db.session.add(DealerTag(
+                name=name,
+                is_active=bool(form.is_active.data),
+                sort_order=form.sort_order.data or 0,
+            ))
+            flash('Dealer tag saved for quick-select.', 'success')
+        db.session.commit()
+    else:
+        for errors in form.errors.values():
+            for err in errors:
+                flash(err, 'danger')
+    return redirect(url_for('admin.salesmen'))
+
+
+@admin_bp.route('/dealer-tags/<int:id>/toggle', methods=['POST'])
+@admin_role_required
+def dealer_tag_toggle(id):
+    tag = db.session.get(DealerTag, id) or abort(404)
+    tag.is_active = not tag.is_active
+    db.session.commit()
+    flash(f'Dealer tag "{tag.name}" {"enabled" if tag.is_active else "disabled"}.', 'success')
+    return redirect(url_for('admin.salesmen'))
+
+
+@admin_bp.route('/dealer-tags/<int:id>/delete', methods=['POST'])
+@admin_role_required
+def dealer_tag_delete(id):
+    tag = db.session.get(DealerTag, id) or abort(404)
+    name = tag.name
+    db.session.delete(tag)
+    db.session.commit()
+    flash(f'Dealer tag "{name}" deleted.', 'success')
+    return redirect(url_for('admin.salesmen'))
 
 
 # ------------------------------ HELPERS ------------------------------

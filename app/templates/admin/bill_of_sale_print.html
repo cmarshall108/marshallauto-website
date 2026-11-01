@@ -59,11 +59,15 @@
             of sale: <span class="bos-blank bos-blank-terms"></span>
         </p>
 
+        {% if salesperson %}
+        <p class="bos-meta">Salesperson:&nbsp;&nbsp;<span class="bos-fill">{{ salesperson }}</span></p>
+        {% endif %}
+
         <div class="bos-signatures">
             <div>
                 <p class="bos-party">Seller:</p>
                 <p class="bos-sign-line"><span>Signature</span></p>
-                <p class="bos-sign-line"><span>Printed Name</span></p>
+                <p class="bos-sign-line"><span>{% if salesperson %}{{ salesperson }}{% else %}Printed Name{% endif %}</span></p>
                 <p class="bos-sign-line"><span>Date</span></p>
             </div>
             <div>

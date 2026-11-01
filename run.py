@@ -44,7 +44,12 @@ def create_admin():
     if User.query.filter_by(username=username).first():
         print(f'Admin user "{username}" already exists.')
         return
-    user = User(username=username)
+    user = User(
+        username=username,
+        role=User.ROLE_ADMIN,
+        profile_complete=True,
+        must_change_password=False,
+    )
     user.set_password(password)
     db.session.add(user)
     db.session.commit()

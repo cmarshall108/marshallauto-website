@@ -23,6 +23,16 @@ def _error(message, status=400):
 
 @chat_bp.before_request
 def _limit_body():
+    if (
+        current_user.is_authenticated
+        and current_user.is_active
+        and getattr(current_user, 'needs_onboarding', False)
+        and request.endpoint
+        and request.endpoint.startswith('chat.')
+        and request.endpoint != 'chat.presence'  # allow presence cleanup during setup
+    ):
+        from flask import redirect, url_for
+        return redirect(url_for('admin.profile_setup'))
     if (request.content_length or 0) > 16 * 1024:
         return _error('Chat requests must be smaller than 16 KiB.', 413)
 

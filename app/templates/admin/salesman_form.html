@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">{{ title }}</h2>
+    <a href="{{ url_for('admin.salesmen') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<form method="POST" class="card border-0 shadow p-4" autocomplete="off" style="max-width: 720px;">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+        {% if not salesman %}
+        <div class="col-md-6">
+            <label class="form-label">Username *</label>
+            {{ form.username(class="form-control") }}
+            {% for error in form.username.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Temporary Password *</label>
+            {{ form.temporary_password(class="form-control", autocomplete="new-password") }}
+            <div class="form-text">{{ form.temporary_password.description }}</div>
+            {% for error in form.temporary_password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-light border mb-0">
+                Username: <strong>{{ salesman.username }}</strong>
+                · Role: salesman
+                · 2FA: {{ 'enabled' if salesman.totp_enabled else 'setup pending' }}
+            </div>
+        </div>
+        <div class="col-12">
+            <label class="form-label">Reset Temporary Password</label>
+            {{ form.reset_temporary_password(class="form-control", autocomplete="new-password") }}
+            <div class="form-text">{{ form.reset_temporary_password.description }}</div>
+            {% for error in form.reset_temporary_password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="col-md-6">
+            <label class="form-label">Full Name</label>
+            {{ form.full_name(class="form-control") }}
+            {% for error in form.full_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Dealer Tag</label>
+            {{ form.dealer_tag(class="form-control", placeholder="e.g. J. Smith") }}
+            {% if form.dealer_tag.description %}<div class="form-text">{{ form.dealer_tag.description }}</div>{% endif %}
+            {% for error in form.dealer_tag.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Email</label>
+            {{ form.email(class="form-control") }}
+            {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            {{ form.phone(class="form-control") }}
+            {% for error in form.phone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.is_active(class="form-check-input") }}
+                <label class="form-check-label" for="{{ form.is_active.id }}">Active account</label>
+            </div>
+        </div>
+        <div class="col-12">
+            {{ form.submit(class="btn btn-primary btn-lg") }}
+            <a href="{{ url_for('admin.salesmen') }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+        </div>
+    </div>
+</form>
+{% endblock %}

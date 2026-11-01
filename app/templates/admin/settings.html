@@ -9,7 +9,8 @@
 
 <section class="card border-0 shadow p-4 mb-4">
     <h5 class="fw-bold">Admin Two-Factor Authentication</h5>
-    <p>Two-factor authentication is optional. Enable the requirement below when you are ready to require an authenticator code for every admin.</p>
+    <p>Two-factor authentication is optional for administrator accounts. Enable the requirement below when you are ready to require an authenticator code for every admin. <strong>Salesman accounts always require 2FA</strong> and complete setup on first login.</p>
+    <p class="mb-2"><a href="{{ url_for('admin.salesmen') }}">Manage salesman accounts and dealer tags</a></p>
     {% if form.admin_two_factor_required.data and current_user.totp_enabled %}
     <p class="text-muted small">Keep your recovery codes safe. They cannot be displayed again, but you can replace them after verifying your password and a fresh code.</p>
     <div><a href="{{ url_for('admin.two_factor_recovery') }}" class="btn btn-outline-primary">Replace Recovery Codes</a></div>

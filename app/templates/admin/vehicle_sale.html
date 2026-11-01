@@ -30,6 +30,24 @@
             {{ form.payment_method(class="form-select") }}
             {% for error in form.payment_method.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
+        <div class="col-md-6">
+            {{ form.salesperson.label(class="form-label") }}
+            {{ form.salesperson(class="form-control", list="dealer-tag-options", autocomplete="off") }}
+            {% if dealer_tags %}
+            <datalist id="dealer-tag-options">
+                {% for tag in dealer_tags %}
+                <option value="{{ tag }}"></option>
+                {% endfor %}
+            </datalist>
+            <div class="form-text">
+                Prefills from your dealer tag.
+                {% for tag in dealer_tags %}
+                <button type="button" class="btn btn-link btn-sm p-0 me-2 dealer-tag-pick" data-tag="{{ tag }}">{{ tag }}</button>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% for error in form.salesperson.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
         <div class="col-12">
             {{ form.sale_notes.label(class="form-label") }}
             {{ form.sale_notes(class="form-control", rows="6", maxlength="20000", placeholder="For example: negotiated price, cashier's check details, buyer information, or follow-up items.") }}
@@ -134,4 +152,12 @@
 
 {% block extra_js %}
 <script src="{{ asset_url('js/admin-sale-scan.js') }}"></script>
+<script>
+document.querySelectorAll('.dealer-tag-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var input = document.querySelector('input[name="salesperson"]');
+        if (input) input.value = btn.getAttribute('data-tag') || '';
+    });
+});
+</script>
 {% endblock %}

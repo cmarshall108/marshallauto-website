@@ -1,0 +1,155 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Salesmen & Dealer Tags{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Salesmen &amp; Dealer Tags</h2>
+        <p class="text-muted mb-0">Create salesman logins, store their info, and manage quick-select tags for test drives.</p>
+    </div>
+    <a href="{{ url_for('admin.salesman_new') }}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i> Add Salesman</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Dealer Tag</th>
+                                <th>2FA</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in salesmen %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">{{ s.full_name or '—' }}</div>
+                                    <div class="small text-muted">{{ s.email or '' }}{% if s.phone %} · {{ s.phone }}{% endif %}</div>
+                                </td>
+                                <td><code>{{ s.username }}</code></td>
+                                <td>{{ s.dealer_tag or '—' }}</td>
+                                <td>
+                                    {% if s.totp_enabled %}
+                                    <span class="badge text-bg-success">On</span>
+                                    {% else %}
+                                    <span class="badge text-bg-warning">Setup pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if s.is_active_user %}
+                                    <span class="badge text-bg-primary">Active</span>
+                                    {% else %}
+                                    <span class="badge text-bg-secondary">Inactive</span>
+                                    {% endif %}
+                                    {% if s.must_change_password or not s.profile_complete %}
+                                    <div class="small text-muted mt-1">First-login setup pending</div>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <a href="{{ url_for('admin.salesman_edit', id=s.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                    {% if s.is_active_user %}
+                                    <form method="POST" action="{{ url_for('admin.salesman_deactivate', id=s.id) }}" class="d-inline" onsubmit="return confirm('Deactivate this salesman?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Deactivate</button>
+                                    </form>
+                                    {% else %}
+                                    <form method="POST" action="{{ url_for('admin.salesman_activate', id=s.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Activate</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">No salesman accounts yet. Add one to get started.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow p-4 mb-4">
+            <h5 class="fw-bold">Save a dealer tag</h5>
+            <p class="small text-muted">Tags appear as quick-select options on test drive and sale forms. Salesman profiles also sync their tag here.</p>
+            <form method="POST" action="{{ url_for('admin.dealer_tag_create') }}" class="row g-3">
+                {{ tag_form.hidden_tag() }}
+                <div class="col-12">
+                    <label class="form-label">Tag name *</label>
+                    {{ tag_form.name(class="form-control", placeholder="e.g. Front Desk") }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label">Sort order</label>
+                    {{ tag_form.sort_order(class="form-control") }}
+                </div>
+                <div class="col-6 d-flex align-items-end">
+                    <div class="form-check mb-2">
+                        {{ tag_form.is_active(class="form-check-input") }}
+                        <label class="form-check-label" for="{{ tag_form.is_active.id }}">Active</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    {{ tag_form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+
+        <div class="card border-0 shadow">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tag</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tag in dealer_tags %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">{{ tag.name }}</div>
+                                    {% if tag.user %}<div class="small text-muted">Linked to {{ tag.user.username }}</div>{% endif %}
+                                </td>
+                                <td>
+                                    {% if tag.is_active %}
+                                    <span class="badge text-bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge text-bg-secondary">Off</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <form method="POST" action="{{ url_for('admin.dealer_tag_toggle', id=tag.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">{% if tag.is_active %}Disable{% else %}Enable{% endif %}</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin.dealer_tag_delete', id=tag.id) }}" class="d-inline" onsubmit="return confirm('Delete this dealer tag?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-center text-muted py-3">No dealer tags saved yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

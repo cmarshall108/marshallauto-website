@@ -325,6 +325,8 @@ def _ensure_schema_columns(app):
                             'ALTER TABLE vehicles ADD COLUMN previous_price NUMERIC(10, 2)')
                 _add_column(conn, 'vehicles', 'price_dropped_at',
                             'ALTER TABLE vehicles ADD COLUMN price_dropped_at DATETIME')
+                _add_column(conn, 'vehicles', 'salesperson',
+                            'ALTER TABLE vehicles ADD COLUMN salesperson VARCHAR(128)')
         if 'reviews' in tables:
             with db.engine.begin() as conn:
                 _add_column(conn, 'reviews', 'source',
@@ -350,6 +352,38 @@ def _ensure_schema_columns(app):
                     ('spam_reasons', 'ALTER TABLE leads ADD COLUMN spam_reasons VARCHAR(512)'),
                 ]:
                     _add_column(conn, 'leads', col, ddl)
+        if 'user' in tables:
+            with db.engine.begin() as conn:
+                for col, ddl in [
+                    ("role", "ALTER TABLE user ADD COLUMN role VARCHAR(20) DEFAULT 'admin' NOT NULL"),
+                    ('full_name', 'ALTER TABLE user ADD COLUMN full_name VARCHAR(128)'),
+                    ('email', 'ALTER TABLE user ADD COLUMN email VARCHAR(120)'),
+                    ('phone', 'ALTER TABLE user ADD COLUMN phone VARCHAR(32)'),
+                    ('dealer_tag', 'ALTER TABLE user ADD COLUMN dealer_tag VARCHAR(64)'),
+                    (
+                        'profile_complete',
+                        'ALTER TABLE user ADD COLUMN profile_complete BOOLEAN DEFAULT 1 NOT NULL',
+                    ),
+                    (
+                        'must_change_password',
+                        'ALTER TABLE user ADD COLUMN must_change_password BOOLEAN DEFAULT 0 NOT NULL',
+                    ),
+                    ('totp_secret_encrypted', 'ALTER TABLE user ADD COLUMN totp_secret_encrypted TEXT'),
+                    (
+                        'totp_enabled',
+                        'ALTER TABLE user ADD COLUMN totp_enabled BOOLEAN DEFAULT 0 NOT NULL',
+                    ),
+                    ('totp_last_counter', 'ALTER TABLE user ADD COLUMN totp_last_counter BIGINT'),
+                    ('auth_version', 'ALTER TABLE user ADD COLUMN auth_version VARCHAR(32)'),
+                    (
+                        'failed_login_attempts',
+                        'ALTER TABLE user ADD COLUMN failed_login_attempts INTEGER DEFAULT 0 NOT NULL',
+                    ),
+                    ('locked_until', 'ALTER TABLE user ADD COLUMN locked_until DATETIME'),
+                    ('last_login_at', 'ALTER TABLE user ADD COLUMN last_login_at DATETIME'),
+                    ('last_login_ip', 'ALTER TABLE user ADD COLUMN last_login_ip VARCHAR(64)'),
+                ]:
+                    _add_column(conn, 'user', col, ddl)
     except Exception as e:
         app.logger.warning('Schema ensure skipped: %s', e)
 
@@ -357,9 +391,19 @@ def _ensure_schema_columns(app):
 def _ensure_admin_exists(app):
     from app.models import User
     username = app.config['ADMIN_USERNAME']
-    if User.query.filter_by(username=username).first():
+    existing = User.query.filter_by(username=username).first()
+    if existing:
+        # Keep the bootstrap admin elevated if an older DB had no role column default applied.
+        if not existing.role:
+            existing.role = User.ROLE_ADMIN
+            db.session.commit()
         return
-    user = User(username=username)
+    user = User(
+        username=username,
+        role=User.ROLE_ADMIN,
+        profile_complete=True,
+        must_change_password=False,
+    )
     user.set_password(app.config['ADMIN_PASSWORD'])
     db.session.add(user)
     db.session.commit()

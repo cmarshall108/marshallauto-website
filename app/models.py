@@ -36,11 +36,25 @@ def _include_phone_integration_companion(
 
 
 class User(UserMixin, db.Model):
+    ROLE_ADMIN = 'admin'
+    ROLE_SALESMAN = 'salesman'
+    ROLES = (ROLE_ADMIN, ROLE_SALESMAN)
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     is_active_user = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    # Role + staff profile (salesmen complete these on first login)
+    role = db.Column(db.String(20), default=ROLE_ADMIN, nullable=False, index=True)
+    full_name = db.Column(db.String(128), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    phone = db.Column(db.String(32), nullable=True)
+    # Short dealer name-tag used for quick-select on test drives and sale forms
+    dealer_tag = db.Column(db.String(64), nullable=True)
+    profile_complete = db.Column(db.Boolean, default=True, nullable=False)
+    must_change_password = db.Column(db.Boolean, default=False, nullable=False)
 
     # Brute-force protection: temporary account lockout after repeated failed logins
     failed_login_attempts = db.Column(db.Integer, default=0, nullable=False)
@@ -71,6 +85,28 @@ class User(UserMixin, db.Model):
     def is_locked(self):
         return bool(self.locked_until and self.locked_until > utcnow())
 
+    @property
+    def is_admin(self):
+        return (self.role or self.ROLE_ADMIN) == self.ROLE_ADMIN
+
+    @property
+    def is_salesman(self):
+        return (self.role or self.ROLE_ADMIN) == self.ROLE_SALESMAN
+
+    @property
+    def display_name(self):
+        """Preferred human-readable name for forms and logs."""
+        return (self.full_name or self.dealer_tag or self.username or '').strip()
+
+    @property
+    def salesperson_label(self):
+        """Label used when prefilling salesperson fields (prefer dealer tag)."""
+        return (self.dealer_tag or self.full_name or self.username or '').strip()
+
+    @property
+    def needs_onboarding(self):
+        return (not self.profile_complete) or bool(self.must_change_password)
+
     def register_failed_login(self, max_attempts=5, lockout_minutes=15):
         """Lock the account for a cool-down period once too many bad passwords are entered."""
         self.failed_login_attempts = (self.failed_login_attempts or 0) + 1
@@ -93,6 +129,49 @@ class AdminRecoveryCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     code_hash = db.Column(db.String(64), nullable=False, unique=True)
+
+
+class DealerTag(db.Model):
+    """Saved dealer/sales name tags for quick-select on test drives and sale forms."""
+    __tablename__ = 'dealer_tags'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('linked_dealer_tags', lazy='dynamic'))
+
+    @classmethod
+    def active_names(cls):
+        rows = (
+            cls.query.filter_by(is_active=True)
+            .order_by(cls.sort_order.asc(), cls.name.asc())
+            .all()
+        )
+        return [row.name for row in rows]
+
+    @classmethod
+    def upsert_for_user(cls, user):
+        """Keep a dealer tag row in sync with a salesman's saved tag/name."""
+        label = (user.dealer_tag or user.full_name or '').strip()
+        if not label:
+            return None
+        existing = cls.query.filter(db.func.lower(cls.name) == label.lower()).first()
+        if existing:
+            existing.name = label
+            existing.is_active = True
+            existing.user_id = user.id
+            return existing
+        tag = cls(name=label, user_id=user.id, is_active=True)
+        db.session.add(tag)
+        return tag
+
+    def __repr__(self):
+        return f'<DealerTag {self.name}>'
 
 
 class VehicleSaleImage(db.Model):
@@ -149,6 +228,7 @@ class Vehicle(db.Model):
     sold_at = db.Column(db.DateTime, nullable=True, index=True)
     sold_price = db.Column(db.Numeric(10, 2), nullable=True)
     payment_method = db.Column(db.String(32), nullable=True)
+    salesperson = db.Column(db.String(128), nullable=True)
     sale_notes = db.Column(db.Text, nullable=True)
 
     # Details

@@ -61,7 +61,21 @@
         </div>
         <div class="col-md-4">
             <label class="form-label">Salesperson</label>
-            {{ form.salesperson(class="form-control") }}
+            {{ form.salesperson(class="form-control", list="dealer-tag-options", autocomplete="off") }}
+            {% if dealer_tags %}
+            <datalist id="dealer-tag-options">
+                {% for tag in dealer_tags %}
+                <option value="{{ tag }}"></option>
+                {% endfor %}
+            </datalist>
+            <div class="form-text">
+                Prefills from your dealer tag.
+                Quick-select:
+                {% for tag in dealer_tags %}
+                <button type="button" class="btn btn-link btn-sm p-0 me-2 dealer-tag-pick" data-tag="{{ tag }}">{{ tag }}</button>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
         <div class="col-md-4">
             <label class="form-label">Date of Birth</label>
@@ -145,4 +159,12 @@
 {% block extra_js %}
 <script>window.testDriveLicenseAnalysisUrl = {{ url_for('admin.test_drive_analyze_license')|tojson }};</script>
 <script src="{{ asset_url('js/admin-test-drive.js') }}"></script>
+<script>
+document.querySelectorAll('.dealer-tag-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var input = document.querySelector('input[name="salesperson"]');
+        if (input) input.value = btn.getAttribute('data-tag') || '';
+    });
+});
+</script>
 {% endblock %}

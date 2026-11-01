@@ -1,0 +1,57 @@
+{% extends "admin/auth_base.html" %}
+
+{% block title %}Complete Your Profile{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow p-4" style="max-width: 560px; margin: 2rem auto;">
+    <h2 class="fw-bold mb-2">Welcome — finish setup</h2>
+    <p class="text-muted">
+        Enter your contact details and dealer tag. This information is stored on your account
+        and used to prefill salesperson fields (including test drives).
+        {% if require_password %}
+        You must also choose a new password to replace the temporary one.
+        {% endif %}
+    </p>
+    <form method="POST" class="row g-3" autocomplete="off">
+        {{ form.hidden_tag() }}
+        {% if request.args.get('next') %}
+        <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+        {% endif %}
+        <div class="col-12">
+            <label class="form-label">Full Name *</label>
+            {{ form.full_name(class="form-control", autofocus=true) }}
+            {% for error in form.full_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Email *</label>
+            {{ form.email(class="form-control", autocomplete="email") }}
+            {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Phone *</label>
+            {{ form.phone(class="form-control", autocomplete="tel") }}
+            {% for error in form.phone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            <label class="form-label">Dealer Tag *</label>
+            {{ form.dealer_tag(class="form-control", placeholder="e.g. J. Smith") }}
+            <div class="form-text">{{ form.dealer_tag.description }}</div>
+            {% for error in form.dealer_tag.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">New Password{% if require_password %} *{% endif %}</label>
+            {{ form.new_password(class="form-control", autocomplete="new-password") }}
+            <div class="form-text">{{ form.new_password.description }}</div>
+            {% for error in form.new_password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Confirm New Password{% if require_password %} *{% endif %}</label>
+            {{ form.confirm_password(class="form-control", autocomplete="new-password") }}
+            {% for error in form.confirm_password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            {{ form.submit(class="btn btn-primary btn-lg w-100") }}
+        </div>
+    </form>
+</div>
+{% endblock %}
