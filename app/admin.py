@@ -102,7 +102,10 @@ def _admin_no_index(response):
         'admin.two_factor_setup', 'admin.two_factor_qr', 'admin.two_factor_verify',
         'admin.two_factor_recovery',
     ):
-        response.headers['Referrer-Policy'] = 'no-referrer'
+        # same-origin: keep setup URLs out of third-party referrers, but still send
+        # Referer on same-origin POSTs. Flask-WTF SSL-strict CSRF rejects missing
+        # Referer on HTTPS, so no-referrer breaks authenticator setup/verify submits.
+        response.headers['Referrer-Policy'] = 'same-origin'
         response.headers['X-Frame-Options'] = 'DENY'
     return response
 

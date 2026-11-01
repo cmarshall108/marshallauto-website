@@ -185,16 +185,17 @@ def create_app(config_class=None):
         from flask import flash, jsonify, redirect, request, session, url_for
         message = 'Your session expired or the security token was missing. Please try that again.'
         # The flashed message is deliberately generic, so log the specific reason
-        # (token missing / session token missing / mismatch / expired) to make
-        # these failures diagnosable without exposing token values.
+        # (token missing / session token missing / mismatch / expired / missing referrer)
+        # to make these failures diagnosable without exposing token values.
         app.logger.warning(
             'CSRF validation failed on %s %s (endpoint=%s): %s '
-            '[session_seed=%s, session_keys=%d, form_token=%s, cookie=%s]',
+            '[session_seed=%s, session_keys=%d, form_token=%s, cookie=%s, referrer=%s]',
             request.method, request.path, request.endpoint, e.description,
             'present' if session.get('csrf_token') else 'missing',
             len(session),
             'present' if request.form.get('csrf_token') else 'missing',
             'present' if request.cookies.get(app.config['SESSION_COOKIE_NAME']) else 'missing',
+            'present' if request.referrer else 'missing',
         )
         wants_json = (
             request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -203,6 +204,11 @@ def create_app(config_class=None):
         if wants_json:
             return jsonify({'success': False, 'message': message}), 400
         flash(message, 'danger')
+        # Prefer staying on the admin auth flow when Referer was stripped (e.g. no-referrer).
+        if request.path.startswith('/admin/login'):
+            return redirect(request.path)
+        if request.path.startswith('/admin/'):
+            return redirect(request.referrer or url_for('admin.login'))
         return redirect(request.referrer or url_for('main.index'))
 
     @app.errorhandler(RequestEntityTooLarge)

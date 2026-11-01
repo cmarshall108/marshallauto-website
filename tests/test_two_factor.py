@@ -103,7 +103,9 @@ class TwoFactorTests(unittest.TestCase):
         self.assertEqual(qr.status_code, 200)
         self.assertEqual(qr.mimetype, 'image/svg+xml')
         self.assertEqual(qr.headers['Cache-Control'], 'private, no-store')
-        self.assertEqual(qr.headers['Referrer-Policy'], 'no-referrer')
+        self.assertEqual(qr.headers['Referrer-Policy'], 'same-origin')
+        setup_headers = self.client.get('/admin/login/setup').headers
+        self.assertEqual(setup_headers.get('Referrer-Policy'), 'same-origin')
         self.assertEqual(self.client.get('/admin/login/setup').status_code, 200)
         self.assertEqual(self.secret(), secret)
         with self.client.session_transaction() as cookie:
@@ -284,6 +286,64 @@ class TwoFactorTests(unittest.TestCase):
             db.session.get(User, self.user_id).is_active_user = False
             db.session.commit()
         self.assertEqual(self.client.get('/admin/').status_code, 302)
+
+    def test_https_setup_succeeds_with_same_origin_referrer_policy(self):
+        """Production CSRF SSL-strict requires Referer; no-referrer on setup pages broke enrollment."""
+        self.app.config['WTF_CSRF_ENABLED'] = True
+        self.app.config['WTF_CSRF_SSL_STRICT'] = True
+        self.app.config['PREFERRED_URL_SCHEME'] = 'https'
+        self.app.config['SERVER_NAME'] = 'marshallautosanford.com'
+
+        origin = 'https://marshallautosanford.com'
+        secure = self.app.test_client()
+        with patch('app.admin.rate_limit_exceeded', return_value=False):
+            login_page = secure.get('/admin/login', base_url=origin)
+            self.assertEqual(login_page.status_code, 200)
+            login = secure.post(
+                '/admin/login',
+                base_url=origin,
+                data={
+                    'csrf_token': self.csrf_token(login_page),
+                    'username': 'two-factor-admin',
+                    'password': 'test-password-only',
+                },
+                headers={'Referer': f'{origin}/admin/login'},
+            )
+            self.assertEqual(login.location, '/admin/login/setup')
+
+            setup_page = secure.get('/admin/login/setup', base_url=origin)
+            self.assertEqual(setup_page.status_code, 200)
+            self.assertEqual(setup_page.headers.get('Referrer-Policy'), 'same-origin')
+
+            # Missing Referer on HTTPS still fails under SSL-strict (old no-referrer case).
+            blocked = secure.post(
+                '/admin/login/setup',
+                base_url=origin,
+                data={
+                    'csrf_token': self.csrf_token(setup_page),
+                    'code': pyotp.TOTP(self.secret()).now(),
+                },
+                headers={'Accept': 'application/json'},
+            )
+            self.assertEqual(blocked.status_code, 400)
+
+            # Same-origin Referer (sent under Referrer-Policy: same-origin) allows enrollment.
+            setup_page = secure.get('/admin/login/setup', base_url=origin)
+            ok = secure.post(
+                '/admin/login/setup',
+                base_url=origin,
+                data={
+                    'csrf_token': self.csrf_token(setup_page),
+                    'code': pyotp.TOTP(self.secret()).now(),
+                },
+                headers={'Referer': f'{origin}/admin/login/setup'},
+            )
+            self.assertEqual(ok.status_code, 200)
+            self.assertIn('I Saved My Codes', ok.get_data(as_text=True))
+            with self.app.app_context():
+                self.assertTrue(db.session.get(User, self.user_id).totp_enabled)
+
+        self.app.config['WTF_CSRF_ENABLED'] = False
 
     def test_default_policy_allows_password_login_even_after_enrollment(self):
         self.enroll()
