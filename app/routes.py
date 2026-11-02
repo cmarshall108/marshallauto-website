@@ -1750,7 +1750,13 @@ def carfax_download(report_id):
     # Basic path traversal guard
     filename = os.path.basename(report.filename)
     directory = os.path.join(current_app.config['UPLOAD_FOLDER'], 'carfax')
-    return send_from_directory(directory, filename, as_attachment=False, mimetype='application/pdf')
+    response = send_from_directory(
+        directory, filename, as_attachment=False, mimetype='application/pdf',
+    )
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @main.route('/feeds/vehicles.xml')

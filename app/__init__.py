@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, Request, current_app, request
+from flask import Flask, Request, abort, current_app, request
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -107,6 +107,31 @@ def create_app(config_class=None):
             return None
         return user if user and user.is_active and session_verified(user) else None
 
+    @app.before_request
+    def protect_carfax_static_files():
+        """Apply listing visibility rules to PDFs requested through Flask's static route."""
+        if request.endpoint != 'static':
+            return None
+        filename = (request.view_args or {}).get('filename', '')
+        prefix = 'uploads/carfax/'
+        if not filename.startswith(prefix):
+            return None
+        stored_filename = filename[len(prefix):]
+        if not stored_filename or '/' in stored_filename or '\\' in stored_filename:
+            abort(404)
+        from app.models import CarfaxReport, Vehicle
+        report = CarfaxReport.query.filter_by(filename=stored_filename).first()
+        if not report:
+            abort(404)
+        vehicle = db.session.get(Vehicle, report.vehicle_id)
+        if not vehicle:
+            abort(404)
+        from flask_login import current_user
+        is_public_listing = vehicle.status == 'available' and not vehicle.is_coming_soon
+        if not is_public_listing and not current_user.is_authenticated:
+            abort(404)
+        return None
+
     from app.admin import admin_bp
     from app.routes import analytics_collect, inject_globals, main
 
@@ -163,8 +188,11 @@ def create_app(config_class=None):
         response.headers.setdefault('Content-Security-Policy', CONTENT_SECURITY_POLICY)
         if request.is_secure:
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        if request.path.startswith('/static/uploads/carfax/'):
+            response.headers['Cache-Control'] = 'private, no-store'
+            response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
         # Cache static assets aggressively; HTML stays short-lived
-        if request_is_static(response):
+        elif request_is_static(response):
             response.headers.setdefault('Cache-Control', 'public, max-age=604800, immutable')
         return response
 

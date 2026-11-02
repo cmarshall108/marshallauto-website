@@ -13,9 +13,10 @@ class CarfaxReportTests(unittest.TestCase):
         self.tmp = TemporaryDirectory()
         self.app = create_app(TestingConfig)
         self.app.config.update(
-            UPLOAD_FOLDER=self.tmp.name,
+            UPLOAD_FOLDER=os.path.join(self.tmp.name, 'uploads'),
             PHOTO_HIGHLIGHTS_ENABLED=False,
         )
+        self.app.static_folder = self.tmp.name
         self.ctx = self.app.app_context()
         self.ctx.push()
         db.create_all()
@@ -29,9 +30,11 @@ class CarfaxReportTests(unittest.TestCase):
         db.session.commit()
         self.vehicle_id = self.vehicle.id
         self.report_id = self.report.id
-        os.makedirs(os.path.join(self.tmp.name, 'carfax'))
+        os.makedirs(os.path.join(self.app.config['UPLOAD_FOLDER'], 'carfax'))
         self.pdf = b'%PDF-1.4\nCARFAX test report\n%%EOF'
-        with open(os.path.join(self.tmp.name, 'carfax', self.report.filename), 'wb') as pdf:
+        with open(os.path.join(
+            self.app.config['UPLOAD_FOLDER'], 'carfax', self.report.filename,
+        ), 'wb') as pdf:
             pdf.write(self.pdf)
         self.client = self.app.test_client()
         with patch('app.admin.rate_limit_exceeded', return_value=False):
@@ -89,11 +92,44 @@ class CarfaxReportTests(unittest.TestCase):
         response = public_client.get(self.download_path)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, self.pdf)
+        self.assertEqual(response.headers['Cache-Control'], 'private, no-store')
+        self.assertEqual(response.headers['X-Robots-Tag'], 'noindex, nofollow, noarchive')
+        response.close()
+        direct_path = f'/static/uploads/carfax/{self.report.filename}'
+        response = public_client.get(direct_path)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, self.pdf)
+        self.assertEqual(response.headers['Cache-Control'], 'private, no-store')
         response.close()
         with self.app.app_context():
             db.session.get(Vehicle, self.vehicle_id).status = 'sold'
             db.session.commit()
         self.assertEqual(public_client.get(self.download_path).status_code, 404)
+        self.assertEqual(public_client.get(direct_path).status_code, 404)
+        self.assertEqual(self.client.get(direct_path).status_code, 200)
+        with self.app.app_context():
+            vehicle = db.session.get(Vehicle, self.vehicle_id)
+            vehicle.status = 'available'
+            vehicle.is_coming_soon = True
+            db.session.commit()
+        self.assertEqual(public_client.get(self.download_path).status_code, 404)
+        self.assertEqual(public_client.get(direct_path).status_code, 404)
+
+    def test_direct_static_download_requires_a_database_listing_record(self):
+        public_client = self.app.test_client()
+        response = public_client.get('/static/uploads/carfax/untracked.pdf')
+        self.assertEqual(response.status_code, 404)
+
+    def test_non_carfax_static_assets_remain_public(self):
+        public_asset = os.path.join(self.app.static_folder, 'public-asset.txt')
+        with open(public_asset, 'w', encoding='utf-8') as asset:
+            asset.write('public site asset')
+        try:
+            response = self.app.test_client().get('/static/public-asset.txt')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data, b'public site asset')
+        finally:
+            os.remove(public_asset)
 
     def test_admin_pages_still_require_login(self):
         public_client = self.app.test_client()
