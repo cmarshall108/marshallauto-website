@@ -22,6 +22,7 @@ from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_mileage_badge, format_price,
     format_phone_number, notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
+    slugify,
     send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
     structured_data_how_to, structured_data_item_list, structured_data_local_business,
     structured_data_vehicle, structured_data_website,
@@ -121,6 +122,50 @@ def _coming_soon_query():
     )
 
 
+def _available_model_landings():
+    """Return unique, inventory-backed make/model landing-page facts."""
+    rows = (
+        db.session.query(
+            Vehicle.make,
+            Vehicle.model,
+            db.func.count(Vehicle.id).label('vehicle_count'),
+            db.func.min(Vehicle.year).label('min_year'),
+            db.func.max(Vehicle.year).label('max_year'),
+            db.func.min(Vehicle.display_price).label('min_price'),
+            db.func.max(Vehicle.display_price).label('max_price'),
+            db.func.min(Vehicle.mileage).label('min_mileage'),
+            db.func.max(Vehicle.mileage).label('max_mileage'),
+            db.func.max(Vehicle.updated_at).label('lastmod'),
+        )
+        .filter_by(status='available', is_coming_soon=False)
+        .group_by(Vehicle.make, Vehicle.model)
+        .order_by(Vehicle.make, Vehicle.model)
+        .all()
+    )
+    landings = []
+    seen_slugs = set()
+    duplicate_slugs = set()
+    for row in rows:
+        slug = slugify(f'{row.make}-{row.model}')
+        if slug in seen_slugs:
+            duplicate_slugs.add(slug)
+        seen_slugs.add(slug)
+        landings.append({
+            'slug': slug,
+            'make': row.make,
+            'model': row.model,
+            'count': row.vehicle_count,
+            'min_year': row.min_year,
+            'max_year': row.max_year,
+            'min_price': row.min_price,
+            'max_price': row.max_price,
+            'min_mileage': row.min_mileage,
+            'max_mileage': row.max_mileage,
+            'lastmod': row.lastmod,
+        })
+    return [landing for landing in landings if landing['slug'] not in duplicate_slugs]
+
+
 def _build_inventory_query(make=None, model=None, body_style=None, title_status=None,
                            min_price=None, max_price=None, max_mileage=None, search=None,
                            sort='newest'):
@@ -195,6 +240,9 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
 
     makes = _available_makes()
     body_styles = _available_body_styles()
+    has_filters = any(value is not None and value != '' for value in (
+        make, model, body_style, title_status, min_price, max_price, max_mileage, search,
+    ))
 
     link_city = (request.view_args or {}).get('city') or current_app.config['BUSINESS_CITY'].lower().replace(' ', '-')
     link_state = (request.view_args or {}).get('state') or current_app.config['BUSINESS_STATE'].lower()
@@ -203,6 +251,13 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         *area, makes, body_styles,
         _vehicle_list_query().filter_by(title_status='rebuilt').first() is not None,
     ) if area else []
+    model_inventory_links = [
+        {
+            'label': f"Used {landing['make']} {landing['model']}",
+            'url': url_for('main.inventory_by_model', slug=landing['slug']),
+        }
+        for landing in _available_model_landings()
+    ] if request.endpoint == 'main.inventory' and not has_filters else []
 
     links = {}
     if pagination.has_prev:
@@ -243,9 +298,6 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
             ("Used Cars for Sale", url_for('main.inventory', _external=True))
         ])
 
-    has_filters = any(value is not None and value != '' for value in (
-        make, model, body_style, title_status, min_price, max_price, max_mileage, search,
-    ))
     arbitrary_filters = has_filters and request.endpoint == 'main.inventory'
     alternate_sort = sort != 'newest'
     canonical_override = landing_canonical or current_app.config['SITE_URL'].rstrip('/') + url_for('main.inventory')
@@ -306,6 +358,7 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         analytics_inventory=analytics_inventory,
         landing_faqs=landing_faqs or [],
         inventory_links=inventory_links,
+        model_inventory_links=model_inventory_links,
         landing_area=area if landing_h1 else None,
         buyer_guides=published_buyer_guides(),
     )
@@ -507,6 +560,78 @@ def index():
         areas=areas,
         home_faqs=home_faqs,
         coming_soon=_coming_soon_query().limit(3).all(),
+    )
+
+
+@main.route('/inventory/models/<slug>')
+def inventory_by_model(slug):
+    """Inventory-backed search landing for a make/model currently in stock."""
+    landing = next(
+        (item for item in _available_model_landings() if item['slug'] == slug),
+        None,
+    )
+    if not landing:
+        abort(404)
+
+    make = landing['make']
+    model = landing['model']
+    city = current_app.config['BUSINESS_CITY']
+    state = current_app.config['BUSINESS_STATE']
+    vehicle_label = f'{make} {model}'
+    h1 = f"Used {vehicle_label} for Sale"
+    if landing['count'] == 1:
+        inventory_summary = (
+            f"Our current {vehicle_label} listing is a {landing['min_year']} model "
+            f"priced at {format_price(landing['min_price'])} with "
+            f"{format_mileage(landing['min_mileage'])}."
+        )
+    else:
+        year_range = (
+            str(landing['min_year']) if landing['min_year'] == landing['max_year']
+            else f"{landing['min_year']}–{landing['max_year']}"
+        )
+        price_range = (
+            format_price(landing['min_price']) if landing['min_price'] == landing['max_price']
+            else f"{format_price(landing['min_price'])}–{format_price(landing['max_price'])}"
+        )
+        mileage_range = (
+            format_mileage(landing['min_mileage'])
+            if landing['min_mileage'] == landing['max_mileage']
+            else f"{format_mileage(landing['min_mileage'])}–{format_mileage(landing['max_mileage'])}"
+        )
+        inventory_summary = (
+            f"Our current {vehicle_label} inventory includes {landing['count']} vehicles "
+            f"from {year_range}, priced {price_range}, with mileage from {mileage_range}."
+        )
+    intro = (
+        f"{inventory_summary} Browse current listings at {current_app.config['BUSINESS_NAME']} "
+        f"in {city}, {state}. Inventory changes as vehicles are sold and added; contact us "
+        f"to confirm availability or arrange a test drive."
+    )
+    meta_title = f"Used {vehicle_label} for Sale in {city}, {state} | {current_app.config['BUSINESS_NAME']}"
+    meta_description = (
+        f"Browse {landing['count']} used {vehicle_label} "
+        f"{'for sale' if landing['count'] == 1 else 'listings'} at "
+        f"{current_app.config['BUSINESS_NAME']} in {city}, {state}. "
+        f"See current prices, mileage, photos, and vehicle details."
+    )
+    canonical = url_for('main.inventory_by_model', slug=slug, _external=True)
+    breadcrumb = structured_data_breadcrumb([
+        ('Home', current_app.config['SITE_URL']),
+        ('Inventory', url_for('main.inventory', _external=True)),
+        (f'Used {vehicle_label}', canonical),
+    ])
+    return _render_inventory(
+        page=max(request.args.get('page', 1, type=int) or 1, 1),
+        make=make,
+        model=model,
+        sort=request.args.get('sort', 'newest'),
+        landing_h1=h1,
+        landing_intro=intro,
+        landing_meta_title=meta_title,
+        landing_meta_description=meta_description,
+        landing_breadcrumb=breadcrumb,
+        landing_canonical=canonical,
     )
 
 
@@ -1693,6 +1818,14 @@ def sitemap():
             'priority': '0.55',
             'changefreq': 'monthly',
             'lastmod': (post.updated_at or post.created_at).isoformat() + 'Z',
+        })
+
+    for landing in _available_model_landings():
+        pages.append({
+            'loc': url_for('main.inventory_by_model', slug=landing['slug'], _external=True),
+            'priority': '0.70',
+            'changefreq': 'daily',
+            'lastmod': landing['lastmod'].isoformat() + 'Z' if landing['lastmod'] else None,
         })
 
     top_makes = _available_makes()[:8]

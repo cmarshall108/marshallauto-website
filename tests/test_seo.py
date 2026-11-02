@@ -131,6 +131,33 @@ class SeoTests(unittest.TestCase):
         self.assertEqual(html.select_one('link[rel="canonical"]')['href'], f'http://localhost{path}?page=2')
         self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'index, follow')
 
+    def test_in_stock_models_get_specific_indexable_inventory_pages(self):
+        path = '/inventory/models/toyota-camry'
+        html = self.page(path)
+        self.assertEqual(html.select_one('h1').get_text(' ', strip=True), 'Used Toyota Camry for Sale')
+        self.assertEqual(
+            html.select_one('link[rel="canonical"]')['href'],
+            f'http://localhost{path}',
+        )
+        self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'index, follow')
+        self.assertIn('13 vehicles', html.get_text())
+        self.assertIsNotNone(html.select_one('.vehicle-card'))
+        self.assertIn(f'http://localhost{path}', self.sitemap_pages())
+
+    def test_model_landings_are_linked_from_inventory_and_disappear_when_out_of_stock(self):
+        html = self.page('/inventory')
+        self.assertIsNotNone(html.select_one(
+            'a[href="/inventory/models/toyota-camry"]',
+        ))
+
+        Vehicle.query.update({'status': 'sold'})
+        db.session.commit()
+        self.assertEqual(self.client.get('/inventory/models/toyota-camry').status_code, 404)
+        self.assertNotIn(
+            'http://localhost/inventory/models/toyota-camry',
+            self.sitemap_pages(),
+        )
+
     def test_empty_inventory_is_noindex(self):
         Vehicle.query.update({'status': 'sold'})
         db.session.commit()

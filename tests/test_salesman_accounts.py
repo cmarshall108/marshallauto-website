@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import pyotp
+from flask import url_for
 
 from app import create_app, db
 from app.models import DealerTag, User, Vehicle
@@ -65,6 +66,33 @@ class SalesmanAccountTests(unittest.TestCase):
         self.assertIn(response.status_code, (302, 200))
         # Site-wide 2FA off for admin
         self.assertEqual(self.client.get('/admin/dashboard').status_code, 200)
+
+    def test_every_admin_route_requires_authentication_by_default(self):
+        anonymous = self.app.test_client()
+        public_auth_endpoints = {
+            'admin.login',
+            'admin.two_factor_setup',
+            'admin.two_factor_qr',
+            'admin.two_factor_verify',
+        }
+        with self.app.test_request_context():
+            for rule in self.app.url_map.iter_rules():
+                if not rule.endpoint.startswith('admin.'):
+                    continue
+                if rule.endpoint in public_auth_endpoints:
+                    continue
+                path = url_for(
+                    rule.endpoint,
+                    **{argument: '1' for argument in rule.arguments},
+                )
+                method = 'GET' if 'GET' in rule.methods else 'POST'
+                response = anonymous.open(path, method=method)
+                self.assertEqual(
+                    response.status_code,
+                    302,
+                    f'{method} {path} exposed {rule.endpoint} anonymously',
+                )
+                self.assertIn('/admin/login', response.headers['Location'])
 
     def create_salesman_via_admin(self, username='sales1', password='temp-password-ok'):
         self.login_admin()

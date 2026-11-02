@@ -260,6 +260,19 @@
 </section>
 {% endif %}
 
+{% if model_inventory_links %}
+<section class="section-padding border-top">
+    <div class="container">
+        <h2 class="h4 fw-bold mb-3">Shop Current Inventory by Model</h2>
+        <ul class="list-unstyled d-flex flex-wrap gap-3 mb-0">
+            {% for link in model_inventory_links %}
+            <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</section>
+{% endif %}
+
 {% if landing_area %}
 <section class="section-padding bg-light-brand">
     <div class="container">

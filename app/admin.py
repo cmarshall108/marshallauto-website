@@ -81,7 +81,15 @@ _ONBOARDING_EXEMPT_ENDPOINTS = frozenset({
 
 @admin_bp.before_request
 def _enforce_staff_onboarding():
-    """Force incomplete salesman profiles through first-login setup before the panel."""
+    """Require authentication across admin routes and enforce salesman onboarding."""
+    public_auth_endpoints = {
+        'admin.login', 'admin.two_factor_setup',
+        'admin.two_factor_qr', 'admin.two_factor_verify',
+    }
+    if request.endpoint not in public_auth_endpoints and (
+        not current_user.is_authenticated or not current_user.is_active
+    ):
+        return redirect(url_for('admin.login', next=request.path))
     if request.endpoint in _ONBOARDING_EXEMPT_ENDPOINTS:
         return None
     if (
