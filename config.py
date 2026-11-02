@@ -28,7 +28,9 @@ class Config:
     REMEMBER_COOKIE_SAMESITE = 'Lax'
     REMEMBER_COOKIE_DURATION = timedelta(days=14)
     WTF_CSRF_TIME_LIMIT = 3600 * 8  # 8 hours
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
+    PERMANENT_SESSION_LIFETIME = timedelta(days=3)
+    TWO_FACTOR_SESSION_LIFETIME = timedelta(hours=12)
+    SALESMAN_SESSION_LIFETIME = timedelta(days=3)
 
     # Uploads
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')

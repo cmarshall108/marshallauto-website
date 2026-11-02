@@ -9,6 +9,7 @@ from flask import current_app, url_for
 
 from app import db
 from app.models import InventoryAlert, Lead, TestDrive, Vehicle, VehicleHoldRequest, utcnow
+from app.utils import format_phone_number
 
 HOLD_HOURS = 72
 APPOINTMENT_HOURS = (9, 10, 11, 12, 13, 14, 15, 16, 17)
@@ -32,6 +33,7 @@ def appointment_slots(days=7):
 
 
 def _lead(name, email, phone, message, vehicle, source):
+    phone = format_phone_number(phone)
     lead = Lead(
         name=name.strip(),
         email=email.strip(),
@@ -50,6 +52,7 @@ def create_test_drive_request(vehicle, *, name, email, phone, appointment_at, no
         raise ShopperRequestError('This vehicle is not currently available for a test drive.')
     if appointment_at not in appointment_slots():
         raise ShopperRequestError('Choose an available weekday appointment time.')
+    phone = format_phone_number(phone)
     message = (
         f"Test-drive request for {vehicle.title} on "
         f"{appointment_at.strftime('%A, %B %-d at %-I:%M %p')}.\n"
@@ -76,6 +79,7 @@ def create_hold_request(vehicle, *, name, email, phone, deposit_amount, acknowle
         raise ShopperRequestError('This vehicle is not available to hold.')
     if not acknowledged:
         raise ShopperRequestError('The 72-hour hold terms must be acknowledged before this request can be submitted.')
+    phone = format_phone_number(phone)
     amount = deposit_amount
     if amount is None or amount <= 0:
         raise ShopperRequestError('Enter the deposit amount you are prepared to pay at the dealership.')
@@ -107,6 +111,7 @@ def create_hold_request(vehicle, *, name, email, phone, deposit_amount, acknowle
 def create_inventory_alert(vehicle, *, name, email, phone, alert_type, max_price=None):
     if alert_type not in ('vehicle', 'make', 'body_style'):
         raise ShopperRequestError('Choose a valid alert.')
+    phone = format_phone_number(phone)
     if alert_type == 'vehicle' and not vehicle:
         raise ShopperRequestError('Choose a vehicle for this alert.')
     if alert_type != 'vehicle' and max_price is not None and max_price <= 0:

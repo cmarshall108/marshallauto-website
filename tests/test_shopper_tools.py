@@ -63,6 +63,8 @@ class ShopperToolTests(unittest.TestCase):
         self.assertEqual(hold.status, 'requested')
         self.assertIsNone(hold.expires_at)
         self.assertEqual(lead.source, 'hold_request')
+        self.assertEqual(lead.phone, '(919) 555-0101')
+        self.assertEqual(hold.customer_phone, '(919) 555-0101')
         confirm_hold(hold)
         self.assertEqual(hold.status, 'active')
         self.assertLess(hold.expires_at - utcnow(), timedelta(hours=72, seconds=5))
@@ -77,6 +79,7 @@ class ShopperToolTests(unittest.TestCase):
         drive = TestDrive.query.one()
         self.assertEqual(drive.status, 'requested')
         self.assertNotEqual(drive.status, 'out')
+        self.assertEqual(drive.customer_phone, '(919) 555-0101')
 
     def test_price_drop_alert_matches_once(self):
         create_inventory_alert(
@@ -84,6 +87,7 @@ class ShopperToolTests(unittest.TestCase):
             alert_type='vehicle',
         )
         alert = InventoryAlert.query.one()
+        self.assertEqual(alert.customer_phone, '(919) 555-0101')
         alert.last_seen_price = Decimal('10000.00')
         self.vehicle.sale_price = Decimal('9000.00')
         db.session.commit()

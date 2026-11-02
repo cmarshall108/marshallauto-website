@@ -82,6 +82,7 @@ class SalesmanAccountTests(unittest.TestCase):
             user = User.query.filter_by(username=username).first()
             self.assertIsNotNone(user)
             self.assertTrue(user.is_salesman)
+            self.assertEqual(user.phone, '(919) 555-0100')
             self.assertTrue(user.must_change_password)
             self.assertFalse(user.profile_complete)
             self.assertFalse(user.totp_enabled)
@@ -130,6 +131,7 @@ class SalesmanAccountTests(unittest.TestCase):
             self.assertTrue(user.profile_complete)
             self.assertFalse(user.must_change_password)
             self.assertEqual(user.dealer_tag, 'S. Sales')
+            self.assertEqual(user.phone, '(919) 555-0100')
         return password
 
     def test_admin_can_create_salesman_and_dealer_tag(self):
@@ -205,7 +207,12 @@ class SalesmanAccountTests(unittest.TestCase):
         with patch('app.two_factor.totp_counter', return_value=next_counter):
             verify = self.client.post('/admin/login/verify', data={'code': code})
         self.assertEqual(verify.status_code, 302)
-        self.assertEqual(self.client.get('/admin/dashboard').status_code, 200)
+        with self.client.session_transaction() as browser_session:
+            self.assertTrue(browser_session.permanent)
+        with patch('app.two_factor.time.time', return_value=time.time() + 24 * 60 * 60):
+            self.assertEqual(self.client.get('/admin/dashboard').status_code, 200)
+        with patch('app.two_factor.time.time', return_value=time.time() + 3 * 24 * 60 * 60 + 1):
+            self.assertEqual(self.client.get('/admin/dashboard').status_code, 302)
 
     def test_salesman_cannot_manage_salesmen(self):
         username, temp = self.create_salesman_via_admin()

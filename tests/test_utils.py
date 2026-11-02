@@ -7,7 +7,7 @@ from unittest import mock
 from flask import Flask
 
 from app.utils import (
-    _ffmpeg_path, format_currency, format_mileage_badge, is_low_mileage,
+    _ffmpeg_path, format_currency, format_mileage_badge, format_phone_number, is_low_mileage,
     is_safe_redirect, notify_new_lead,
 )
 
@@ -31,6 +31,16 @@ class MileageBadgeTests(unittest.TestCase):
         self.assertFalse(is_low_mileage(99999, year=current_year - 8))
         self.assertTrue(is_low_mileage(74999, year=current_year))
         self.assertFalse(is_low_mileage(75000, year=current_year))
+
+
+class PhoneNumberFormattingTests(unittest.TestCase):
+    def test_formats_valid_us_and_international_numbers(self):
+        self.assertEqual(format_phone_number('9195550182'), '(919) 555-0182')
+        self.assertEqual(format_phone_number('+442071838750'), '+44 20 7183 8750')
+
+    def test_preserves_invalid_and_empty_values(self):
+        self.assertEqual(format_phone_number('123'), '123')
+        self.assertEqual(format_phone_number('  '), '')
 
 
 class FfmpegResolutionTests(unittest.TestCase):

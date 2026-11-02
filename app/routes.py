@@ -21,7 +21,7 @@ from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
     aggregate_rating_data, client_ip, format_mileage, format_mileage_badge, format_price,
-    notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
+    format_phone_number, notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
     send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
     structured_data_how_to, structured_data_item_list, structured_data_local_business,
     structured_data_vehicle, structured_data_website,
@@ -1257,7 +1257,7 @@ def _build_lead_from_form(form, source='contact'):
     attr = _attribution_from_request()
     name = (form.name.data or '').strip()[:128]
     email = (form.email.data or '').strip()[:128]
-    phone = (form.phone.data or '').strip()[:32] or None
+    phone = format_phone_number(form.phone.data)[:32] or None
     message = (form.message.data or '').strip() or None
 
     spam = check_lead_spam_for_request(

@@ -53,11 +53,15 @@ def requires_two_factor(user):
 def session_verified(user):
     if not requires_two_factor(user):
         return True
+    lifetime = current_app.config.get(
+        'SALESMAN_SESSION_LIFETIME' if user.is_salesman else 'TWO_FACTOR_SESSION_LIFETIME',
+        current_app.config['PERMANENT_SESSION_LIFETIME'],
+    )
     return (
         user.totp_enabled and bool(user.auth_version)
         and session.get('admin_2fa_version') == user.auth_version
         and 0 <= time.time() - session.get('admin_2fa_at', 0)
-        < current_app.config['PERMANENT_SESSION_LIFETIME'].total_seconds()
+        < lifetime.total_seconds()
     )
 
 
@@ -99,6 +103,7 @@ def pending_user():
 
 
 def mark_session_verified(user):
+    session.permanent = user.is_salesman
     session['admin_2fa_version'] = user.auth_version
     session['admin_2fa_at'] = time.time()
 

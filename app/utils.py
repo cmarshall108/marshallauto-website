@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
 from functools import lru_cache
 
+import phonenumbers
 from flask import current_app, request
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func
@@ -36,6 +37,25 @@ _rate_buckets = defaultdict(deque)
 
 def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def format_phone_number(phone, region='US'):
+    """Format valid phone numbers for display while preserving unparseable input."""
+    value = (phone or '').strip()
+    if not value:
+        return ''
+    try:
+        parsed = phonenumbers.parse(value, region)
+    except phonenumbers.NumberParseException:
+        return value
+    if not phonenumbers.is_valid_number(parsed):
+        return value
+    style = (
+        phonenumbers.PhoneNumberFormat.NATIONAL
+        if parsed.country_code == 1
+        else phonenumbers.PhoneNumberFormat.INTERNATIONAL
+    )
+    return phonenumbers.format_number(parsed, style)
 
 
 def allowed_file(filename, allowed_extensions):

@@ -50,7 +50,7 @@ from app.marketplace_import import (
 )
 from app.utils import (
     MAX_PRIVATE_IMAGE_BYTES, client_ip, delete_license_image, delete_local_video_file,
-    delete_receipt_image, format_currency, is_safe_redirect,
+    delete_receipt_image, format_currency, format_phone_number, is_safe_redirect,
     rate_limit_exceeded, save_license_image_data_url,
     save_sale_document_data_url, save_uploaded_image, save_uploaded_license_image,
     save_uploaded_pdf, save_uploaded_receipt_image, save_uploaded_sale_document,
@@ -401,7 +401,7 @@ def profile_setup():
             mark_session_verified(current_user)
         current_user.full_name = form.full_name.data.strip()
         current_user.email = form.email.data.strip()
-        current_user.phone = form.phone.data.strip()
+        current_user.phone = format_phone_number(form.phone.data)
         current_user.dealer_tag = form.dealer_tag.data.strip()
         current_user.profile_complete = True
         DealerTag.upsert_for_user(current_user)
@@ -1954,7 +1954,7 @@ def test_drive_new():
         test_drive = TestDrive(
             vehicle_id=form.vehicle_id.data,
             customer_name=form.customer_name.data.strip(),
-            customer_phone=(form.customer_phone.data or '').strip() or None,
+            customer_phone=format_phone_number(form.customer_phone.data) or None,
             customer_email=(form.customer_email.data or '').strip() or None,
             license_number=(form.license_number.data or '').strip() or None,
             license_state=(form.license_state.data or '').strip() or None,
@@ -2041,7 +2041,7 @@ def test_drive_edit(id):
     if form.validate_on_submit():
         was_out = test_drive.status == 'out'
         test_drive.customer_name = form.customer_name.data.strip()
-        test_drive.customer_phone = (form.customer_phone.data or '').strip() or None
+        test_drive.customer_phone = format_phone_number(form.customer_phone.data) or None
         test_drive.customer_email = (form.customer_email.data or '').strip() or None
         test_drive.license_number = (form.license_number.data or '').strip() or None
         test_drive.license_state = (form.license_state.data or '').strip() or None
@@ -2404,7 +2404,7 @@ def salesman_new():
             role=User.ROLE_SALESMAN,
             full_name=(form.full_name.data or '').strip() or None,
             email=(form.email.data or '').strip() or None,
-            phone=(form.phone.data or '').strip() or None,
+            phone=format_phone_number(form.phone.data) or None,
             dealer_tag=(form.dealer_tag.data or '').strip() or None,
             is_active_user=bool(form.is_active.data),
             profile_complete=False,
@@ -2436,7 +2436,7 @@ def salesman_edit(id):
     if form.validate_on_submit():
         salesman.full_name = (form.full_name.data or '').strip() or None
         salesman.email = (form.email.data or '').strip() or None
-        salesman.phone = (form.phone.data or '').strip() or None
+        salesman.phone = format_phone_number(form.phone.data) or None
         salesman.dealer_tag = (form.dealer_tag.data or '').strip() or None
         salesman.is_active_user = bool(form.is_active.data)
         if form.reset_temporary_password.data:
