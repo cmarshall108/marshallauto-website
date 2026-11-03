@@ -38,6 +38,9 @@ from app.models import (
 from app.financing import (
     FinancingEncryptionUnavailable, delete_application_record, load_encrypted_pdf,
 )
+from app.coming_soon_stock_photos import (
+    ensure_stock_photo_for_vehicle, stock_photo_filename,
+)
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
 )
@@ -874,6 +877,7 @@ def vehicle_import():
         reader = csv.DictReader(io.StringIO(raw))
         created = 0
         errors = []
+        imported_vehicles = []
         for idx, row in enumerate(reader, start=2):  # header is row 1
             row = {(k or '').strip().lower(): (v or '').strip() for k, v in row.items()}
             missing = [f for f in CSV_REQUIRED_FIELDS if not row.get(f)]
@@ -928,6 +932,7 @@ def vehicle_import():
             db.session.add(vehicle)
             db.session.flush()
             vehicle.ensure_slug()
+            imported_vehicles.append(vehicle)
             created += 1
 
         if created:
@@ -936,7 +941,25 @@ def vehicle_import():
             db.session.rollback()
 
         if created:
+            attempted_photos = set()
+            photo_failures = 0
+            for vehicle in imported_vehicles:
+                if not vehicle.is_coming_soon:
+                    continue
+                photo_key = stock_photo_filename(
+                    vehicle.year, vehicle.make, vehicle.model, vehicle.body_style,
+                )
+                if photo_key in attempted_photos:
+                    continue
+                attempted_photos.add(photo_key)
+                photo_failures += bool(_ensure_coming_soon_stock_photo(vehicle))
             flash(f'Imported {created} vehicle(s).', 'success')
+            if photo_failures:
+                flash(
+                    f'Could not generate AI reference photos for {photo_failures} '
+                    'Coming Soon vehicle model(s). Check the server log and try again.',
+                    'warning',
+                )
         if errors:
             flash(
                 f'{len(errors)} row(s) skipped: ' + '; '.join(errors[:10]) +
@@ -1031,12 +1054,18 @@ def vehicle_new():
         else:
             _handle_vehicle_images(vehicle, request.files.getlist('images'))
             db.session.refresh(vehicle)
+            stock_photo_error = (
+                None if _deferred_vehicle_media()
+                else _ensure_coming_soon_stock_photo(vehicle)
+            )
             _enqueue_highlights_for_vehicle(vehicle)
             if not _deferred_vehicle_media():
                 _maybe_publish_vehicle_to_facebook(
                     vehicle, is_new=True, force=bool(form.post_to_facebook.data),
                 )
             flash('Vehicle added successfully.', 'success')
+            if stock_photo_error:
+                flash(stock_photo_error, 'warning')
             return _vehicle_save_response(vehicle)
     if _deferred_vehicle_media():
         from flask import get_flashed_messages
@@ -1091,6 +1120,10 @@ def vehicle_edit(id):
         _handle_vehicle_images(vehicle, request.files.getlist('images'))
         db.session.commit()
         db.session.refresh(vehicle)
+        stock_photo_error = (
+            None if _deferred_vehicle_media()
+            else _ensure_coming_soon_stock_photo(vehicle)
+        )
         if vehicle.display_price != previous_price or (vehicle.status == 'sold') != was_sold:
             from app.shopper import process_inventory_alerts
             process_inventory_alerts()
@@ -1102,6 +1135,8 @@ def vehicle_edit(id):
                 force=bool(form.post_to_facebook.data),
             )
         flash('Vehicle updated successfully.', 'success')
+        if stock_photo_error:
+            flash(stock_photo_error, 'warning')
         return _vehicle_save_response(vehicle)
     if _deferred_vehicle_media():
         return jsonify(
@@ -1320,6 +1355,21 @@ def vehicle_rebuild_cost_edit(id, entry_id):
 
 def _deferred_vehicle_media():
     return request.method == 'POST' and request.headers.get('X-Vehicle-Media-Upload') == 'deferred'
+
+
+def _ensure_coming_soon_stock_photo(vehicle):
+    try:
+        ensure_stock_photo_for_vehicle(vehicle)
+    except (OSError, RuntimeError, ValueError):
+        current_app.logger.exception(
+            'Could not generate a Coming Soon reference photo for vehicle %s.',
+            vehicle.id,
+        )
+        return (
+            'Vehicle saved, but its AI reference photo could not be generated. '
+            'Check the server log and try again.'
+        )
+    return None
 
 
 def _vehicle_save_response(vehicle):
@@ -1554,12 +1604,16 @@ def vehicle_media_upload(id):
 @login_required
 def vehicle_media_finish(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    photo_error = _ensure_coming_soon_stock_photo(vehicle)
+    if photo_error:
+        flash(photo_error, 'warning')
     _maybe_publish_vehicle_to_facebook(
         vehicle, is_new=request.form.get('is_new') == '1',
         force=request.form.get('post_to_facebook') == '1',
     )
     return jsonify(
         success=True,
+        stock_photo_warning=bool(photo_error),
         redirect_url=url_for('admin.vehicle_sale', id=id)
         if vehicle.status == 'sold' else url_for('admin.vehicles'),
     )

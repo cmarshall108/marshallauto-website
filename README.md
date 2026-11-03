@@ -69,26 +69,22 @@ can only download reports for available vehicles.
 
 ### Coming Soon stock photos
 
-Coming Soon cards on the showcase and homepage automatically look for a
-representative Wikimedia Commons photo when no actual vehicle photo has been
-uploaded. Matching uses the saved year/make/model, including values populated
-by the existing admin VIN decoder. No VIN, contact information, or credentials
-are sent to Commons. The visitor's browser contacts Commons directly, so the
-service receives the visitor's IP address; requests omit cookies and referrers.
+Run `flask --app run.py generate-coming-soon-stock-photos` with `XAI_API_KEY`
+configured to generate a representative Grok Imagine image for each distinct
+make/model/body style currently shown as Coming Soon without an actual uploaded
+photo. Each generated WebP is saved under `app/static/images/coming-soon-stock/`
+and reused across model years of that same body style. Existing generated
+images are never regenerated unless `--force` is provided. No image-generation
+API is called while shoppers browse the site. Saving a new vehicle or marking
+one Coming Soon generates its shared image automatically after any uploaded
+vehicle photos are processed; CSV imports do the same. Run the command above
+to generate missing images for vehicles that were already marked Coming Soon.
 
-Only images explicitly identified as **CC0**, with a matching CC0 dedication
-URL, no attribution requirement, and no listed restrictions are accepted.
-CC BY/CC BY-SA, unknown licenses, and mismatched model years are excluded.
-CC0 waives copyright restrictions; it does not guarantee clearance of trademarks
-or other non-copyright rights. No paid service or API key is required.
-
-Stock photos are clearly labeled as representative, with a source link; color,
-trim, and equipment may differ. They are never saved as actual inventory photos
-or used in vehicle feeds, detail pages, or listings. Uploading actual photos
-automatically takes precedence. Requests are lazy-loaded, deduplicated per page,
-and time-limited. If no verified match exists, JavaScript is disabled, or the
-service fails, the existing placeholder remains. CC0 coverage is limited, so
-not every year/make/model will have a stock photo.
+These are clearly labeled AI-generated reference images, not photos of the
+specific vehicles; color, trim, and equipment may differ. They are used only
+on Coming Soon cards, never on inventory listings, vehicle details, or feeds.
+Uploaded actual vehicle photos always take precedence. If an image has not yet
+been generated, the existing placeholder and disclaimer are shown.
 
 ### Storefront visual theme
 

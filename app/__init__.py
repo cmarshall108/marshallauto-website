@@ -152,6 +152,11 @@ def create_app(config_class=None):
     register_buyer_guide_commands(app)
     from app.vin_backfill import register_commands as register_vin_backfill_commands
     register_vin_backfill_commands(app)
+    from app.coming_soon_stock_photos import (
+        existing_stock_photo_filename,
+        register_commands as register_coming_soon_photo_commands,
+    )
+    register_coming_soon_photo_commands(app)
 
     # Public analytics beacon (sendBeacon / no form token)
     csrf.exempt(analytics_collect)
@@ -184,6 +189,7 @@ def create_app(config_class=None):
         return f"{url_for('static', filename=filename)}?v={version}"
 
     app.jinja_env.globals['asset_url'] = asset_url
+    app.jinja_env.globals['existing_stock_photo_filename'] = existing_stock_photo_filename
 
     # Security headers
     @app.after_request

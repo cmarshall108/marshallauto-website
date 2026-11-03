@@ -302,20 +302,62 @@ class MediaUploadTests(unittest.TestCase):
         self.assertEqual(VideoUploadJob.query.first().status, 'completed')
 
     def test_deferred_create_saves_details_and_posts_only_after_uploads(self):
-        with patch('app.admin._maybe_publish_vehicle_to_facebook') as publish:
+        with patch('app.admin._maybe_publish_vehicle_to_facebook') as publish, \
+                patch('app.admin._ensure_coming_soon_stock_photo', return_value=None) as stock_photo:
             response = self.client.post('/admin/vehicles/new', data={
                 'year': '2021', 'make': 'Toyota', 'model': 'Camry',
                 'price': '16000', 'mileage': '30000', 'condition': 'used',
                 'title_status': 'clean', 'status': 'available', 'drivetrain': '',
+                'is_coming_soon': 'y',
             }, headers={**self.headers, 'X-Vehicle-Media-Upload': 'deferred'})
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json['success'])
             publish.assert_not_called()
+            stock_photo.assert_not_called()
             finish = self.client.post(response.json['finish_url'], data={
                 'is_new': '1', 'post_to_facebook': '1',
             }, headers=self.headers)
             self.assertEqual(finish.status_code, 200)
             self.assertEqual(publish.call_args.kwargs, {'is_new': True, 'force': True})
+            stock_photo.assert_called_once()
+
+    def test_create_coming_soon_generates_reference_photo_after_saving(self):
+        with patch(
+            'app.admin._ensure_coming_soon_stock_photo',
+            return_value=None,
+        ) as stock_photo:
+            response = self.client.post('/admin/vehicles/new', data={
+                'year': '2021', 'make': 'Toyota', 'model': 'Camry',
+                'price': '16000', 'mileage': '30000', 'condition': 'used',
+                'title_status': 'clean', 'status': 'available',
+                'is_coming_soon': 'y', 'drivetrain': '',
+            }, headers=self.headers)
+
+        self.assertEqual(response.status_code, 302)
+        vehicle = Vehicle.query.filter_by(make='Toyota', model='Camry').one()
+        self.assertTrue(vehicle.is_coming_soon)
+        stock_photo.assert_called_once_with(vehicle)
+
+    def test_marking_existing_vehicle_coming_soon_generates_reference_photo(self):
+        with patch(
+            'app.admin._ensure_coming_soon_stock_photo',
+            return_value=None,
+        ) as stock_photo:
+            response = self.client.post(
+                f'/admin/vehicles/{self.vehicle.id}/edit',
+                data={
+                    'year': '2020', 'make': 'Honda', 'model': 'Civic',
+                    'price': '15000', 'mileage': '40000', 'condition': 'used',
+                    'title_status': 'clean', 'status': 'available',
+                    'is_coming_soon': 'y', 'drivetrain': '',
+                },
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        db.session.refresh(self.vehicle)
+        self.assertTrue(self.vehicle.is_coming_soon)
+        stock_photo.assert_called_once_with(self.vehicle)
 
     def test_deferred_validation_and_authentication(self):
         response = self.client.post('/admin/vehicles/new', data={'year': 'bad'}, headers={

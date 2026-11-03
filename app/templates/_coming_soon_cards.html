@@ -1,21 +1,25 @@
 <div class="row g-4">
     {% for vehicle in vehicles %}
-    <div class="col-md-6 col-xl-4">
-        <article class="coming-soon-card" id="vehicle-{{ vehicle.slug }}"{% if not vehicle.primary_image() %}
-                 data-stock-year="{{ vehicle.year }}" data-stock-make="{{ vehicle.make }}"
-                 data-stock-model="{{ vehicle.model }}"{% endif %}>
+        {% set actual_image = vehicle.primary_image() %}
+        {% set generated_photo = none if actual_image else existing_stock_photo_filename(vehicle) %}
+        <div class="col-md-6 col-xl-4">
+            <article class="coming-soon-card" id="vehicle-{{ vehicle.slug }}">
             <div class="position-relative">
-                <img src="{{ vehicle.primary_image_url() }}"
-                     alt="{{ vehicle.title }} coming soon at {{ business_name }}"
+                    <img src="{{ asset_url(generated_photo) if generated_photo else vehicle.primary_image_url() }}"
+                         alt="{{ vehicle.title }}{% if generated_photo %} representative AI-generated image, not the actual vehicle{% else %} coming soon at {{ business_name }}{% endif %}"
                      loading="lazy" decoding="async" width="600" height="400">
                 <span class="badge text-bg-info coming-soon-badge">Coming Soon</span>
             </div>
             <div class="p-4">
-                {% if not vehicle.primary_image() %}
+                    {% if not actual_image %}
                 <p class="small text-muted mb-2 stock-photo-note" aria-live="polite">
-                    Actual vehicle photos coming soon.
-                </p>
-                {% endif %}
+                        {% if generated_photo %}
+                        AI-generated reference image only; not the actual vehicle. Color, trim, and equipment may differ.
+                        {% else %}
+                        AI-generated reference image not available yet. Actual vehicle photos coming soon.
+                        {% endif %}
+                    </p>
+                    {% endif %}
                 <h3 class="h5 fw-bold mb-2">{{ vehicle.title }}</h3>
                 <p class="text-muted mb-3">
                     {% if vehicle.exterior_color %}{{ vehicle.exterior_color }}{% if vehicle.body_style %} {{ vehicle.body_style|lower }}{% endif %}.{% elif vehicle.body_style %}{{ vehicle.body_style }}.{% endif %}

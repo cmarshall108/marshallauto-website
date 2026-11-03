@@ -1,9 +1,17 @@
+import tempfile
 import unittest
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 
 from app import create_app, db
+from app.coming_soon_stock_photos import (
+    ensure_stock_photo_for_vehicle,
+    existing_stock_photo_filename,
+    stock_photo_filename,
+)
 from app.models import Vehicle, VehicleImage
 from config import TestingConfig
 
@@ -12,6 +20,8 @@ class ComingSoonTests(unittest.TestCase):
     def setUp(self):
         self.app = create_app(TestingConfig)
         self.app.config['SITE_URL'] = 'https://dealer.example'
+        self.static_dir = tempfile.TemporaryDirectory()
+        self.app.static_folder = self.static_dir.name
         self.ctx = self.app.app_context()
         self.ctx.push()
         db.create_all()
@@ -32,6 +42,7 @@ class ComingSoonTests(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         self.ctx.pop()
+        self.static_dir.cleanup()
 
     def add_vehicle(self, slug, *, is_coming_soon, price):
         vehicle = Vehicle(
@@ -42,6 +53,7 @@ class ComingSoonTests(unittest.TestCase):
             mileage=60000,
             status='available',
             is_coming_soon=is_coming_soon,
+            body_style='SUV' if is_coming_soon else 'Sedan',
             slug=slug,
             description='Fresh arrival being prepared for sale.',
             created_at=datetime(2026, 9, 1, 10),
@@ -65,22 +77,41 @@ class ComingSoonTests(unittest.TestCase):
         )
         self.assertNotIn(self.available.title, text)
 
-    def test_missing_photos_opt_into_stock_lookup_on_showcase_and_homepage(self):
+    def test_missing_photos_use_grok_reference_asset_when_available(self):
         self.teaser.vin = '2T3P1RFV0LC123456'
         db.session.commit()
+        filename = stock_photo_filename(
+            self.teaser.year, self.teaser.make, self.teaser.model,
+            self.teaser.body_style,
+        )
+        image_path = Path(self.app.static_folder) / filename
+        image_path.parent.mkdir(parents=True)
+        image_path.write_bytes(b'generated image placeholder')
+
         for path in ('/coming-soon', '/'):
             with self.subTest(path=path):
                 page = BeautifulSoup(self.client.get(path).data, 'html.parser')
                 card = page.select_one('.coming-soon-card')
-                self.assertEqual(card['data-stock-year'], '2020')
-                self.assertEqual(card['data-stock-make'], 'Toyota')
-                self.assertEqual(card['data-stock-model'], 'RAV4')
                 self.assertNotIn(self.teaser.vin, str(card))
-                self.assertIn('vehicle-placeholder.jpg', card.img['src'])
-                self.assertIn('Actual vehicle photos coming soon', card.get_text())
-                self.assertIsNotNone(page.select_one('script[src*="coming-soon-photos.js"]'))
+                self.assertIn('/static/' + filename, card.img['src'])
+                self.assertIn('AI-generated reference image only', card.get_text())
+                self.assertIn('not the actual vehicle', card.img['alt'])
 
-    def test_actual_photos_do_not_use_stock_lookup_or_disclaimer(self):
+    def test_missing_generated_photo_shows_placeholder_and_disclaimer(self):
+        page = BeautifulSoup(self.client.get('/coming-soon').data, 'html.parser')
+        card = page.select_one('.coming-soon-card')
+
+        self.assertIn('vehicle-placeholder.jpg', card.img['src'])
+        self.assertIn('AI-generated reference image not available yet', card.get_text())
+
+    def test_actual_photos_take_precedence_over_generated_reference(self):
+        filename = stock_photo_filename(
+            self.teaser.year, self.teaser.make, self.teaser.model,
+            self.teaser.body_style,
+        )
+        image_path = Path(self.app.static_folder) / filename
+        image_path.parent.mkdir(parents=True)
+        image_path.write_bytes(b'generated image placeholder')
         db.session.add(VehicleImage(
             vehicle_id=self.teaser.id, filename='actual-rav4.jpg', is_primary=True,
         ))
@@ -89,13 +120,92 @@ class ComingSoonTests(unittest.TestCase):
             with self.subTest(path=path):
                 page = BeautifulSoup(self.client.get(path).data, 'html.parser')
                 card = page.select_one('.coming-soon-card')
-                self.assertNotIn('data-stock-year', card.attrs)
                 self.assertIsNone(card.select_one('.stock-photo-note'))
                 self.assertEqual(card.img['src'], '/static/uploads/vehicles/actual-rav4.jpg')
 
-    def test_sale_inventory_does_not_use_stock_lookup(self):
+    def test_sale_inventory_does_not_use_coming_soon_reference_photos(self):
         page = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')
-        self.assertIsNone(page.select_one('[data-stock-year]'))
+        self.assertIsNone(page.select_one('.stock-photo-note'))
+
+    def test_grok_command_generates_one_image_per_model_and_body_style(self):
+        duplicate = self.add_vehicle(
+            '2020-Toyota-RAV4-coming-soon-duplicate',
+            is_coming_soon=True,
+            price=23000,
+        )
+        duplicate.year = 2019
+        image_vehicle = self.add_vehicle(
+            '2019-Acura-MDX-coming-soon',
+            is_coming_soon=True,
+            price=27000,
+        )
+        db.session.add(VehicleImage(
+            vehicle=image_vehicle, filename='actual-mdx.jpg', is_primary=True,
+        ))
+        db.session.commit()
+        self.app.config['XAI_API_KEY'] = 'test-api-key'
+
+        with patch(
+            'app.coming_soon_stock_photos.generate_stock_photo',
+            return_value='images/coming-soon-stock/2020-toyota-rav4.webp',
+        ) as generate:
+            result = self.app.test_cli_runner().invoke(
+                args=['generate-coming-soon-stock-photos'],
+            )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        generate.assert_called_once_with(
+            2019, 'Toyota', 'RAV4', 'test-api-key', self.app.static_folder, 'SUV',
+        )
+
+    def test_grok_command_reuses_saved_image_for_other_years(self):
+        self.add_vehicle(
+            '2019-Toyota-RAV4-coming-soon',
+            is_coming_soon=True,
+            price=23000,
+        ).year = 2019
+        filename = stock_photo_filename(
+            2020, 'Toyota', 'RAV4', 'SUV',
+        )
+        image_path = Path(self.app.static_folder) / filename
+        image_path.parent.mkdir(parents=True)
+        image_path.write_bytes(b'generated image placeholder')
+        self.app.config['XAI_API_KEY'] = 'test-api-key'
+
+        with patch('app.coming_soon_stock_photos.generate_stock_photo') as generate:
+            result = self.app.test_cli_runner().invoke(
+                args=['generate-coming-soon-stock-photos'],
+            )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        generate.assert_not_called()
+        self.assertEqual(
+            existing_stock_photo_filename(self.teaser),
+            filename,
+        )
+
+    def test_vehicle_save_reuses_generated_image_for_equivalent_model_year(self):
+        self.app.config['XAI_API_KEY'] = 'test-api-key'
+        filename = stock_photo_filename(
+            self.teaser.year, self.teaser.make, self.teaser.model,
+            self.teaser.body_style,
+        )
+        image_path = Path(self.app.static_folder) / filename
+
+        def save_generated_image(*_args):
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            image_path.write_bytes(b'generated image placeholder')
+            return filename
+
+        with patch(
+            'app.coming_soon_stock_photos.generate_stock_photo',
+            side_effect=save_generated_image,
+        ) as generate:
+            self.assertEqual(ensure_stock_photo_for_vehicle(self.teaser), filename)
+            self.teaser.year = 2019
+            self.assertEqual(ensure_stock_photo_for_vehicle(self.teaser), filename)
+
+        generate.assert_called_once()
 
     def test_teaser_is_not_in_sale_inventory_homepage_or_feed(self):
         inventory = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')
