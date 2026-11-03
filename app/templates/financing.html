@@ -49,7 +49,7 @@
 {% macro person_fields(prefix, is_applicant=false) %}
 <div class="row g-2">
     {{ text_field(prefix, 'name', 'Full legal name (last, first, middle)', true, autocomplete='name') }}
-    {{ text_field(prefix, 'ssn', 'Social Security number', true, type='ssn', hint='A format check only; we cannot verify the number or identity.') }}
+    {{ text_field(prefix, 'ssn', 'Social Security number', true, type='ssn', hint='1234-56-7890') }}
     {{ text_field(prefix, 'dob', 'Date of birth', true, type='date', autocomplete='bday') }}
     {{ text_field(prefix, 'residence_address', 'Current residence address (street, city, state, ZIP)', true, maxlength=160, autocomplete='street-address') }}
     {{ text_field(prefix, 'residence_years', 'Years at current address', true, type='integer') }}
