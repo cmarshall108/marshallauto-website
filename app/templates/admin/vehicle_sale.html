@@ -11,6 +11,9 @@
     <div class="d-flex gap-2">
         <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">Edit Vehicle</a>
         <a href="{{ url_for('admin.vehicles', status='sold') }}" class="btn btn-outline-secondary">Sold Vehicles</a>
+        <a href="{{ url_for('admin.vehicle_sale_receipt', id=vehicle.id) }}" class="btn btn-primary">
+            {{ 'Edit Customer Receipt' if vehicle.sale_receipt else 'Create Customer Receipt' }}
+        </a>
     </div>
 </div>
 <div class="alert alert-info">

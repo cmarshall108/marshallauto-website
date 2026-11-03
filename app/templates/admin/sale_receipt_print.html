@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% block title %}Customer Receipt - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="receipt-page">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3 no-print">
+        <a href="{{ url_for('admin.vehicle_sale_receipt', id=vehicle.id) }}" class="btn btn-outline-secondary">Edit Receipt</a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>Print Customer Receipt
+        </button>
+    </div>
+
+    <article class="receipt-sheet">
+        <header class="receipt-header">
+            <img src="{{ url_for('static', filename='images/dealership-logo.jpg') }}" alt="Marshall Auto">
+            <div>
+                <h1>Vehicle Sale Receipt</h1>
+                <p>{{ seller_name }}<br>{{ seller_address }}{% if seller_phone %}<br>{{ seller_phone }}{% endif %}</p>
+            </div>
+        </header>
+
+        <div class="receipt-meta">
+            <div><strong>Receipt #:</strong> {{ receipt.id }}</div>
+            <div><strong>Receipt date:</strong> {{ receipt.created_at.strftime('%m/%d/%Y') }}</div>
+            <div><strong>Customer:</strong> {{ receipt.buyer_name or 'Customer' }}</div>
+            {% if receipt.buyer_address %}<div class="receipt-address"><strong>Address:</strong> {{ receipt.buyer_address }}</div>{% endif %}
+        </div>
+
+        <h2>Vehicle</h2>
+        <dl class="receipt-vehicle">
+            <div><dt>Vehicle</dt><dd>{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}{% if vehicle.trim %} {{ vehicle.trim }}{% endif %}</dd></div>
+            <div><dt>VIN</dt><dd>{{ vehicle.vin or 'Not recorded' }}</dd></div>
+            {% if vehicle.stock_number %}<div><dt>Stock #</dt><dd>{{ vehicle.stock_number }}</dd></div>{% endif %}
+        </dl>
+
+        <h2>Itemized charges</h2>
+        <table class="receipt-table">
+            <thead><tr><th>Description</th><th>Amount</th></tr></thead>
+            <tbody>
+                {% for description, amount in line_items %}
+                <tr><td>{{ description }}</td><td>{{ format_currency(amount) }}</td></tr>
+                {% endfor %}
+                {% if receipt.credits %}
+                <tr><td>Credits / deposits applied</td><td>-{{ format_currency(receipt.credits) }}</td></tr>
+                {% endif %}
+                <tr class="receipt-total"><th>Total due</th><th>{{ total_due }}</th></tr>
+            </tbody>
+        </table>
+
+        <div class="receipt-payment">
+            <div><span>Amount received</span><strong>{{ amount_received }}</strong></div>
+            {% if receipt.payment_method %}<div><span>Payment method</span><strong>{{ payment_method_label }}</strong></div>{% endif %}
+            {% if balance_due != '$0.00' %}<div><span>Balance due</span><strong>{{ balance_due }}</strong></div>{% endif %}
+            {% if change_due != '$0.00' %}<div><span>Change / credit due</span><strong>{{ change_due }}</strong></div>{% endif %}
+        </div>
+        <p class="receipt-thanks">Thank you for your business.</p>
+    </article>
+</div>
+
+<style>
+    .receipt-page { max-width: 8.5in; margin: 0 auto; }
+    .receipt-sheet {
+        max-width: 8.5in;
+        margin: 0 auto;
+        padding: 0.55in;
+        border: 1px solid #d5dbe2;
+        background: #fff;
+        color: #17202a;
+        box-shadow: 0 12px 36px rgba(20, 34, 56, 0.1);
+    }
+    .receipt-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 2px solid #25282c; padding-bottom: 0.25in; }
+    .receipt-header img { width: 1.8in; height: auto; object-fit: contain; }
+    .receipt-header h1 { margin: 0; font-size: 22pt; text-align: right; }
+    .receipt-header p { margin: 0.08in 0 0; text-align: right; font-size: 10pt; }
+    .receipt-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1in 0.3in; padding: 0.22in 0; }
+    .receipt-address { grid-column: 1 / -1; }
+    .receipt-sheet h2 { margin: 0.2in 0 0.08in; font-size: 12pt; text-transform: uppercase; letter-spacing: 0.04em; }
+    .receipt-vehicle { margin: 0; }
+    .receipt-vehicle div { display: grid; grid-template-columns: 1.25in 1fr; padding: 0.04in 0; border-bottom: 1px solid #e5e7eb; }
+    .receipt-vehicle dt { font-weight: 700; }
+    .receipt-vehicle dd { margin: 0; }
+    .receipt-table { width: 100%; border-collapse: collapse; }
+    .receipt-table th, .receipt-table td { padding: 0.09in 0.08in; border-bottom: 1px solid #d9dee5; text-align: left; }
+    .receipt-table th:last-child, .receipt-table td:last-child { width: 1.5in; text-align: right; white-space: nowrap; }
+    .receipt-table thead th { background: #f0f2f4; }
+    .receipt-table .receipt-total th { border-top: 2px solid #25282c; border-bottom: 0; font-size: 13pt; }
+    .receipt-payment { margin-top: 0.16in; padding: 0.12in; background: #f7f8fa; }
+    .receipt-payment div { display: flex; justify-content: space-between; gap: 0.2in; padding: 0.04in 0; }
+    .receipt-thanks { margin: 0.35in 0 0; text-align: center; font-weight: 700; }
+    @page { size: letter portrait; margin: 0.45in; }
+    @media print {
+        body { background: #fff !important; }
+        .admin-sidebar, .admin-mobile-nav, .admin-content > *:not(.receipt-page), .no-print { display: none !important; }
+        .admin-content { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        .receipt-page { max-width: none; margin: 0; }
+        .receipt-sheet { max-width: none; margin: 0; padding: 0; border: 0; box-shadow: none; }
+    }
+</style>
+{% endblock %}

@@ -6,7 +6,9 @@ from wtforms import (
     IntegerField, PasswordField, SelectField, StringField, SubmitField,
     TextAreaField,
 )
-from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional, ValidationError
+from wtforms.validators import (
+    DataRequired, Email, InputRequired, Length, NumberRange, Optional, ValidationError,
+)
 from wtforms.validators import EqualTo
 
 
@@ -243,6 +245,51 @@ class VehicleSaleForm(FlaskForm):
     scanned_document_data = HiddenField()
     printer_label = StringField('Selected Printer', validators=[Optional(), Length(max=128)])
     submit = SubmitField('Save Sale Details')
+
+
+class VehicleSaleReceiptForm(FlaskForm):
+    buyer_name = StringField('Customer Name', validators=[Optional(), Length(max=128)])
+    buyer_address = TextAreaField('Customer Address', validators=[Optional(), Length(max=512)])
+    vehicle_price = DecimalField(
+        'Agreed Vehicle Price ($)',
+        validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
+    )
+    highway_use_tax = DecimalField(
+        'Highway Use Tax ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+        default=0,
+    )
+    document_fee = DecimalField(
+        'Document Fee ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+        default=0,
+    )
+    title_registration_fee = DecimalField(
+        'Title / Registration Fees ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+        default=0,
+    )
+    other_charges_data = HiddenField()
+    credits = DecimalField(
+        'Credits / Deposits Applied ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+        default=0,
+    )
+    amount_received = DecimalField(
+        'Amount Received ($)',
+        validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
+    )
+    payment_method = SelectField('Payment Method', choices=[
+        ('', '-- Select --'),
+        ('cash', 'Cash'),
+        ('cashiers_check', "Cashier's Check"),
+        ('certified_check', 'Certified Check'),
+        ('personal_check', 'Personal Check'),
+        ('financing', 'Financing'),
+        ('wire', 'Wire / Bank Transfer'),
+        ('other', 'Other / Mixed Payment'),
+    ], validators=[Optional()])
+    submit = SubmitField('Save and Preview Receipt')
 
 
 class VehicleAcquisitionCostForm(FlaskForm):

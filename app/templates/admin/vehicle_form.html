@@ -129,8 +129,9 @@
         <div class="col-12">
             <div class="alert alert-info mb-0">
                 <strong>Private Sale Details</strong>
-                <p class="mb-2">Record the actual selling amount, payment method, notes, and buyer ID photos separately from this public listing.</p>
+                <p class="mb-2">Record private sale details and create an itemized customer receipt separately from this public listing.</p>
                 <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-outline-primary">Edit Sale Details</a>
+                <a href="{{ url_for('admin.vehicle_sale_receipt', id=vehicle.id) }}" class="btn btn-primary">Customer Receipt</a>
             </div>
         </div>
         {% endif %}

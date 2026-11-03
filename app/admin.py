@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 import base64
 import binascii
@@ -27,13 +28,14 @@ from app.forms import (
     ProfileSetupForm, RebuildCostEntryForm, ReviewForm, SalesmanCreateForm,
     SalesmanEditForm, ServiceRecordForm, SiteSettingForm, TestDriveEditForm,
     TestDriveForm, TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm,
-    VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm,
+    VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm, VehicleSaleReceiptForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, PageView,
     Review, ServiceRecord, InventoryAlert, RebuildCostEntry, RebuildCostReceipt,
     SiteSetting, TestDrive, User, Vehicle, VehicleHoldRequest, VehicleImage,
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
+    VehicleSaleReceipt, VehicleSaleReceiptCharge,
 )
 from app.financing import (
     FinancingEncryptionUnavailable, delete_application_record, load_encrypted_pdf,
@@ -1520,6 +1522,168 @@ def vehicle_sale(id):
         return redirect(url_for('admin.vehicle_sale', id=id))
     return render_template(
         'admin/vehicle_sale.html', form=form, vehicle=vehicle, dealer_tags=dealer_tags,
+    )
+
+
+MAX_SALE_RECEIPT_CHARGES = 20
+MAX_SALE_RECEIPT_AMOUNT = Decimal('99999999.99')
+
+
+def _parse_sale_receipt_charges(raw):
+    if not raw:
+        return []
+    if len(raw) > 8192:
+        raise ValueError('Keep additional receipt charges to 8 KB or less.')
+    try:
+        values = json.loads(raw)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError('Additional receipt charges could not be read. Remove and re-enter them.') from exc
+    if not isinstance(values, list) or len(values) > MAX_SALE_RECEIPT_CHARGES:
+        raise ValueError(f'Enter no more than {MAX_SALE_RECEIPT_CHARGES} additional charges.')
+
+    charges = []
+    for item in values:
+        if not isinstance(item, dict):
+            raise ValueError('Each additional charge needs a description and amount.')
+        description = item.get('description')
+        if not isinstance(description, str) or not description.strip() or len(description.strip()) > 128:
+            raise ValueError('Each additional charge needs a description of 1 to 128 characters.')
+        try:
+            amount = Decimal(str(item.get('amount')))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ValueError('Enter a valid amount for each additional charge.') from exc
+        if not amount.is_finite() or amount < 0 or amount > MAX_SALE_RECEIPT_AMOUNT:
+            raise ValueError('Additional charges must be between $0 and $99,999,999.99.')
+        charges.append((description.strip(), amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)))
+    return charges
+
+
+def _render_sale_receipt_form(vehicle, form, status=200):
+    return render_template(
+        'admin/sale_receipt_form.html',
+        vehicle=vehicle,
+        form=form,
+        existing_receipt=vehicle.sale_receipt,
+        format_currency=format_currency,
+    ), status
+
+
+@admin_bp.route('/vehicles/<int:id>/sale/receipt', methods=['GET', 'POST'])
+@admin_required
+def vehicle_sale_receipt(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    if vehicle.status != 'sold':
+        flash('Mark this vehicle as sold before creating a customer receipt.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=id))
+
+    receipt = vehicle.sale_receipt
+    form = VehicleSaleReceiptForm(obj=receipt)
+    if request.method == 'GET':
+        if receipt:
+            form.other_charges_data.data = json.dumps([
+                {'description': charge.description, 'amount': str(charge.amount)}
+                for charge in receipt.charges
+            ])
+        else:
+            starting_amount = (
+                vehicle.sold_price
+                if vehicle.sold_price is not None
+                else vehicle.display_price
+            )
+            form.vehicle_price.data = starting_amount
+            form.amount_received.data = starting_amount
+            form.payment_method.data = vehicle.payment_method or ''
+            form.other_charges_data.data = '[]'
+    if form.validate_on_submit():
+        try:
+            charges = _parse_sale_receipt_charges(form.other_charges_data.data)
+            subtotal = (
+                form.vehicle_price.data
+                + (form.highway_use_tax.data or Decimal('0'))
+                + (form.document_fee.data or Decimal('0'))
+                + (form.title_registration_fee.data or Decimal('0'))
+                + sum((amount for _, amount in charges), start=Decimal('0'))
+            )
+            if (form.credits.data or Decimal('0')) > subtotal:
+                raise ValueError('Credits and deposits cannot exceed the itemized charges.')
+        except ValueError as exc:
+            form.other_charges_data.errors.append(str(exc))
+            return _render_sale_receipt_form(vehicle, form, 422)
+
+        if receipt is None:
+            receipt = VehicleSaleReceipt(vehicle=vehicle)
+        receipt.buyer_name = (form.buyer_name.data or '').strip() or None
+        receipt.buyer_address = (form.buyer_address.data or '').strip() or None
+        receipt.vehicle_price = form.vehicle_price.data
+        receipt.highway_use_tax = form.highway_use_tax.data or Decimal('0')
+        receipt.document_fee = form.document_fee.data or Decimal('0')
+        receipt.title_registration_fee = form.title_registration_fee.data or Decimal('0')
+        receipt.credits = form.credits.data or Decimal('0')
+        receipt.amount_received = form.amount_received.data
+        receipt.payment_method = form.payment_method.data or None
+        receipt.charges = [
+            VehicleSaleReceiptCharge(description=description, amount=amount)
+            for description, amount in charges
+        ]
+        db.session.add(receipt)
+        db.session.commit()
+        flash('Customer receipt saved.', 'success')
+        return redirect(url_for('admin.vehicle_sale_receipt_print', id=id))
+    if request.method == 'POST':
+        return _render_sale_receipt_form(vehicle, form, 422)
+    return _render_sale_receipt_form(vehicle, form)
+
+
+@admin_bp.get('/vehicles/<int:id>/sale/receipt/print')
+@admin_required
+def vehicle_sale_receipt_print(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    if vehicle.status != 'sold':
+        flash('Mark this vehicle as sold before creating a customer receipt.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=id))
+    receipt = vehicle.sale_receipt
+    if receipt is None:
+        flash('Enter the sale amounts before printing a customer receipt.', 'warning')
+        return redirect(url_for('admin.vehicle_sale_receipt', id=id))
+
+    total_due = receipt.total_due
+    amount_received = receipt.amount_received
+    payment_method_labels = {
+        'cash': 'Cash',
+        'cashiers_check': "Cashier's Check",
+        'certified_check': 'Certified Check',
+        'personal_check': 'Personal Check',
+        'financing': 'Financing',
+        'wire': 'Wire / Bank Transfer',
+        'other': 'Other / Mixed Payment',
+    }
+    return render_template(
+        'admin/sale_receipt_print.html',
+        vehicle=vehicle,
+        receipt=receipt,
+        seller_name=current_app.config['BUSINESS_NAME'],
+        seller_address=(
+            f"{current_app.config['BUSINESS_ADDRESS']}, "
+            f"{current_app.config['BUSINESS_CITY']}, "
+            f"{current_app.config['BUSINESS_STATE']} "
+            f"{current_app.config['BUSINESS_ZIP']}"
+        ),
+        seller_phone=current_app.config['BUSINESS_PHONE'],
+        total_due=format_currency(total_due),
+        amount_received=format_currency(amount_received),
+        balance_due=format_currency(max(total_due - amount_received, Decimal('0'))),
+        change_due=format_currency(max(amount_received - total_due, Decimal('0'))),
+        payment_method_label=payment_method_labels.get(
+            receipt.payment_method, receipt.payment_method or '',
+        ),
+        line_items=[
+            ('Vehicle price', receipt.vehicle_price),
+            ('Highway Use Tax', receipt.highway_use_tax),
+            ('Document fee', receipt.document_fee),
+            ('Title / registration fees', receipt.title_registration_fee),
+            *((charge.description, charge.amount) for charge in receipt.charges),
+        ],
+        format_currency=format_currency,
     )
 
 

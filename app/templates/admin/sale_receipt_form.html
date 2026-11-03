@@ -1,0 +1,94 @@
+{% extends "admin/base.html" %}
+{% block title %}Customer Receipt - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Customer Receipt</h2>
+        <div>{{ vehicle.title }}{% if vehicle.stock_number %} &middot; Stock #{{ vehicle.stock_number }}{% endif %}</div>
+    </div>
+    <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-outline-secondary">Back to Sale Details</a>
+</div>
+
+<div class="alert alert-info">
+    Enter the actual amounts for this transaction. Highway Use Tax and fees are entered manually; this receipt does not calculate tax rates or determine which fees apply.
+</div>
+
+<form method="POST" class="card border-0 shadow p-4" id="sale-receipt-form">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+        <div class="col-md-6">
+            {{ form.buyer_name.label(class="form-label") }}
+            {{ form.buyer_name(class="form-control", autocomplete="name") }}
+            {% for error in form.buyer_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.buyer_address.label(class="form-label") }}
+            {{ form.buyer_address(class="form-control", rows="2", autocomplete="street-address") }}
+            {% for error in form.buyer_address.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.vehicle_price.label(class="form-label") }}
+            {{ form.vehicle_price(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01", required=true) }}
+            <div class="form-text">Verify the negotiated vehicle price before tax and fees.</div>
+            {% for error in form.vehicle_price.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.highway_use_tax.label(class="form-label") }}
+            {{ form.highway_use_tax(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.highway_use_tax.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.document_fee.label(class="form-label") }}
+            {{ form.document_fee(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.document_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.title_registration_fee.label(class="form-label") }}
+            {{ form.title_registration_fee(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.title_registration_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+            <label class="form-label" for="receipt-other-charges">Other itemized charges</label>
+            <div id="receipt-other-charges" class="d-grid gap-2"></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="receipt-add-charge">Add a charge</button>
+            {% for error in form.other_charges_data.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.credits.label(class="form-label") }}
+            {{ form.credits(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            <div class="form-text">Deposits or discounts applied to the total.</div>
+            {% for error in form.credits.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Calculated total due</label>
+            <div class="form-control bg-body-secondary fw-bold" id="receipt-total" aria-live="polite">$0.00</div>
+            <div class="form-text">Calculated from the amounts above. Credits are subtracted.</div>
+        </div>
+        <div class="col-md-6">
+            {{ form.amount_received.label(class="form-label") }}
+            {{ form.amount_received(class="form-control", min="0", max="99999999.99", step="0.01", required=true) }}
+            <div class="form-text">Verify the actual total collected from the customer.</div>
+            {% for error in form.amount_received.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.payment_method.label(class="form-label") }}
+            {{ form.payment_method(class="form-select") }}
+            {% for error in form.payment_method.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12 d-flex flex-wrap gap-2 mt-4">
+            {{ form.submit(class="btn btn-primary") }}
+            {% if existing_receipt %}
+            <a href="{{ url_for('admin.vehicle_sale_receipt_print', id=vehicle.id) }}" class="btn btn-outline-primary">Print Saved Receipt</a>
+            {% endif %}
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.initialSaleReceiptCharges = {{ form.other_charges_data.data|default('[]', true)|tojson }};
+</script>
+<script src="{{ asset_url('js/admin-sale-receipt.js') }}"></script>
+{% endblock %}

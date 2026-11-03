@@ -196,6 +196,53 @@ class VehicleSaleDocument(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
 
+class VehicleSaleReceipt(db.Model):
+    __tablename__ = 'vehicle_sale_receipts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, unique=True)
+    buyer_name = db.Column(db.String(128), nullable=True)
+    buyer_address = db.Column(db.Text, nullable=True)
+    vehicle_price = db.Column(db.Numeric(10, 2), nullable=False)
+    highway_use_tax = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    document_fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    title_registration_fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    credits = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    amount_received = db.Column(db.Numeric(10, 2), nullable=False)
+    payment_method = db.Column(db.String(32), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    vehicle = db.relationship('Vehicle', back_populates='sale_receipt')
+    charges = db.relationship(
+        'VehicleSaleReceiptCharge',
+        back_populates='receipt',
+        cascade='all, delete-orphan',
+        order_by='VehicleSaleReceiptCharge.id.asc()',
+    )
+
+    @property
+    def total_due(self):
+        charges = sum((charge.amount for charge in self.charges), start=0)
+        return (
+            self.vehicle_price + self.highway_use_tax + self.document_fee
+            + self.title_registration_fee + charges - self.credits
+        )
+
+
+class VehicleSaleReceiptCharge(db.Model):
+    __tablename__ = 'vehicle_sale_receipt_charges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    receipt_id = db.Column(
+        db.Integer, db.ForeignKey('vehicle_sale_receipts.id'), nullable=False, index=True,
+    )
+    description = db.Column(db.String(128), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+
+    receipt = db.relationship('VehicleSaleReceipt', back_populates='charges')
+
+
 class Vehicle(db.Model):
     __tablename__ = 'vehicles'
 
@@ -329,6 +376,12 @@ class Vehicle(db.Model):
         lazy='select',
         cascade='all, delete-orphan',
         order_by='VehicleSaleDocument.id.asc()',
+    )
+    sale_receipt = db.relationship(
+        'VehicleSaleReceipt',
+        back_populates='vehicle',
+        uselist=False,
+        cascade='all, delete-orphan',
     )
 
     @hybrid_property
