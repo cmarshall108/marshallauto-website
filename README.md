@@ -79,6 +79,7 @@ API is called while shoppers browse the site. Saving a new vehicle or marking
 one Coming Soon generates its shared image automatically after any uploaded
 vehicle photos are processed; CSV imports do the same. Run the command above
 to generate missing images for vehicles that were already marked Coming Soon.
+The deployment script also runs this backfill after each successful deploy.
 
 These are clearly labeled AI-generated reference images, not photos of the
 specific vehicles; color, trim, and equipment may differ. They are used only

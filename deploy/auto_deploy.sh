@@ -154,6 +154,12 @@ fi
 
 log "DEPLOYED $(git rev-parse --short HEAD) — healthy"
 
+# Non-fatal and resumable: generate missing reference photos for existing
+# Coming Soon vehicles; uploaded vehicle photos take precedence.
+if ! FLASK_APP=run.py "$PYTHON" -m flask generate-coming-soon-stock-photos; then
+  log "WARNING: Coming Soon stock photo backfill was incomplete; rerun flask generate-coming-soon-stock-photos"
+fi
+
 # Non-fatal and resumable: fetch full VIN/EPA data for existing inventory.
 if ! FLASK_APP=run.py "$PYTHON" -m flask backfill-vin-data; then
   log "WARNING: VIN data backfill was incomplete; rerun flask backfill-vin-data"
