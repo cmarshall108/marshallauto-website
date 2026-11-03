@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""List and scan printers on the computer viewing the sale page.
+"""List and scan printers on the computer viewing the admin page.
 
 The public site cannot see a Mac's printers. Run this beside the browser:
 
     python3 scripts/local_printer_agent.py
 
-It listens only on 127.0.0.1 and returns the scanned PDF to the page.
+It listens only on 127.0.0.1 and returns scanned pages to the browser.
 """
+import errno
 import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +21,7 @@ from app.local_scanners import ScannerError, list_scanners, scan_document
 
 HOST = '127.0.0.1'
 PORT = 8765
+PORT_FALLBACK_COUNT = 10
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -72,9 +74,28 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write('%s - %s\n' % (self.address_string(), fmt % args))
 
 
+def create_server():
+    server = None
+    for port in range(PORT, PORT + PORT_FALLBACK_COUNT + 1):
+        try:
+            server = ThreadingHTTPServer((HOST, port), Handler)
+            break
+        except OSError as exc:
+            if exc.errno != errno.EADDRINUSE:
+                raise
+    if server is None:
+        raise OSError(
+            f'No available local scanner-agent port in range {PORT}-{PORT + PORT_FALLBACK_COUNT}.',
+        )
+    return server
+
+
 def main():
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f'Local printer agent listening on http://{HOST}:{PORT}', flush=True)
+    server = create_server()
+    print(
+        f'Local printer agent listening on http://{HOST}:{server.server_address[1]}',
+        flush=True,
+    )
     server.serve_forever()
 
 

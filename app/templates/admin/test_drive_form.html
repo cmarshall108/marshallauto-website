@@ -158,6 +158,7 @@
 
 {% block extra_js %}
 <script>window.testDriveLicenseAnalysisUrl = {{ url_for('admin.test_drive_analyze_license')|tojson }};</script>
+<script src="{{ asset_url('js/admin-local-scanner.js') }}"></script>
 <script src="{{ asset_url('js/admin-test-drive.js') }}"></script>
 <script>
 document.querySelectorAll('.dealer-tag-pick').forEach(function (btn) {

@@ -5,7 +5,6 @@
 (function () {
     'use strict';
 
-    const AGENT = 'http://127.0.0.1:8765';
     const printerSelect = document.getElementById('sale-printer-select');
     const printerLabel = document.getElementById('sale-printer-label');
     const scanBtn = document.getElementById('sale-scan-start');
@@ -79,10 +78,7 @@
     async function loadPrinters() {
         printerSelect.replaceChildren(new Option('Looking for printers…', ''));
         try {
-            const response = await fetch(`${AGENT}/printers`, { cache: 'no-store' });
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.error || 'Could not list printers.');
-            const printers = payload.printers || [];
+            const printers = await window.LocalScannerAgent.listPrinters();
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             printers.forEach((printer) => {
                 printerSelect.add(new Option(printer.label, printer.id));
@@ -99,7 +95,7 @@
         } catch (error) {
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             if (idPhotoFallback) idPhotoFallback.classList.remove('d-none');
-            showError('Cannot connect to the local scanner service. Start it on this computer with “python3 scripts/local_printer_agent.py”, then refresh this page. You can also attach a scanned file or use a photo for the customer ID.');
+            showError(error.message || 'Could not connect to the local scanner service.');
         }
     }
 
@@ -127,11 +123,7 @@
         if (idScanBtn) idScanBtn.disabled = true;
         button.textContent = 'Scanning…';
         try {
-            const response = await fetch(`${AGENT}/scan`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ printer_id: printerSelect.value, purpose: isId ? 'id' : 'document' }),
-            });
+            const response = await window.LocalScannerAgent.scan(printerSelect.value, isId ? 'id' : 'document');
             if (!response.ok) {
                 let message = 'The selected printer could not scan.';
                 try {

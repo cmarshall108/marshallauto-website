@@ -151,6 +151,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ asset_url('js/admin-local-scanner.js') }}"></script>
 <script src="{{ asset_url('js/admin-sale-scan.js') }}"></script>
 <script>
 document.querySelectorAll('.dealer-tag-pick').forEach(function (btn) {

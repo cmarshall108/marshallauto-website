@@ -160,10 +160,7 @@
         if (!printerSelect) return;
         printerSelect.replaceChildren(new Option('Looking for printers…', ''));
         try {
-            const response = await fetch('http://127.0.0.1:8765/printers', { cache: 'no-store' });
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.error || 'Could not list printers.');
-            const printers = payload.printers || [];
+            const printers = await window.LocalScannerAgent.listPrinters();
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             printers.forEach((printer) => printerSelect.add(new Option(printer.label, printer.id)));
             if (printers.length === 1) printerSelect.value = printers[0].id;
@@ -177,7 +174,7 @@
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             if (photoFallback) photoFallback.classList.remove('d-none');
             if (scanError) {
-                scanError.textContent = 'Cannot connect to the local scanner service. Start it on this computer with “python3 scripts/local_printer_agent.py”, then refresh this page. You can also take or upload a license photo.';
+                scanError.textContent = error.message || 'Could not connect to the local scanner service.';
                 scanError.classList.remove('d-none');
             }
         }
@@ -197,11 +194,7 @@
         scanBtn.disabled = true;
         scanBtn.textContent = 'Scanning…';
         try {
-            const response = await fetch('http://127.0.0.1:8765/scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ printer_id: printerSelect.value, purpose: 'id' }),
-            });
+            const response = await window.LocalScannerAgent.scan(printerSelect.value, 'id');
             if (!response.ok) {
                 let message = 'The selected printer could not scan the license.';
                 try {

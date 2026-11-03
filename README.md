@@ -49,7 +49,8 @@ python3 scripts/local_printer_agent.py
 
 Refresh the admin page after the service starts. Scanner discovery is performed
 by that computer, not by the website server. If no scanner appears after startup,
-make sure Bonjour/mDNS traffic is allowed on the local network.
+the service checks ports 8765 through 8775 and uses the first available one.
+Make sure Bonjour/mDNS traffic is allowed on the local network.
 
 ### Local IAAI Buy Now finder
 
