@@ -11,7 +11,10 @@
 </div>
 
 <div class="alert alert-info">
-    Enter the actual amounts for this transaction. Highway Use Tax and fees are entered manually; this receipt does not calculate tax rates or determine which fees apply.
+    Enter the actual amounts for this sale. Sales tax and fees are entered manually. Cash Due is calculated after the down payment and trade allowance.
+</div>
+<div class="alert alert-secondary">
+    The printed receipt states that the vehicle is sold as-is, that no liability or collision insurance is included, and that title is guaranteed to the purchaser by the seller.
 </div>
 
 <form method="POST" class="card border-0 shadow p-4" id="sale-receipt-form">
@@ -28,15 +31,25 @@
             {% for error in form.buyer_address.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-6">
+            {{ form.salesman.label(class="form-label") }}
+            {{ form.salesman(class="form-control", list="receipt-salesman-options", autocomplete="off") }}
+            {% if dealer_tags %}
+            <datalist id="receipt-salesman-options">
+                {% for tag in dealer_tags %}<option value="{{ tag }}"></option>{% endfor %}
+            </datalist>
+            {% endif %}
+            {% for error in form.salesman.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
             {{ form.vehicle_price.label(class="form-label") }}
             {{ form.vehicle_price(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01", required=true) }}
             <div class="form-text">Verify the negotiated vehicle price before tax and fees.</div>
             {% for error in form.vehicle_price.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-6">
-            {{ form.highway_use_tax.label(class="form-label") }}
-            {{ form.highway_use_tax(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
-            {% for error in form.highway_use_tax.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            {{ form.sales_tax.label(class="form-label") }}
+            {{ form.sales_tax(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.sales_tax.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-6">
             {{ form.document_fee.label(class="form-label") }}
@@ -44,9 +57,14 @@
             {% for error in form.document_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-6">
-            {{ form.title_registration_fee.label(class="form-label") }}
-            {{ form.title_registration_fee(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
-            {% for error in form.title_registration_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            {{ form.warranty_fee.label(class="form-label") }}
+            {{ form.warranty_fee(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.warranty_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            {{ form.tags_fee.label(class="form-label") }}
+            {{ form.tags_fee(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.tags_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-12">
             <label class="form-label" for="receipt-other-charges">Other itemized charges</label>
@@ -55,21 +73,19 @@
             {% for error in form.other_charges_data.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-6">
-            {{ form.credits.label(class="form-label") }}
-            {{ form.credits(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
-            <div class="form-text">Deposits or discounts applied to the total.</div>
-            {% for error in form.credits.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            {{ form.down_payment.label(class="form-label") }}
+            {{ form.down_payment(class="form-control receipt-credit", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.down_payment.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-6">
-            <label class="form-label">Calculated total due</label>
+            {{ form.trade_allow.label(class="form-label") }}
+            {{ form.trade_allow(class="form-control receipt-credit", min="0", max="99999999.99", step="0.01") }}
+            {% for error in form.trade_allow.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Cash Due</label>
             <div class="form-control bg-body-secondary fw-bold" id="receipt-total" aria-live="polite">$0.00</div>
-            <div class="form-text">Calculated from the amounts above. Credits are subtracted.</div>
-        </div>
-        <div class="col-md-6">
-            {{ form.amount_received.label(class="form-label") }}
-            {{ form.amount_received(class="form-control", min="0", max="99999999.99", step="0.01", required=true) }}
-            <div class="form-text">Verify the actual total collected from the customer.</div>
-            {% for error in form.amount_received.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            <div class="form-text">Vehicle price, sales tax, and fees, minus the down payment and trade allowance.</div>
         </div>
         <div class="col-md-6">
             {{ form.payment_method.label(class="form-label") }}

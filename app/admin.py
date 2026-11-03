@@ -1564,6 +1564,7 @@ def _render_sale_receipt_form(vehicle, form, status=200):
         vehicle=vehicle,
         form=form,
         existing_receipt=vehicle.sale_receipt,
+        dealer_tags=_dealer_tag_choices(),
         format_currency=format_currency,
     ), status
 
@@ -1591,21 +1592,27 @@ def vehicle_sale_receipt(id):
                 else vehicle.display_price
             )
             form.vehicle_price.data = starting_amount
-            form.amount_received.data = starting_amount
             form.payment_method.data = vehicle.payment_method or ''
             form.other_charges_data.data = '[]'
+        if not form.salesman.data:
+            form.salesman.data = vehicle.salesperson or (
+                current_user.salesperson_label if current_user.is_authenticated else ''
+            )
     if form.validate_on_submit():
         try:
             charges = _parse_sale_receipt_charges(form.other_charges_data.data)
             subtotal = (
                 form.vehicle_price.data
-                + (form.highway_use_tax.data or Decimal('0'))
+                + (form.sales_tax.data or Decimal('0'))
                 + (form.document_fee.data or Decimal('0'))
-                + (form.title_registration_fee.data or Decimal('0'))
+                + (form.warranty_fee.data or Decimal('0'))
+                + (form.tags_fee.data or Decimal('0'))
                 + sum((amount for _, amount in charges), start=Decimal('0'))
             )
-            if (form.credits.data or Decimal('0')) > subtotal:
-                raise ValueError('Credits and deposits cannot exceed the itemized charges.')
+            reductions = (form.down_payment.data or Decimal('0')) + (form.trade_allow.data or Decimal('0'))
+            if reductions > subtotal:
+                raise ValueError('Down payment and trade allowance cannot exceed the itemized charges.')
+            cash_due = subtotal - reductions
         except ValueError as exc:
             form.other_charges_data.errors.append(str(exc))
             return _render_sale_receipt_form(vehicle, form, 422)
@@ -1614,12 +1621,18 @@ def vehicle_sale_receipt(id):
             receipt = VehicleSaleReceipt(vehicle=vehicle)
         receipt.buyer_name = (form.buyer_name.data or '').strip() or None
         receipt.buyer_address = (form.buyer_address.data or '').strip() or None
+        receipt.salesman = (form.salesman.data or '').strip() or None
         receipt.vehicle_price = form.vehicle_price.data
-        receipt.highway_use_tax = form.highway_use_tax.data or Decimal('0')
+        receipt.sales_tax = form.sales_tax.data or Decimal('0')
         receipt.document_fee = form.document_fee.data or Decimal('0')
-        receipt.title_registration_fee = form.title_registration_fee.data or Decimal('0')
-        receipt.credits = form.credits.data or Decimal('0')
-        receipt.amount_received = form.amount_received.data
+        receipt.warranty_fee = form.warranty_fee.data or Decimal('0')
+        receipt.tags_fee = form.tags_fee.data or Decimal('0')
+        receipt.down_payment = form.down_payment.data or Decimal('0')
+        receipt.trade_allow = form.trade_allow.data or Decimal('0')
+        receipt.highway_use_tax = Decimal('0')
+        receipt.title_registration_fee = Decimal('0')
+        receipt.credits = Decimal('0')
+        receipt.amount_received = cash_due
         receipt.payment_method = form.payment_method.data or None
         receipt.charges = [
             VehicleSaleReceiptCharge(description=description, amount=amount)
@@ -1646,8 +1659,6 @@ def vehicle_sale_receipt_print(id):
         flash('Enter the sale amounts before printing a customer receipt.', 'warning')
         return redirect(url_for('admin.vehicle_sale_receipt', id=id))
 
-    total_due = receipt.total_due
-    amount_received = receipt.amount_received
     payment_method_labels = {
         'cash': 'Cash',
         'cashiers_check': "Cashier's Check",
@@ -1669,18 +1680,16 @@ def vehicle_sale_receipt_print(id):
             f"{current_app.config['BUSINESS_ZIP']}"
         ),
         seller_phone=current_app.config['BUSINESS_PHONE'],
-        total_due=format_currency(total_due),
-        amount_received=format_currency(amount_received),
-        balance_due=format_currency(max(total_due - amount_received, Decimal('0'))),
-        change_due=format_currency(max(amount_received - total_due, Decimal('0'))),
+        cash_due=format_currency(receipt.cash_due),
         payment_method_label=payment_method_labels.get(
             receipt.payment_method, receipt.payment_method or '',
         ),
         line_items=[
             ('Vehicle price', receipt.vehicle_price),
-            ('Highway Use Tax', receipt.highway_use_tax),
-            ('Document fee', receipt.document_fee),
-            ('Title / registration fees', receipt.title_registration_fee),
+            ('Sales Tax', receipt.sales_tax),
+            ('Doc Fee', receipt.document_fee),
+            ('Warranty Fee', receipt.warranty_fee),
+            ('Tags Fee', receipt.tags_fee),
             *((charge.description, charge.amount) for charge in receipt.charges),
         ],
         format_currency=format_currency,

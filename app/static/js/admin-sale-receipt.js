@@ -71,8 +71,10 @@
         chargesRoot.querySelectorAll('.receipt-other-amount').forEach((field) => {
             cents += amountInCents(field.value);
         });
-        const credits = form.querySelector('[name="credits"]');
-        cents = Math.max(0, cents - amountInCents(credits ? credits.value : ''));
+        form.querySelectorAll('.receipt-credit').forEach((field) => {
+            cents -= amountInCents(field.value);
+        });
+        cents = Math.max(0, cents);
         totalDisplay.textContent = money.format(cents / 100);
     }
 
@@ -90,7 +92,7 @@
     }
 
     addChargeButton.addEventListener('click', () => addCharge());
-    form.querySelectorAll('.receipt-amount').forEach((field) => {
+    form.querySelectorAll('.receipt-amount, .receipt-credit').forEach((field) => {
         field.addEventListener('input', updateTotal);
     });
     form.addEventListener('submit', () => {

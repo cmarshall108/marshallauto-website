@@ -250,34 +250,41 @@ class VehicleSaleForm(FlaskForm):
 class VehicleSaleReceiptForm(FlaskForm):
     buyer_name = StringField('Customer Name', validators=[Optional(), Length(max=128)])
     buyer_address = TextAreaField('Customer Address', validators=[Optional(), Length(max=512)])
+    salesman = StringField('Salesman', validators=[Optional(), Length(max=128)])
     vehicle_price = DecimalField(
         'Agreed Vehicle Price ($)',
         validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
     )
-    highway_use_tax = DecimalField(
-        'Highway Use Tax ($)',
+    sales_tax = DecimalField(
+        'Sales Tax ($)',
         validators=[Optional(), NumberRange(min=0, max=99999999.99)],
         default=0,
     )
     document_fee = DecimalField(
-        'Document Fee ($)',
+        'Doc Fee ($)',
         validators=[Optional(), NumberRange(min=0, max=99999999.99)],
         default=0,
     )
-    title_registration_fee = DecimalField(
-        'Title / Registration Fees ($)',
+    warranty_fee = DecimalField(
+        'Warranty Fee ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+        default=0,
+    )
+    tags_fee = DecimalField(
+        'Tags Fee ($)',
         validators=[Optional(), NumberRange(min=0, max=99999999.99)],
         default=0,
     )
     other_charges_data = HiddenField()
-    credits = DecimalField(
-        'Credits / Deposits Applied ($)',
+    down_payment = DecimalField(
+        'Down Payment ($)',
         validators=[Optional(), NumberRange(min=0, max=99999999.99)],
         default=0,
     )
-    amount_received = DecimalField(
-        'Amount Received ($)',
-        validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
+    trade_allow = DecimalField(
+        'Trade-Allow ($)',
+        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
+        default=0,
     )
     payment_method = SelectField('Payment Method', choices=[
         ('', '-- Select --'),

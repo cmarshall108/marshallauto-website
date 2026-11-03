@@ -203,11 +203,18 @@ class VehicleSaleReceipt(db.Model):
     vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, unique=True)
     buyer_name = db.Column(db.String(128), nullable=True)
     buyer_address = db.Column(db.Text, nullable=True)
+    salesman = db.Column(db.String(128), nullable=True)
     vehicle_price = db.Column(db.Numeric(10, 2), nullable=False)
+    sales_tax = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     highway_use_tax = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     document_fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     title_registration_fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    warranty_fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    tags_fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     credits = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    down_payment = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    trade_allow = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    # Legacy amount received is kept for compatibility with the first receipt schema.
     amount_received = db.Column(db.Numeric(10, 2), nullable=False)
     payment_method = db.Column(db.String(32), nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
@@ -225,9 +232,14 @@ class VehicleSaleReceipt(db.Model):
     def total_due(self):
         charges = sum((charge.amount for charge in self.charges), start=0)
         return (
-            self.vehicle_price + self.highway_use_tax + self.document_fee
-            + self.title_registration_fee + charges - self.credits
+            self.vehicle_price + self.sales_tax + self.document_fee
+            + self.warranty_fee + self.tags_fee + charges
+            - self.down_payment - self.trade_allow
         )
+
+    @property
+    def cash_due(self):
+        return self.total_due
 
 
 class VehicleSaleReceiptCharge(db.Model):

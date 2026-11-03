@@ -23,6 +23,7 @@
             <div><strong>Receipt #:</strong> {{ receipt.id }}</div>
             <div><strong>Receipt date:</strong> {{ receipt.created_at.strftime('%m/%d/%Y') }}</div>
             <div><strong>Customer:</strong> {{ receipt.buyer_name or 'Customer' }}</div>
+            <div><strong>Salesman:</strong> {{ receipt.salesman or 'Not recorded' }}</div>
             {% if receipt.buyer_address %}<div class="receipt-address"><strong>Address:</strong> {{ receipt.buyer_address }}</div>{% endif %}
         </div>
 
@@ -40,19 +41,21 @@
                 {% for description, amount in line_items %}
                 <tr><td>{{ description }}</td><td>{{ format_currency(amount) }}</td></tr>
                 {% endfor %}
-                {% if receipt.credits %}
-                <tr><td>Credits / deposits applied</td><td>-{{ format_currency(receipt.credits) }}</td></tr>
-                {% endif %}
-                <tr class="receipt-total"><th>Total due</th><th>{{ total_due }}</th></tr>
+                <tr><td>Down Payment</td><td>-{{ format_currency(receipt.down_payment) }}</td></tr>
+                <tr><td>Trade-Allow</td><td>-{{ format_currency(receipt.trade_allow) }}</td></tr>
+                <tr class="receipt-total"><th>Cash Due</th><th>{{ cash_due }}</th></tr>
             </tbody>
         </table>
 
         <div class="receipt-payment">
-            <div><span>Amount received</span><strong>{{ amount_received }}</strong></div>
+            <div><span>Cash Due</span><strong>{{ cash_due }}</strong></div>
             {% if receipt.payment_method %}<div><span>Payment method</span><strong>{{ payment_method_label }}</strong></div>{% endif %}
-            {% if balance_due != '$0.00' %}<div><span>Balance due</span><strong>{{ balance_due }}</strong></div>{% endif %}
-            {% if change_due != '$0.00' %}<div><span>Change / credit due</span><strong>{{ change_due }}</strong></div>{% endif %}
         </div>
+        <section class="receipt-terms">
+            <p>This vehicle is sold as-is.</p>
+            <p>No liability or collision insurance is included.</p>
+            <p>Title is guaranteed to the purchaser by the seller.</p>
+        </section>
         <p class="receipt-thanks">Thank you for your business.</p>
     </article>
 </div>
@@ -86,7 +89,9 @@
     .receipt-table .receipt-total th { border-top: 2px solid #25282c; border-bottom: 0; font-size: 13pt; }
     .receipt-payment { margin-top: 0.16in; padding: 0.12in; background: #f7f8fa; }
     .receipt-payment div { display: flex; justify-content: space-between; gap: 0.2in; padding: 0.04in 0; }
-    .receipt-thanks { margin: 0.35in 0 0; text-align: center; font-weight: 700; }
+    .receipt-terms { margin-top: 0.28in; padding-top: 0.12in; border-top: 1px solid #25282c; }
+    .receipt-terms p { margin: 0 0 0.06in; font-weight: 700; }
+    .receipt-thanks { margin: 0.28in 0 0; text-align: center; font-weight: 700; }
     @page { size: letter portrait; margin: 0.45in; }
     @media print {
         body { background: #fff !important; }
