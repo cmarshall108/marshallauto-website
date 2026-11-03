@@ -99,7 +99,7 @@
         } catch (error) {
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             if (idPhotoFallback) idPhotoFallback.classList.remove('d-none');
-            showError('No scanner is available on this computer. Use a photo for the customer ID instead.');
+            showError('Cannot connect to the local scanner service. Start it on this computer with “python3 scripts/local_printer_agent.py”, then refresh this page. You can also attach a scanned file or use a photo for the customer ID.');
         }
     }
 

@@ -177,7 +177,7 @@
             printerSelect.replaceChildren(new Option('Select a printer or scanner', ''));
             if (photoFallback) photoFallback.classList.remove('d-none');
             if (scanError) {
-                scanError.textContent = 'No scanner is available on this computer. Take or upload a license photo instead.';
+                scanError.textContent = 'Cannot connect to the local scanner service. Start it on this computer with “python3 scripts/local_printer_agent.py”, then refresh this page. You can also take or upload a license photo.';
                 scanError.classList.remove('d-none');
             }
         }

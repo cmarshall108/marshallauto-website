@@ -37,6 +37,20 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Edit site settings, SEO defaults, and analytics IDs
   - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
 
+### Local network scanner
+
+The admin browser uses a small local service to discover and scan Bonjour/eSCL
+devices on its network. Start it on the same computer as the browser, from the
+project directory, and leave it running while using scanner features:
+
+```bash
+python3 scripts/local_printer_agent.py
+```
+
+Refresh the admin page after the service starts. Scanner discovery is performed
+by that computer, not by the website server. If no scanner appears after startup,
+make sure Bonjour/mDNS traffic is allowed on the local network.
+
 ### Local IAAI Buy Now finder
 
 The optional `tools/iaai_buy_now_finder.py` utility opens a persistent local
