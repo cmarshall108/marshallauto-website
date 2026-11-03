@@ -21,7 +21,7 @@ import re
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ import random
 import socket
 import traceback
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, List, Optional, Sequence
+from typing import Sequence
 
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import selectinload
@@ -95,8 +95,7 @@ def enqueue_image_highlight_job(image_id: int, force: bool = False, priority: in
 
 def enqueue_vehicle_highlight_jobs(vehicle_id: int, force: bool = False, only_missing: bool = True) -> int:
     """Enqueue jobs for all images on a vehicle. Returns number of jobs created/kept."""
-    from app import db
-    from app.models import Vehicle, VehicleImage
+    from app.models import Vehicle
 
     vehicle = (
         Vehicle.query

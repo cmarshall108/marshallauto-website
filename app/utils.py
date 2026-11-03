@@ -8,13 +8,10 @@ import smtplib
 import subprocess
 import sys
 import tempfile
-import time
 import warnings
-from collections import defaultdict, deque
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
-from functools import lru_cache
 
 import phonenumbers
 from flask import current_app, request
@@ -30,10 +27,6 @@ except ImportError:  # pragma: no cover - HEIC uploads will be rejected as unrea
 HEIC_EXTENSIONS = {'heic', 'heif'}
 MAX_PRIVATE_IMAGE_BYTES = 15 * 1024 * 1024
 MAX_PRIVATE_IMAGE_PIXELS = 20_000_000
-
-# In-process rate limit buckets: key -> deque of timestamps
-_rate_buckets = defaultdict(deque)
-
 
 def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -77,18 +70,6 @@ def rate_limit_exceeded(bucket_key, limit, window_seconds):
     """Shared sliding-window limiter when Redis is configured; otherwise per process."""
     from app.platform import rate_limit_exceeded as shared_rate_limit
     return shared_rate_limit(bucket_key, limit, window_seconds)
-
-
-def _memory_rate_limit_exceeded(bucket_key, limit, window_seconds):
-    now = time.time()
-    bucket = _rate_buckets[bucket_key]
-    cutoff = now - window_seconds
-    while bucket and bucket[0] < cutoff:
-        bucket.popleft()
-    if len(bucket) >= limit:
-        return True
-    bucket.append(now)
-    return False
 
 
 def _validate_image_magic(file_obj):

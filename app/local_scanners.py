@@ -3,9 +3,7 @@
 A browser cannot see macOS printers. This helper is called by a small local
 agent on that computer, which then posts the page back to the open sale.
 """
-import socket
 import subprocess
-import xml.etree.ElementTree as ET
 from urllib.parse import unquote, urlparse
 
 ESCL_NS = {

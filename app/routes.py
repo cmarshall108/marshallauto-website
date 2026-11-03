@@ -15,7 +15,6 @@ from app import db
 from app.forms import ContactForm, InventoryAlertForm, TestDriveRequestForm
 from app.models import (
     CarfaxReport, FinancingApplication, Lead, Review, SiteSetting, Vehicle,
-    VehicleImage,
 )
 from app.models import BlogPost
 from app.financing import (

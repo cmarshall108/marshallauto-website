@@ -761,8 +761,6 @@ def build_analytics_dashboard(args):
     end_date = end.date() if hasattr(end, 'date') else end
     if range_key == '24h':
         # Hourly for last 24h
-        hour_expr = func.strftime('%Y-%m-%d %H:00', PageView.created_at)
-        # SQLite strftime; PostgreSQL needs different — use Python bucketing fallback
         hourly_rows = (
             _pv_filter(db.session.query(
                 PageView.created_at,
