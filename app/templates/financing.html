@@ -138,7 +138,7 @@
                     <p class="mb-0">Please <a href="{{ url_for('main.inventory') }}">check the inventory</a> again soon or call us at <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a>.</p>
                 </div>
                 {% else %}
-                <form method="post" action="{{ url_for('main.financing_apply') }}" id="financing-application" novalidate>
+                <form method="post" action="{{ url_for('main.financing_apply') }}" id="financing-application">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="visually-hidden" aria-hidden="true">
                         <label for="financing-website">Leave this field empty</label>

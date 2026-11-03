@@ -134,6 +134,16 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertNotIn(b'chat-widget.js', response.data)
         self.assertIn(b'financing.js', response.data)
         self.assertIn(b'name="website"', response.data)
+        self.assertNotIn(b'novalidate', response.data)
+        for field in (
+            'certify_accuracy',
+            'authorize_credit_report',
+            'electronic_signature_consent',
+        ):
+            self.assertRegex(
+                response.data,
+                rf'name="{field}"[^>]*required'.encode(),
+            )
         self.assertEqual(response.headers['Cache-Control'], 'private, no-store, max-age=0')
         self.assertEqual(response.headers['Referrer-Policy'], 'same-origin')
         self.assertIn("script-src 'self'", response.headers['Content-Security-Policy'])
@@ -237,6 +247,21 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertEqual(deleted.status_code, 302)
         self.assertEqual(FinancingApplication.query.count(), 0)
         self.assertFalse(os.path.exists(path))
+
+    def test_application_requires_all_three_authorizations(self):
+        authorization_errors = {
+            'certify_accuracy': b'Confirm that the information is complete and accurate.',
+            'authorize_credit_report': b'Authorize the lender and seller to verify',
+            'electronic_signature_consent': b'Agree to use your typed name as an electronic signature',
+        }
+
+        for field, expected_error in authorization_errors.items():
+            with self.subTest(field=field):
+                response = self.submit(**{field: ''})
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(expected_error, response.data)
+                self.assertEqual(FinancingApplication.query.count(), 0)
 
     def test_joint_application_adds_coapplicant_and_residence_history_page(self):
         data = self.application_form(
