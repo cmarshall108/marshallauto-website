@@ -1,4 +1,5 @@
 import os
+import re
 import stat
 import tempfile
 import unittest
@@ -131,8 +132,27 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertIn(b'financing.js', response.data)
         self.assertIn(b'name="website"', response.data)
         self.assertEqual(response.headers['Cache-Control'], 'private, no-store, max-age=0')
-        self.assertEqual(response.headers['Referrer-Policy'], 'no-referrer')
+        self.assertEqual(response.headers['Referrer-Policy'], 'same-origin')
         self.assertIn("script-src 'self'", response.headers['Content-Security-Policy'])
+
+    def test_https_application_submission_passes_csrf_with_same_origin_referer(self):
+        self.app.config['WTF_CSRF_ENABLED'] = True
+        page = self.client.get('/financing', base_url='https://localhost')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data)
+
+        self.assertIsNotNone(token)
+        self.assertEqual(page.headers['Referrer-Policy'], 'same-origin')
+
+        response = self.client.post(
+            '/financing/apply',
+            data={'csrf_token': token.group(1).decode(), 'vehicle_id': '999999'},
+            base_url='https://localhost',
+            headers={'Referer': 'https://localhost/financing'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(b'Choose a vehicle that is currently available.', response.data)
+        self.assertNotIn(b'Your session expired or the security token was missing.', response.data)
 
     def test_application_page_stays_disabled_without_encryption_key(self):
         self.app.config['FINANCING_ENCRYPTION_KEY'] = None

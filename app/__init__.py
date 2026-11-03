@@ -200,7 +200,7 @@ def create_app(config_class=None):
         }:
             response.headers['Cache-Control'] = 'private, no-store, max-age=0'
             response.headers['Pragma'] = 'no-cache'
-            response.headers['Referrer-Policy'] = 'no-referrer'
+            response.headers['Referrer-Policy'] = 'same-origin'
             response.headers['Content-Security-Policy'] = (
                 "default-src 'self'; "
                 "script-src 'self'; "
