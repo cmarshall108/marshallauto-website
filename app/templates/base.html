@@ -352,7 +352,6 @@
                 <span class="fw-bold">Chat with {{ business_name }}</span>
                 <button type="button" id="chat-widget-close" class="btn-close btn-close-white" aria-label="Close chat"></button>
             </div>
-            {% endif %}
             <div class="chat-widget-body">
                 <p id="chat-widget-status" class="small text-muted mb-2" role="status">Checking team availability...</p>
                 <p class="small text-muted mb-2">Need help now? Call <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a>.</p>
@@ -399,6 +398,7 @@
             <i class="bi bi-chat-dots-fill"></i>
         </button>
     </div>
+    {% endif %}
 
     <!-- Mobile sticky CTA -->
     <div class="mobile-cta-bar d-lg-none" role="navigation" aria-label="Quick actions">
