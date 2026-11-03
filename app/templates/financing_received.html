@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block content %}
+<section class="section-padding">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm p-4 p-md-5 text-center">
+                    <div class="display-5 text-success mb-3" aria-hidden="true">✓</div>
+                    <h1 class="h2 fw-bold">Your application was received</h1>
+                    <p class="text-muted">Marshall Auto will review your application and send it to Lendmark Financial Services through the lender-approved channel. This is not a loan approval or commitment to lend; the lender makes all credit decisions and sets any final terms.</p>
+                    <p class="small text-muted">For questions, call <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a>. Please do not email Social Security numbers or application documents.</p>
+                    <a class="btn btn-primary align-self-center" href="{{ url_for('main.inventory') }}">Return to inventory</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

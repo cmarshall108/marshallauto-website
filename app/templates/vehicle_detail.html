@@ -779,7 +779,7 @@ bi-check-circle
                 <div class="card border-0 shadow p-4 mb-4 sticky-lg-top" style="top: 5.5rem;">
                     <h5 class="fw-bold mb-3">Have Questions?</h5>
                     {% if vehicle.is_available %}
-                    <p class="text-muted">Interested in this vehicle? Visit us to complete a Lendmark Financial Services financing application. The lender determines eligibility, approval, and terms.</p>
+                    <p class="text-muted">Interested in this vehicle? Start a secure online application. The lender determines eligibility, approval, and terms.</p>
                     {% else %}
                     <p class="text-muted">Ask our team about financing through Lendmark Financial Services and current vehicle availability.</p>
                     {% endif %}
@@ -794,7 +794,7 @@ bi-check-circle
                             <li>Pickup is at {{ business_address }}. Ask us about delivery options and cost before planning a trip.</li>
                         </ul>
                     </div>
-                    <a href="{{ url_for('main.financing') }}" class="btn btn-primary w-100 mb-2">View Financing Options</a>
+                    <a href="{{ url_for('main.financing', vehicle_id=vehicle.id) }}" class="btn btn-primary w-100 mb-2">Apply for This Vehicle</a>
                     <a href="{{ url_for('main.inventory', make=vehicle.make) }}" class="btn btn-outline-primary w-100 mb-2">More {{ vehicle.make }} Vehicles</a>
                     {% if vehicle.body_style %}
                     <a href="{{ url_for('main.inventory', body_style=vehicle.body_style) }}" class="btn btn-outline-primary w-100">Browse {{ vehicle.body_style }}s</a>
@@ -842,7 +842,7 @@ bi-check-circle
                             {% endwith %}
                         </div>
                     </a>
-                    <p class="px-4 pb-3 mb-0 small text-muted">Interested in this vehicle? Visit us to complete a Lendmark Financial Services financing application. Approval and terms are determined by the lender.</p>
+                    <p class="px-4 pb-3 mb-0 small text-muted">Interested in this vehicle? <a href="{{ url_for('main.financing', vehicle_id=rv.id) }}">Apply securely online</a>. Approval and terms are determined by the lender.</p>
                 </div>
                 {% endfor %}
             </div>

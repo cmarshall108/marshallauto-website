@@ -6,11 +6,25 @@ Image delivery can use a CDN base URL without moving the stored files.
 """
 import time
 from collections import defaultdict, deque
+from urllib.parse import urlsplit
 
 from flask import current_app, request
 
 _memory_buckets = defaultdict(deque)
 _memory_cache = {}
+
+
+def _redact_financing_request(event, hint):
+    request_data = event.get('request') if event else None
+    is_financing_submission = (
+        request_data
+        and urlsplit(str(request_data.get('url') or '')).path == '/financing/apply'
+    )
+    if is_financing_submission:
+        for key in ('data', 'cookies', 'headers'):
+            request_data.pop(key, None)
+        event.pop('user', None)
+    return event
 
 
 def init_error_tracking(app):
@@ -23,12 +37,14 @@ def init_error_tracking(app):
     except ImportError:
         app.logger.warning('SENTRY_DSN is set but sentry-sdk is not installed.')
         return False
+
     sentry_sdk.init(
         dsn=dsn,
         integrations=[FlaskIntegration()],
         traces_sample_rate=float(app.config.get('SENTRY_TRACES_SAMPLE_RATE', 0)),
         environment=app.config.get('SENTRY_ENVIRONMENT', 'production'),
         send_default_pii=False,
+        before_send=_redact_financing_request,
     )
     return True
 

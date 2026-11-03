@@ -10,21 +10,31 @@
         var presenceStatus = document.getElementById('admin-chat-presence-status');
         var action = document.querySelector('.admin-chat-action');
         var toast = document.getElementById('admin-chat-toast');
-        var busy = false, presenceBusy = false, active = true;
+        var busy = false, presenceBusy = false, financingBusy = false, active = true;
         var presenceId = chat.nonce(), toastTimer = null;
-        var alertsFailed = false, presenceFailed = false, storageFailed = false;
+        var alertsFailed = false, presenceFailed = false, financingFailed = false;
+        var storageFailed = false, financingStorageFailed = false;
         var cursorKey = 'marshall-admin-chat-cursor-' + root.dataset.userId;
+        var financingCursorKey = 'marshall-admin-financing-cursor-' + root.dataset.userId;
         var latest = null;
+        var latestFinancing = null;
         try {
             var stored = window.sessionStorage.getItem(cursorKey);
             if (stored !== null && /^\d+$/.test(stored)) latest = Number(stored);
+            stored = window.sessionStorage.getItem(financingCursorKey);
+            if (stored !== null && /^\d+$/.test(stored)) latestFinancing = Number(stored);
         } catch (error) {
             storageFailed = true;
+            financingStorageFailed = true;
             console.warn('Chat alert history could not be restored:', error);
         }
-        function notify(title, message) {
+        function notify(title, message, href, linkLabel) {
             document.getElementById('admin-chat-toast-title').textContent = title;
             document.getElementById('admin-chat-toast-message').textContent = message;
+            var link = document.getElementById('admin-chat-toast-link');
+            link.href = href || '/admin/live-chat';
+            link.textContent = linkLabel || 'Open Live Chat inbox';
+            link.hidden = false;
             toast.hidden = false;
             window.clearTimeout(toastTimer);
             toastTimer = window.setTimeout(function () { toast.hidden = true; }, 12000);
@@ -99,14 +109,67 @@
                 console.warn('Admin chat alerts could not refresh:', error);
             } finally { busy = false; }
         }
+        async function pollFinancing() {
+            if (
+                root.dataset.isAdmin !== 'true'
+                || financingBusy
+                || !active
+            ) return;
+            financingBusy = true;
+            try {
+                var endpoint = '/admin/api/financing-applications/notifications';
+                if (latestFinancing !== null) {
+                    endpoint += '?after=' + encodeURIComponent(latestFinancing);
+                }
+                var data = await chat.request(endpoint);
+                if (!active) return;
+                if (latestFinancing === null) {
+                    latestFinancing = data.latest_id;
+                } else if (data.applications.length) {
+                    var newest = data.applications[data.applications.length - 1];
+                    var summary = data.applications.length === 1
+                        ? 'An application was submitted for ' + newest.vehicle + '.'
+                        : data.applications.length + ' applications were submitted; the newest is for ' + newest.vehicle + '.';
+                    notify(
+                        'New financing application',
+                        summary,
+                        '/admin/financing-applications',
+                        'Review financing applications',
+                    );
+                    latestFinancing = newest.id;
+                } else {
+                    latestFinancing = Math.max(latestFinancing, data.latest_id);
+                }
+                if (!financingStorageFailed) {
+                    try {
+                        window.sessionStorage.setItem(
+                            financingCursorKey,
+                            String(latestFinancing),
+                        );
+                    } catch (error) {
+                        financingStorageFailed = true;
+                        console.warn('Financing alert history could not be saved:', error);
+                    }
+                }
+                financingFailed = false;
+            } catch (error) {
+                if (active && !financingFailed) {
+                    console.warn('Financing alerts could not refresh:', error);
+                }
+                financingFailed = true;
+            } finally { financingBusy = false; }
+        }
         heartbeat();
         poll();
+        pollFinancing();
         window.setInterval(heartbeat, 20000);
         window.setInterval(poll, 5000);
+        window.setInterval(pollFinancing, 5000);
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible') {
                 heartbeat();
                 poll();
+                pollFinancing();
             }
         });
         window.addEventListener('pagehide', function () {
@@ -119,6 +182,7 @@
             active = true;
             heartbeat();
             poll();
+            pollFinancing();
         });
     });
 })();

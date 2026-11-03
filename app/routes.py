@@ -8,13 +8,21 @@ from flask import (
     render_template, request, send_from_directory, url_for as flask_url_for, abort
 )
 from sqlalchemy import or_
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app import db
 from app.forms import ContactForm, InventoryAlertForm, TestDriveRequestForm
-from app.models import CarfaxReport, Lead, Review, SiteSetting, Vehicle, VehicleImage
+from app.models import (
+    CarfaxReport, FinancingApplication, Lead, Review, SiteSetting, Vehicle,
+    VehicleImage,
+)
 from app.models import BlogPost
+from app.financing import (
+    FinancingEncryptionUnavailable, admin_is_online, notify_salespeople_by_textbelt,
+    financing_spam_detected, online_application_available, save_application,
+    validate_application,
+)
 from app.buyer_guides import published_buyer_guides
 from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
@@ -510,7 +518,7 @@ def index():
     ])
     home_faqs = [
         ("Do you offer financing for used cars?",
-         f"Yes. {current_app.config['BUSINESS_NAME']} offers financing through Lendmark Financial Services. Visit us to complete an application for a vehicle you are interested in. The lender determines eligibility, approval, and loan terms; approval is not guaranteed."),
+         f"Yes. {current_app.config['BUSINESS_NAME']} accepts secure online applications for vehicles in its inventory through Lendmark Financial Services. The lender determines eligibility, approval, and loan terms; approval is not guaranteed."),
         ("Does every vehicle come with a CarFax report?",
          "CarFax history reports are available on qualifying vehicles. Contact us for details on a specific car."),
         ("Can I trade in my current vehicle?",
@@ -878,7 +886,7 @@ def inventory_by_make_or_body_city(slug, city, state):
          f"Yes. Browse our current {make_name} listings online or call {current_app.config['BUSINESS_PHONE']} "
          f"and we will help {city_name} shoppers find the right match."),
         (f"Can I finance a used {make_name} from {biz}?",
-         "Yes. Visit us to complete a Lendmark Financial Services application for a vehicle you are interested in. The lender determines vehicle eligibility, approval, and loan terms; approval is not guaranteed."),
+         "Yes. Apply securely online for an available vehicle from our inventory. Lendmark Financial Services determines vehicle eligibility, approval, and loan terms; approval is not guaranteed."),
     ]
     return _render_inventory(
         page=page, make=make_name, sort=sort,
@@ -1589,20 +1597,28 @@ def financing():
     ])
     faqs = [
         (f"Can I get financing at {current_app.config['BUSINESS_NAME']} with bad credit?",
-         "Yes. Marshall Auto offers financing through Lendmark Financial Services. Visit us to complete an application for a vehicle you are interested in. The lender reviews each application under its underwriting criteria; approval is not guaranteed, and we cannot promise a particular APR, down payment, term, or payment."),
+         "Marshall Auto accepts online applications for vehicles in our inventory and works with Lendmark Financial Services. The lender reviews each application under its underwriting criteria; approval is not guaranteed, and we cannot promise a particular APR, down payment, term, or payment."),
         ("What do I need to bring to apply for financing?",
-         "Visit our dealership with the information and documents requested for your Lendmark Financial Services application. Requirements can vary. Review any credit-report authorization and application disclosures before submitting information, and do not send sensitive financial documents through our general contact form or email."),
+         "Select an available vehicle and complete the secure application on this page. You will need your Social Security number, contact and residence history, employment and income details, and driver's-license information. Review the lender's credit-report authorization before submitting."),
         ("Can I start a financing application before choosing a vehicle?",
-         "No. Financing applications are completed in person at Marshall Auto for a vehicle you are interested in. Lendmark Financial Services reviews the completed application; an application is not a final approval or commitment to lend.")
+         "Choose an available vehicle from our inventory as part of the application. Lendmark Financial Services reviews the completed application; an application is not a final approval or commitment to lend.")
     ]
     steps = [
-        {"name": "Choose a Vehicle", "text": "Select a vehicle you are interested in from our inventory, then visit Marshall Auto to begin a financing application. Do not send sensitive financial information through the general contact form."},
-        {"name": "Complete Your Application In Person", "text": "Complete a Lendmark Financial Services application at the dealership for that vehicle. Review the application and credit-report disclosures before you submit them. Lendmark Financial Services makes its own credit decision."},
+        {"name": "Choose a Vehicle", "text": "Select an available vehicle from our inventory and enter the requested borrower, residence, employment, and income details in the secure online form."},
+        {"name": "Review and Submit Securely", "text": "Review the lender's application and credit-report authorization before submitting. Your completed application is encrypted for authorized dealership staff to download and send to the lender."},
         {"name": "Review the Vehicle and Written Terms", "text": "Confirm that the lender will consider the specific vehicle and review the APR, amount financed, finance charge, payment schedule, fees, and total of payments in the written disclosures."},
         {"name": "Proceed Only If the Terms Work for You", "text": "Approval and final terms are subject to lender underwriting and the signed agreement. Arrange required insurance and review all purchase and credit documents before signing."}
     ]
+    vehicles = _vehicle_list_query().order_by(
+        Vehicle.year.desc(), Vehicle.make, Vehicle.model,
+    ).all()
     return render_template(
         'financing.html',
+        financing_vehicles=vehicles,
+        selected_vehicle_id=request.args.get('vehicle_id', type=int),
+        form_values={},
+        form_errors={},
+        application_available=online_application_available(),
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
@@ -1611,18 +1627,165 @@ def financing():
             f"How to Finance a Used Car at {current_app.config['BUSINESS_NAME']}",
             steps,
             description=(
-                f"An overview of applying in person for financing through Lendmark Financial Services at "
+                f"An overview of applying online for financing through Lendmark Financial Services at "
                 f"{current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']}, "
-                f"{current_app.config['BUSINESS_STATE']}, for a vehicle you are interested in."
+                f"{current_app.config['BUSINESS_STATE']}, for an available vehicle."
             ),
         ),
         meta_title=f"Used Car Financing in {current_app.config['BUSINESS_CITY']} | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
             f"Yes, {current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']} offers financing through Lendmark Financial Services. "
-            f"Visit us to complete an application for a vehicle you are interested in. Approval and terms are determined by the lender."
+            f"Apply securely online for an available vehicle. Approval and terms are determined by the lender."
         ),
         page_type='financing',
     )
+
+
+@main.post('/financing/apply')
+def financing_apply():
+    if not online_application_available():
+        abort(503)
+    if rate_limit_exceeded(
+        f'financing-application:{client_ip()}',
+        current_app.config['FINANCING_RATE_LIMIT'],
+        current_app.config['FINANCING_RATE_WINDOW'],
+    ):
+        return _render_financing_application(
+            status=429,
+            form_errors={'form': 'Too many attempts. Please wait before trying again.'},
+        )
+
+    vehicle_id = request.form.get('vehicle_id', type=int)
+    vehicle = None
+    if vehicle_id:
+        vehicle = Vehicle.query.filter_by(
+            id=vehicle_id, status='available', is_coming_soon=False,
+        ).first()
+    if not vehicle:
+        return _render_financing_application(
+            status=400,
+            form_errors={'vehicle_id': 'Choose a vehicle that is currently available.'},
+        )
+
+    if request.form.get('website', '').strip():
+        current_app.logger.warning(
+            'Financing submission rejected by anti-bot honeypot.',
+        )
+        return _render_financing_application(
+            status=400,
+            form_errors={
+                'form': 'We could not verify this submission. Please review the form or call us for help.',
+            },
+        )
+
+    existing_application = FinancingApplication.query.filter_by(
+        vehicle_id=vehicle.id,
+    ).first()
+    if existing_application:
+        return _render_financing_application(
+            status=409,
+            form_errors={
+                'form': 'An application has already been submitted for this vehicle. '
+                'Please contact us if you need help.',
+            },
+        )
+
+    application, errors, safe_values = validate_application(request.form, vehicle)
+    if errors:
+        return _render_financing_application(
+            status=400, form_errors=errors, form_values=safe_values,
+            selected_vehicle_id=vehicle.id,
+        )
+
+    if financing_spam_detected(application):
+        current_app.logger.warning(
+            'Financing submission rejected by local spam screening.',
+        )
+        return _render_financing_application(
+            status=400,
+            form_errors={
+                'form': 'We could not verify this submission. Please review your contact details or call us for help.',
+            },
+            selected_vehicle_id=vehicle.id,
+        )
+
+    application['vehicle']['id'] = vehicle.id
+    try:
+        record = save_application(application)
+    except IntegrityError:
+        existing_application = FinancingApplication.query.filter_by(
+            vehicle_id=vehicle.id,
+        ).first()
+        if not existing_application:
+            raise
+        return _render_financing_application(
+            status=409,
+            form_errors={
+                'form': 'An application has already been submitted for this vehicle. '
+                'Please contact us if you need help.',
+            },
+        )
+    except FinancingEncryptionUnavailable:
+        current_app.logger.error('Financing application encryption is unavailable.')
+        abort(503)
+
+    try:
+        administrator_online = admin_is_online()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            'Could not determine whether an administrator is online for financing application %s.',
+            record.id,
+        )
+        administrator_online = False
+    if not administrator_online:
+        try:
+            notify_salespeople_by_textbelt(vehicle)
+        except Exception:
+            current_app.logger.exception(
+                'Financing application %s was saved, but salesperson notification dispatch failed.',
+                record.id,
+            )
+    current_app.logger.info(
+        'Encrypted financing application %s saved for vehicle %s.',
+        record.id, vehicle.id,
+    )
+    return redirect(url_for('main.financing_received'))
+
+
+@main.get('/financing/received')
+def financing_received():
+    if not online_application_available():
+        abort(503)
+    return render_template(
+        'financing_received.html',
+        meta_title=f"Application Received | {current_app.config['BUSINESS_NAME']}",
+        meta_description='Your secure vehicle financing application has been received.',
+        page_type='financing',
+    )
+
+
+def _render_financing_application(
+    status=200, form_errors=None, form_values=None, selected_vehicle_id=None,
+):
+    return render_template(
+        'financing.html',
+        financing_vehicles=_vehicle_list_query().order_by(
+            Vehicle.year.desc(), Vehicle.make, Vehicle.model,
+        ).all(),
+        selected_vehicle_id=selected_vehicle_id or request.form.get('vehicle_id', type=int),
+        form_values=form_values or {},
+        form_errors=form_errors or {},
+        application_available=online_application_available(),
+        breadcrumbs=None,
+        structured_local=None,
+        structured_website=None,
+        structured_faq=None,
+        structured_how_to=None,
+        meta_title=f"Vehicle Financing | {current_app.config['BUSINESS_NAME']}",
+        meta_description='Apply securely online for a vehicle in the Marshall Auto inventory.',
+        page_type='financing',
+    ), status
 
 
 @main.route('/sell-your-car')

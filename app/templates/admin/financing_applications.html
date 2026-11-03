@@ -1,0 +1,70 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Financing Applications{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Financing Applications</h2>
+        <p class="small text-muted mb-0">Applicant information is held only in encrypted PDFs. Do not download files to shared devices or send them through unapproved channels.</p>
+    </div>
+</div>
+
+<div class="table-card p-3 p-md-4">
+    {% if pagination.items %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th>Submitted</th>
+                    <th>Vehicle</th>
+                    <th>Credit type</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for application in pagination.items %}
+                <tr>
+                    <td>#{{ application.id }}</td>
+                    <td>{{ application.submitted_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                    <td>
+                        {% if application.vehicle %}
+                        {{ application.vehicle.year }} {{ application.vehicle.make }} {{ application.vehicle.model }}
+                        {% else %}
+                        Vehicle no longer in inventory
+                        {% endif %}
+                    </td>
+                    <td>{{ 'Joint' if application.joint_credit else 'Individual' }}</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-primary" href="{{ url_for('admin.financing_application_download', application_id=application.id) }}">
+                            <i class="bi bi-download me-1" aria-hidden="true"></i>Download PDF
+                        </a>
+                        <form class="d-inline" method="post" action="{{ url_for('admin.financing_application_delete', application_id=application.id) }}" onsubmit="return confirm('Permanently delete this application and its encrypted PDF?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Financing application pages">
+        <ul class="pagination justify-content-center mb-0">
+            {% if pagination.has_prev %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('admin.financing_applications', page=pagination.prev_num) }}">Previous</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ pagination.page }} of {{ pagination.pages }}</span></li>
+            {% if pagination.has_next %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('admin.financing_applications', page=pagination.next_num) }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+    {% else %}
+    <p class="text-muted mb-0">No financing applications have been submitted.</p>
+    {% endif %}
+</div>
+{% endblock %}

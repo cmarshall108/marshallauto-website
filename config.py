@@ -37,6 +37,19 @@ class Config:
     # Sensitive documents (driver's license scans, etc.) — kept outside app/static so they
     # are never directly web-servable; only reachable via an authenticated admin route.
     PRIVATE_UPLOAD_FOLDER = os.path.join(basedir, 'instance', 'private_uploads')
+    LENDMARK_APPLICATION_PDF = os.path.join(
+        basedir, 'app', 'private_assets', 'lendmark_credit_application.pdf',
+    )
+    # Generate with Fernet.generate_key(); back up securely and keep stable while
+    # encrypted applications exist. No application data is accepted without it.
+    FINANCING_ENCRYPTION_KEY = os.environ.get('FINANCING_ENCRYPTION_KEY')
+    FINANCING_MAX_CONTENT_LENGTH = int(
+        os.environ.get('FINANCING_MAX_CONTENT_LENGTH', 96 * 1024),
+    )
+    FINANCING_RATE_LIMIT = int(os.environ.get('FINANCING_RATE_LIMIT', 5))
+    FINANCING_RATE_WINDOW = int(os.environ.get('FINANCING_RATE_WINDOW', 3600))
+    FINANCING_ADMIN_TWO_FACTOR_REQUIRED = True
+    TEXTBELT_API_KEY = os.environ.get('TEXTBELT_API_KEY')
     # Total request body size (all images in one form submit). Default 256MB for bulk vehicle photos.
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 256 * 1024 * 1024))
     # Stay below the 100 MB request ceiling on common Cloudflare plans.
@@ -247,6 +260,7 @@ class TestingConfig(Config):
     SITE_URL = 'http://localhost'
     # Unrelated feature tests isolate password-only fixtures; 2FA tests enable enforcement.
     ADMIN_TWO_FACTOR_REQUIRED = False
+    FINANCING_ADMIN_TWO_FACTOR_REQUIRED = False
 
 
 config_by_name = {

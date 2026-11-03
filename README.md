@@ -12,6 +12,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Vehicle detail pages with image gallery, specs, features, service history, and CarFax
   - Carvana-style photo highlight bubbles (features + condition notes) powered by a local OpenCV worker
   - Financing, sell-your-car, about, and contact pages
+  - Online Lendmark financing application for an inventory vehicle, with SSN format validation, completed lender PDF, application-level encryption at rest, and staff-only admin downloads
   - SEO: meta tags, Open Graph, JSON-LD (AutoDealer, Car, FAQ, HowTo, ItemList, Breadcrumb), sitemap.xml, robots.txt
   - Search-only VIN record pages for valid VINs in current and archived inventory, discoverable through sitemap.xml but omitted from site navigation
   - Local SEO landings for cities, makes, body styles, and rebuilt-title inventory
@@ -267,10 +268,7 @@ Only administrators can open Settings or manage salesman accounts and dealer tag
 
 ## Admin two-factor authentication
 
-Two-factor authentication is **off by default for administrator accounts**, including for accounts that
-previously enrolled. **Salesman accounts always require 2FA** (see above). Sign in with your password and use **Settings → Require
-two-factor authentication for every admin → Save Settings** when ready to enable it for admins.
-This switch applies site-wide to admins and requires a fresh sign-in when enabled. Existing
+Two-factor authentication is **required for administrator accounts** by the financing-application security policy. **Salesman accounts always require 2FA** (see above). The Settings → **Require two-factor authentication for every admin** switch adds a site-wide admin requirement. The financing requirement applies to every admin sign-in and must remain enabled while encrypted applications exist. Enabling the site-wide switch requires a fresh sign-in. Existing
 password-only admin sessions no longer grant access; each admin enters their password
 and verifies their authenticator or enrolls before the panel is accessible.
 Scan the locally generated QR code with Google Authenticator, Microsoft
@@ -289,8 +287,8 @@ access is intentionally disabled so it cannot bypass two-factor verification.
 **Settings → Replace Recovery Codes** requires the current password and a fresh
 authenticator/recovery code. It invalidates old recovery codes and other sessions.
 Password changes also invalidate other sessions while two-factor authentication
-is required. Uncheck the site-wide requirement in Settings to return to password-only
-login. Disabling does not delete authenticator secrets or recovery codes; re-enabling
+is required. Unchecking the site-wide setting does not disable the financing requirement.
+Disabling does not delete authenticator secrets or recovery codes; re-enabling
 reuses existing enrollments. Admins without an enrollment are prompted to set up one.
 
 Authenticator secrets are encrypted in the database with a domain-separated key
@@ -308,14 +306,54 @@ server owner can reset that account from the server after verifying their identi
 flask --app run reset-admin-2fa ADMIN_USERNAME
 ```
 
+## Online financing applications
+
+Before deploying the application form, create a dedicated Fernet encryption key and
+set it as `FINANCING_ENCRYPTION_KEY` in the deployment's secret environment:
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Keep this key outside the repository and database, back it up separately, and do not
+rotate or lose it while encrypted applications remain; without it, saved PDFs cannot
+be decrypted. The form refuses submissions without a valid key or over a non-HTTPS
+connection. It does not load analytics, advertising, or third-party browser scripts
+on the application page. Applicant fields, including SSN and ID numbers, are not
+written to the database; the completed lender PDF is encrypted before it is saved
+outside the public static directory. Administrators must sign in with authenticator
+two-factor verification to list, download, or delete application records. Downloads
+are plaintext PDFs, so use a trusted device and the lender-approved delivery channel,
+then delete the application when it is no longer needed.
+
+Only one active application can be submitted per inventory vehicle; deleting it
+frees that vehicle for a future application. When an application arrives, admins
+with an active admin-panel session receive an in-panel alert. If no admin is online,
+the site texts each active salesperson with a usable profile phone through Textbelt.
+Set `TEXTBELT_API_KEY` and keep every salesperson's phone number current for offline
+alerts. The notification includes the vehicle only, never applicant or credit data.
+
+Submissions must pass server-side required-field and format checks, a hidden
+anti-bot field, and the site's local spam scoring before an encrypted PDF is saved.
+Financing spam checks do not call Akismet or send applicant data to an external
+screening service. These checks reduce obvious automated or spam submissions but
+cannot establish identity, verify that an SSN was issued or belongs to the applicant,
+or confirm the accuracy of income and residence details; lender review remains
+necessary. Rejected applicants are asked to review their contact details or call.
+
+Confirm with Lendmark that this online collection, typed electronic signature, credit
+report authorization, and application delivery channel are accepted before taking
+live applications. Configure the encryption and Textbelt keys before launch; without
+the encryption key the form remains disabled and collects no applicant data.
+
 The command asks for confirmation, invalidates sessions/recovery codes, and
 requires a password plus fresh enrollment at the next login. There is no public
 reset endpoint. Reset does not change the account password; change it separately
 if compromised.
 
 Deploy the updated Python requirements and run `flask db upgrade` before restarting
-web processes. No new environment variable is required. Use HTTPS and production
-mode. The test configuration disables required enrollment for unrelated feature
+web processes. Set `TEXTBELT_API_KEY` to enable offline salesperson text alerts. Use
+HTTPS and production mode. The test configuration disables required enrollment for unrelated feature
 fixtures; dedicated two-factor tests explicitly enable the production requirement.
 
 ## Quick Start
@@ -334,7 +372,8 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and set at least `SECRET_KEY` and `ADMIN_PASSWORD`.
+Edit `.env` and set at least `SECRET_KEY`, `ADMIN_PASSWORD`, and a securely generated
+`FINANCING_ENCRYPTION_KEY`. Keep both keys out of source control.
 
 3. Run the application:
 
@@ -436,6 +475,11 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | Variable | Description |
 |----------|-------------|
 | `SECRET_KEY` | Flask secret key (change in production) |
+| `FINANCING_ENCRYPTION_KEY` | Dedicated Fernet key; required to accept or decrypt financing applications |
+| `FINANCING_MAX_CONTENT_LENGTH` | Maximum online financing form size in bytes (default 96 KiB) |
+| `FINANCING_RATE_LIMIT` | Financing submissions per client IP per window (default 5) |
+| `FINANCING_RATE_WINDOW` | Financing submission rate-limit window in seconds (default 3600) |
+| `TEXTBELT_API_KEY` | Textbelt API key for alerting active salespeople when no administrator is online |
 | `DATABASE_URL` | Database connection string (defaults to SQLite) |
 | `ADMIN_USERNAME` | Admin login username |
 | `ADMIN_PASSWORD` | Admin login password |

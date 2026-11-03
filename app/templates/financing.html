@@ -3,96 +3,244 @@
 {% block meta_title %}{{ meta_title }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
 
+{% macro text_field(prefix, name, label, required=false, type='text', autocomplete='', hint='', maxlength=128) %}
+{% set field_id = prefix ~ '-' ~ name %}
+{% set field_name = prefix ~ '_' ~ name %}
+<div class="col-md-6">
+    <label class="form-label small fw-semibold" for="{{ field_id }}">{{ label }}{% if required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}</label>
+    {% if type == 'ssn' %}
+    <div class="input-group">
+        <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="password" inputmode="numeric" pattern="\d{3}-?\d{2}-?\d{4}" maxlength="11" autocomplete="off" autocapitalize="off" spellcheck="false" {% if required %}required{% endif %} aria-describedby="{{ field_id }}-hint">
+        <button class="btn btn-outline-secondary" type="button" data-toggle-secret="{{ field_id }}" aria-label="Show Social Security number">Show</button>
+    </div>
+    {% elif type == 'date' %}
+    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="date" value="{{ form_values.get(field_name, '') }}" {% if required %}required{% endif %} autocomplete="{{ autocomplete or 'off' }}">
+    {% elif type == 'money' %}
+    <div class="input-group">
+        <span class="input-group-text">$</span>
+        <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="10000000" step="0.01" value="{{ form_values.get(field_name, '') }}" inputmode="decimal" {% if required %}required{% endif %} autocomplete="off">
+    </div>
+    {% elif type == 'integer' %}
+    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="{{ 120 if 'years' in name else (11 if 'months' in name else 20) }}" step="1" value="{{ form_values.get(field_name, '0' if 'months' in name else '') }}" inputmode="numeric" {% if required %}required{% endif %} autocomplete="off">
+    {% else %}
+    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="{{ type }}" value="{{ form_values.get(field_name, '') }}" maxlength="{{ maxlength }}" {% if required %}required{% endif %} autocomplete="{{ autocomplete or 'off' }}">
+    {% endif %}
+    <div class="invalid-feedback d-block">{{ form_errors.get(field_name, '') }}</div>
+    {% if hint %}<div class="form-text" id="{{ field_id }}-hint">{{ hint }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro select_field(prefix, name, label, options, required=false, hint='') %}
+{% set field_id = prefix ~ '-' ~ name %}
+{% set field_name = prefix ~ '_' ~ name %}
+<div class="col-md-6">
+    <label class="form-label small fw-semibold" for="{{ field_id }}">{{ label }}{% if required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}</label>
+    <select class="form-select" id="{{ field_id }}" name="{{ field_name }}" {% if required %}required{% endif %}>
+        <option value="">Choose one</option>
+        {% for value, label_text in options %}
+        <option value="{{ value }}" {% if form_values.get(field_name) == value %}selected{% endif %}>{{ label_text }}</option>
+        {% endfor %}
+    </select>
+    <div class="invalid-feedback d-block">{{ form_errors.get(field_name, '') }}</div>
+    {% if hint %}<div class="form-text">{{ hint }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro person_fields(prefix, is_applicant=false) %}
+<div class="row g-2">
+    {{ text_field(prefix, 'name', 'Full legal name (last, first, middle)', true, autocomplete='name') }}
+    {{ text_field(prefix, 'ssn', 'Social Security number', true, type='ssn', hint='A format check only; we cannot verify the number or identity.') }}
+    {{ text_field(prefix, 'dob', 'Date of birth', true, type='date', autocomplete='bday') }}
+    {{ text_field(prefix, 'residence_address', 'Current residence address (street, city, state, ZIP)', true, maxlength=160, autocomplete='street-address') }}
+    {{ text_field(prefix, 'residence_years', 'Years at current address', true, type='integer') }}
+    {{ text_field(prefix, 'residence_months', 'Additional months', true, type='integer') }}
+    {% if is_applicant %}
+    {{ text_field(prefix, 'mailing_address', 'Mailing address (if different)', maxlength=160) }}
+    {{ text_field(prefix, 'previous_address', 'Previous address (if current address is under 2 years)', maxlength=160) }}
+    {{ text_field(prefix, 'previous_residence_years', 'Years at previous address', type='integer') }}
+    {{ text_field(prefix, 'previous_residence_months', 'Additional months at previous address', type='integer') }}
+    {% else %}
+    {{ text_field(prefix, 'previous_address', 'Previous address (if current address is under 2 years)', maxlength=160) }}
+    {{ text_field(prefix, 'previous_residence_years', 'Years at previous address', type='integer') }}
+    {{ text_field(prefix, 'previous_residence_months', 'Additional months at previous address', type='integer') }}
+    {% endif %}
+    {{ text_field(prefix, 'home_phone', 'Home phone', autocomplete='tel') }}
+    {{ text_field(prefix, 'cell_phone', 'Cell phone', autocomplete='tel-national') }}
+    {{ text_field(prefix, 'dependents', 'Number of dependents', true, type='integer') }}
+    {{ text_field(prefix, 'email', 'Email address', true, type='email', autocomplete='email', maxlength=120) }}
+    {{ select_field(prefix, 'housing_status', 'Housing status', [('buy', 'Buy'), ('rent', 'Rent'), ('own', 'Own'), ('other', 'Other')], true) }}
+    {{ text_field(prefix, 'landlord', 'Landlord or mortgage holder', maxlength=128) }}
+    {{ text_field(prefix, 'housing_payment', 'Monthly rent or mortgage payment', type='money') }}
+
+    <div class="col-12"><hr class="my-2"><h4 class="h6 fw-bold mb-0">Employment and income</h4></div>
+    {{ select_field(prefix, 'employment_status', 'Employment status', [('employed', 'Employed'), ('self-employed', 'Self-employed'), ('unemployed', 'Not currently employed'), ('retired', 'Retired')], true) }}
+    {{ text_field(prefix, 'employer_name_address', 'Employer name and address', maxlength=128) }}
+    {{ text_field(prefix, 'occupation', 'Occupation', maxlength=64) }}
+    {{ text_field(prefix, 'employment_date', 'Current employment start date', type='date') }}
+    {{ text_field(prefix, 'work_phone', 'Work phone') }}
+    {{ text_field(prefix, 'work_extension', 'Work phone extension', maxlength=8) }}
+    {{ text_field(prefix, 'employment_gross', 'Monthly employer income (gross)', type='money') }}
+    {{ text_field(prefix, 'employment_net', 'Monthly employer income (net)', type='money') }}
+    {{ text_field(prefix, 'previous_employer', 'Previous employer (if current job is under 2 years)', maxlength=128) }}
+    {{ text_field(prefix, 'previous_employment_date', 'Previous employment start date', type='date') }}
+    {{ text_field(prefix, 'other_income_gross', 'Other monthly income (gross)', type='money') }}
+    {{ text_field(prefix, 'other_income_source', 'Source of other income', maxlength=128) }}
+    {{ text_field(prefix, 'total_gross_income', 'Total monthly income (gross)', true, type='money') }}
+    {{ text_field(prefix, 'total_net_income', 'Total monthly income (net)', true, type='money') }}
+    {{ select_field(prefix, 'alimony_obligation', 'Alimony, child support, or similar obligation?', [('no', 'No'), ('yes', 'Yes')], true, 'Income from alimony or support need not be disclosed unless you choose to rely on it.') }}
+    {{ text_field(prefix, 'alimony_amount', 'Monthly amount (if Yes)', type='money') }}
+
+    {% if is_applicant %}
+    <div class="col-12"><hr class="my-2"><h4 class="h6 fw-bold mb-0">Other vehicle loans</h4></div>
+    {{ text_field(prefix, 'auto_1_year_model', 'Auto year and model', maxlength=64) }}
+    {{ text_field(prefix, 'auto_1_financed_by', 'Financed by', maxlength=64) }}
+    {{ select_field(prefix, 'auto_1_responsibility', 'Who is responsible?', [('', 'Not applicable'), ('applicant', 'Applicant'), ('coapplicant', 'Co-applicant'), ('none', 'No outstanding loan')]) }}
+    {{ text_field(prefix, 'auto_2_year_model', 'Second auto year and model', maxlength=64) }}
+    {{ text_field(prefix, 'auto_2_financed_by', 'Second auto financed by', maxlength=64) }}
+    {{ select_field(prefix, 'auto_2_responsibility', 'Who is responsible?', [('', 'Not applicable'), ('applicant', 'Applicant'), ('coapplicant', 'Co-applicant'), ('none', 'No outstanding loan')]) }}
+    <div class="col-12"><hr class="my-2"><h4 class="h6 fw-bold mb-0">Identification and signature</h4></div>
+    {{ text_field(prefix, 'license_number', 'Driver license or state ID number', true, maxlength=32) }}
+    {{ text_field(prefix, 'license_state', 'Issuing state (2 letters)', true, maxlength=2, autocomplete='address-level1') }}
+    {{ text_field(prefix, 'other_qualifying_id', 'Other qualifying ID (optional)', maxlength=64) }}
+    {% endif %}
+    <div class="col-12">
+        {{ text_field(prefix, 'signature', 'Type your full legal name as your electronic signature', true, maxlength=128) }}
+        <div class="form-text">Your typed name must match the full legal name above. The signature date is recorded when you submit.</div>
+    </div>
+</div>
+{% endmacro %}
+
 {% block content %}
 <section class="bg-light-brand py-5">
     <div class="container">
-        <h1 class="fw-bold">Vehicle Financing</h1>
-        <p class="text-muted mb-0">Yes, we offer financing. The advertised price is the out-the-door price — Marshall Auto does not charge any extra fees. Visit us to complete a Lendmark Financial Services application for a vehicle you are interested in.</p>
+        <h1 class="fw-bold">Secure Vehicle Financing Application</h1>
+        <p class="text-muted mb-0">Choose an available vehicle, complete the lender's credit application online, and submit it to Marshall Auto for secure review.</p>
     </div>
 </section>
 
 <section class="section-padding">
     <div class="container">
-        <div class="row g-5">
-            <div class="col-lg-6">
-                <h2 class="section-title">Apply In Person for a Vehicle You Want</h2>
-                <h3 class="h5 fw-bold mt-4">Financing through Marshall Auto</h3>
-                <p class="text-muted">Yes, financing is available. Marshall Auto arranges vehicle financing through Lendmark Financial Services. To apply, visit our dealership and complete an application for a vehicle you are interested in. Lendmark Financial Services makes its own credit decision and sets any offered terms.</p>
-                <p class="text-muted">Approval is not guaranteed. Eligibility and any down payment, annual percentage rate (APR), loan term, amount financed, and payment amount depend on the applicant, the vehicle, lender requirements, and final underwriting. An application or preliminary indication is not a commitment to lend; only the final signed credit agreement and associated disclosures establish the binding terms.</p>
-                <p class="text-muted">Applications are completed at the dealership for a specific vehicle, including its title status. Do not assume that every vehicle or title classification will be financed.</p>
-                <ul class="list-unstyled my-4">
-                    <li class="mb-3"><i class="bi bi-check-circle-fill text-primary me-2"></i> The advertised price is your out-the-door price. We do not add dealer, documentation, or other extra fees</li>
-                    <li class="mb-3"><i class="bi bi-check-circle-fill text-primary me-2"></i> Financing applications are completed in person through Lendmark Financial Services</li>
-                    <li class="mb-3"><i class="bi bi-check-circle-fill text-primary me-2"></i> Choose the vehicle you are interested in before you apply</li>
-                    <li class="mb-3"><i class="bi bi-check-circle-fill text-primary me-2"></i> Trade-in value may be discussed as part of the purchase; it does not guarantee a particular loan payment</li>
-                </ul>
-                <h4 class="fw-bold mt-4">Before You Apply or Sign</h4>
-                <ul class="text-muted">
-                    <li>Ask the lender which documents and information it requires; requirements vary.</li>
-                    <li>Review any credit-report authorization and application disclosures before submitting information.</li>
-                    <li>Compare the APR, amount financed, finance charge, total of payments, payment schedule, and any required down payment or fees in the written offer.</li>
-                    <li>Confirm insurance availability and coverage requirements for the specific vehicle, especially if it has a branded title.</li>
-                    <li>Do not send account numbers, identity documents, or other sensitive financial information through our general contact form or email. Complete your application in person at the dealership.</li>
-                </ul>
-                <div class="card border-0 shadow p-4 mt-4">
-                    <h5 class="fw-bold mb-2">Review Our Inventory</h5>
-                    <p class="text-muted mb-3">Find a vehicle you are interested in, then visit us to complete a Lendmark Financial Services application. Financing and insurance eligibility can vary by vehicle.</p>
-                    <a href="{{ url_for('main.inventory') }}" class="btn btn-primary">Browse Inventory</a>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="card border-0 shadow p-4 mb-4">
-                    <h4 class="fw-bold mb-3">Estimate Your Payment</h4>
-                    <form id="finance-calculator">
-                        <div class="mb-3">
-                            <label class="form-label" for="calc-price">Vehicle Price</label>
-                            <input type="number" min="0" id="calc-price" class="form-control" inputmode="numeric" value="25000" required>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label" for="calc-down">Down Payment</label>
-                                <input type="number" min="0" id="calc-down" class="form-control" inputmode="numeric" value="3000">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label" for="calc-rate">APR (%)</label>
-                                <input type="number" step="0.01" min="0" id="calc-rate" class="form-control" inputmode="decimal" placeholder="Enter an APR" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="calc-term">Loan Term (months)</label>
-                            <select id="calc-term" class="form-select">
-                                <option value="36">36 months</option>
-                                <option value="48">48 months</option>
-                                <option value="60" selected>60 months</option>
-                                <option value="72">72 months</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Calculate Payment</button>
-                    </form>
-                    <div id="calc-results" class="mt-3 d-none">
-                        <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                            <span>Est. Monthly Payment</span>
-                            <strong id="calc-monthly" class="text-primary"></strong>
-                        </div>
-                        <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                            <span>Total Loan Payments (excl. down payment)</span>
-                            <strong id="calc-total"></strong>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span>Total Interest</span>
-                            <strong id="calc-interest"></strong>
-                        </div>
-                    </div>
-                    <p class="small text-muted mt-3 mb-0">Illustration only, not a credit decision, offer, or quote. It assumes a fixed APR and equal monthly payments and uses only the advertised out-the-door price less the down payment you enter as the amount financed. Marshall Auto does not add dealer or other extra fees to that price. A lender may still charge its own fees, and insurance is separate. Actual terms and payment are determined by the lender and final contract.</p>
+        <div class="row justify-content-center">
+            <div class="col-xl-10">
+                <div class="alert alert-info mb-4" role="note">
+                    <strong>Your information is protected:</strong>
+                    Submit only over HTTPS. The completed application PDF is encrypted before it is saved; SSN and ID details are not stored in the database, emailed, or sent to analytics or third-party browser scripts. Only authenticated dealership administrators with two-step verification can download it. Applications remain private until staff delete them.
                 </div>
 
-                <div class="card border-primary border-2 p-4 text-center">
-                    <h4 class="fw-bold">Apply with Lendmark Financial Services</h4>
-                    <p class="text-muted">Visit our dealership to complete an application for a vehicle you are interested in. Do not send sensitive financial documents through the general contact form.</p>
-                    <a href="{{ url_for('main.contact') }}" class="btn btn-primary btn-lg">Contact Marshall Auto</a>
+                {% if not application_available %}
+                <div class="card border-warning p-4">
+                    <h2 class="h4 fw-bold">Secure online applications are temporarily unavailable</h2>
+                    <p class="mb-0">For your protection, this form is enabled only on a secure HTTPS connection after encrypted storage has been configured. Please call <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a> or visit Marshall Auto. Do not send sensitive information by email or through the contact form.</p>
                 </div>
+                {% elif not financing_vehicles %}
+                <div class="card border-warning p-4">
+                    <h2 class="h4 fw-bold">No vehicles are available to apply for right now</h2>
+                    <p class="mb-0">Please <a href="{{ url_for('main.inventory') }}">check the inventory</a> again soon or call us at <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a>.</p>
+                </div>
+                {% else %}
+                <form method="post" action="{{ url_for('main.financing_apply') }}" id="financing-application" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="visually-hidden" aria-hidden="true">
+                        <label for="financing-website">Leave this field empty</label>
+                        <input type="text" id="financing-website" name="website" tabindex="-1" autocomplete="off">
+                    </div>
+                    {% if form_errors.get('form') %}
+                    <div class="alert alert-danger" role="alert">{{ form_errors.get('form') }}</div>
+                    {% elif form_errors %}
+                    <div class="alert alert-danger" role="alert">Please review the highlighted fields. For your protection, Social Security and ID numbers were cleared after submission; re-enter them before trying again.</div>
+                    {% endif %}
+
+                    <section class="card border-0 shadow-sm p-3 p-md-4 mb-3">
+                        <h2 class="h5 fw-bold">1. Choose a vehicle and amount</h2>
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label for="vehicle_id" class="form-label small fw-semibold">Vehicle of interest <span class="text-danger">*</span></label>
+                                <select class="form-select" id="vehicle_id" name="vehicle_id" required data-vehicle-select>
+                                    <option value="">Choose an available vehicle</option>
+                                    {% for vehicle in financing_vehicles %}
+                                    <option value="{{ vehicle.id }}" data-price="{{ vehicle.display_price }}" {% if selected_vehicle_id == vehicle.id %}selected{% endif %}>
+                                        {{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}{% if vehicle.trim %} {{ vehicle.trim }}{% endif %} — {{ vehicle.display_price | format_currency }}{% if vehicle.stock_number %} (Stock {{ vehicle.stock_number }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form_errors.get('vehicle_id') %}<div class="text-danger small mt-1">{{ form_errors.get('vehicle_id') }}</div>{% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label for="requested_amount" class="form-label small fw-semibold">Amount requested <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input class="form-control" id="requested_amount" name="requested_amount" type="number" min="1" max="10000000" step="0.01" inputmode="decimal" value="{{ form_values.get('requested_amount', '') }}" required>
+                                </div>
+                                {% if form_errors.get('requested_amount') %}<div class="text-danger small mt-1">{{ form_errors.get('requested_amount') }}</div>{% endif %}
+                                <div class="form-text">Enter the credit amount you are requesting.</div>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2">Purpose: vehicle purchase · Application source: Marshall Auto website</div>
+                    </section>
+
+                    <section class="card border-0 shadow-sm p-3 p-md-4 mb-3">
+                        <h2 class="h5 fw-bold">2. Applicant information</h2>
+                        <p class="small text-muted">Please provide at least two years of residence and employment history. If a current address or job is less than two years old, include the previous address or employer and its start date.</p>
+                        {{ person_fields('applicant', true) }}
+                    </section>
+
+                    <section class="card border-0 shadow-sm p-3 p-md-4 mb-3">
+                        <h2 class="h5 fw-bold">3. Credit type and co-applicant</h2>
+                        <p class="small text-muted">If you are married, you have the right to apply for credit separately from or jointly with your spouse.</p>
+                        <div class="form-check">
+                            <input class="form-check-input" id="joint_credit" name="joint_credit" type="checkbox" value="yes" {% if form_values.get('joint_credit') %}checked{% endif %} data-joint-credit>
+                            <label class="form-check-label fw-semibold" for="joint_credit">I am applying jointly with one co-applicant</label>
+                        </div>
+                        <details class="mt-3" id="coapplicant-details">
+                            <summary class="fw-semibold">Co-applicant information (required for joint credit)</summary>
+                            <div class="pt-3">
+                                {{ person_fields('coapplicant') }}
+                            </div>
+                        </details>
+                        {% if form_errors.get('coapplicant_name') %}
+                        <div class="text-danger small mt-2">Complete the co-applicant section for a joint application.</div>
+                        {% endif %}
+                    </section>
+
+                    <section class="card border-0 shadow-sm p-3 p-md-4 mb-3">
+                        <h2 class="h5 fw-bold">4. Review, authorization, and submit</h2>
+                        <details class="mb-3">
+                            <summary class="fw-semibold">Read the lender's credit application authorization</summary>
+                            <div class="small border rounded bg-light p-3 mt-2">
+                                <p>I/we affirm that the information in this application is true and correct and understand it will be relied upon by Lendmark Financial Services, LLC, its subsidiaries and affiliates, and the seller when deciding whether to extend credit. I/we authorize Lendmark and the seller to make inquiries necessary to verify the information, including obtaining personal credit reports, and authorize persons or credit reporting agencies to provide information in response to those inquiries.</p>
+                                <p>I/we consent to Lendmark and its assigns, service providers, and agents calling or sending text messages to the phone numbers provided, including using an automatic telephone dialing system or an artificial or prerecorded voice, and sending email messages to the email addresses provided.</p>
+                                <p class="mb-0">The attached application includes the lender's full disclosures. Review them before submitting. If you prefer not to provide this information online, contact Marshall Auto to discuss applying in person.</p>
+                            </div>
+                        </details>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" id="certify_accuracy" name="certify_accuracy" type="checkbox" value="yes" required {% if form_values.get('certify_accuracy') %}checked{% endif %}>
+                            <label class="form-check-label" for="certify_accuracy">I certify that the information I provided is complete and true to the best of my knowledge. <span class="text-danger">*</span></label>
+                            {% if form_errors.get('certify_accuracy') %}<div class="text-danger small">{{ form_errors.get('certify_accuracy') }}</div>{% endif %}
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" id="authorize_credit_report" name="authorize_credit_report" type="checkbox" value="yes" required {% if form_values.get('authorize_credit_report') %}checked{% endif %}>
+                            <label class="form-check-label" for="authorize_credit_report">I have reviewed the authorization above and authorize Lendmark Financial Services and the seller to verify this application and obtain my consumer credit report as described. My typed name above is my electronic signature. <span class="text-danger">*</span></label>
+                            {% if form_errors.get('authorize_credit_report') %}<div class="text-danger small">{{ form_errors.get('authorize_credit_report') }}</div>{% endif %}
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" id="electronic_signature_consent" name="electronic_signature_consent" type="checkbox" value="yes" required {% if form_values.get('electronic_signature_consent') %}checked{% endif %}>
+                            <label class="form-check-label" for="electronic_signature_consent">I agree to submit this application electronically and use my typed name above as my electronic signature. <span class="text-danger">*</span></label>
+                            {% if form_errors.get('electronic_signature_consent') %}<div class="text-danger small">{{ form_errors.get('electronic_signature_consent') }}</div>{% endif %}
+                        </div>
+                        <p class="small text-muted">Submitting sends the completed application to Marshall Auto for staff review and manual delivery to the lender. It is not a loan approval or commitment to lend. Lendmark determines whether to accept the application and any final terms. Approval is not guaranteed.</p>
+                        <button class="btn btn-primary btn-lg" type="submit" id="financing-submit">Submit Secure Application</button>
+                        <span class="small text-muted ms-2">You can review your entries before submitting.</span>
+                    </section>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+{% if application_available %}
+<script src="{{ asset_url('js/financing.js') }}" defer></script>
+{% endif %}
 {% endblock %}

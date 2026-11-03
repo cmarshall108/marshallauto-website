@@ -10,7 +10,7 @@ from functools import wraps
 
 from flask import (
     Blueprint, Response, abort, current_app, flash, jsonify, redirect, render_template,
-    request, send_from_directory, session, url_for,
+    request, send_file, send_from_directory, session, url_for,
 )
 import pyotp
 import qrcode
@@ -30,10 +30,13 @@ from app.forms import (
     VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm,
 )
 from app.models import (
-    AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, Lead, PageView, Review, ServiceRecord,
-    InventoryAlert, RebuildCostEntry, RebuildCostReceipt, SiteSetting, TestDrive, User, Vehicle,
-    VehicleHoldRequest, VehicleImage,
+    AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, PageView,
+    Review, ServiceRecord, InventoryAlert, RebuildCostEntry, RebuildCostReceipt,
+    SiteSetting, TestDrive, User, Vehicle, VehicleHoldRequest, VehicleImage,
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
+)
+from app.financing import (
+    FinancingEncryptionUnavailable, delete_application_record, load_encrypted_pdf,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -650,6 +653,106 @@ def blog_post_delete(id):
 
 
 # ------------------------------ VEHICLES ------------------------------
+
+@admin_bp.get('/financing-applications')
+@admin_role_required
+def financing_applications():
+    page = request.args.get('page', 1, type=int)
+    pagination = (
+        FinancingApplication.query
+        .options(selectinload(FinancingApplication.vehicle))
+        .order_by(FinancingApplication.submitted_at.desc())
+        .paginate(page=page, per_page=25, error_out=False)
+    )
+    return render_template(
+        'admin/financing_applications.html',
+        pagination=pagination,
+    )
+
+
+@admin_bp.get('/api/financing-applications/notifications')
+@admin_role_required
+def financing_application_notifications():
+    raw_after = request.args.get('after')
+    if raw_after is None:
+        after = None
+    elif raw_after.isascii() and raw_after.isdigit() and len(raw_after) <= 19:
+        after = int(raw_after)
+    else:
+        return jsonify(success=False, message='Invalid notification cursor.'), 400
+    if after is not None and after > 9223372036854775807:
+        return jsonify(success=False, message='Invalid notification cursor.'), 400
+
+    latest_id = db.session.query(
+        func.max(FinancingApplication.id),
+    ).scalar() or 0
+    applications = []
+    if after is not None:
+        rows = FinancingApplication.query.options(
+            selectinload(FinancingApplication.vehicle),
+        ).filter(
+            FinancingApplication.id > after,
+        ).order_by(FinancingApplication.id).limit(50).all()
+        applications = [
+            {
+                'id': row.id,
+                'vehicle': row.vehicle.title if row.vehicle else 'an inventory vehicle',
+            }
+            for row in rows
+        ]
+    return jsonify(success=True, latest_id=latest_id, applications=applications)
+
+
+@admin_bp.get('/financing-applications/<int:application_id>/download')
+@admin_role_required
+def financing_application_download(application_id):
+    application = db.get_or_404(FinancingApplication, application_id)
+    try:
+        pdf_bytes = load_encrypted_pdf(application.encrypted_pdf_filename)
+    except FinancingEncryptionUnavailable:
+        current_app.logger.error(
+            'Financing application %s could not be decrypted; check the configured key.',
+            application.id,
+        )
+        abort(503)
+    except InvalidToken:
+        current_app.logger.error(
+            'Financing application %s failed encrypted-file authentication.',
+            application.id,
+        )
+        abort(503)
+    except FileNotFoundError:
+        current_app.logger.warning(
+            'Financing application %s has no encrypted PDF file.',
+            application.id,
+        )
+        abort(404)
+    current_app.logger.info(
+        'Administrator %s downloaded financing application %s.',
+        current_user.id, application.id,
+    )
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'lendmark-application-{application.id}.pdf',
+        conditional=False,
+    )
+
+
+@admin_bp.post('/financing-applications/<int:application_id>/delete')
+@admin_role_required
+def financing_application_delete(application_id):
+    application = db.get_or_404(FinancingApplication, application_id)
+    application_id = application.id
+    delete_application_record(application)
+    current_app.logger.info(
+        'Administrator %s deleted financing application %s.',
+        current_user.id, application_id,
+    )
+    flash('Financing application and its encrypted PDF were deleted.', 'success')
+    return redirect(url_for('admin.financing_applications'))
+
 
 @admin_bp.route('/vehicles')
 @login_required

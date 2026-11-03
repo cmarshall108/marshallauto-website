@@ -41,6 +41,12 @@ def requires_two_factor(user):
     # Salesmen always enroll and verify 2FA on first/subsequent logins.
     if user is not None and getattr(user, 'is_salesman', False):
         return True
+    if (
+        user is not None
+        and getattr(user, 'is_admin', False)
+        and current_app.config.get('FINANCING_ADMIN_TWO_FACTOR_REQUIRED', False)
+    ):
+        return True
     # Read the policy from the database so changes reach every worker immediately.
     required = db.session.query(SiteSetting.value).filter_by(
         key='admin_two_factor_required',

@@ -60,6 +60,9 @@ class MediaUploadRequest(Request):
         if self.endpoint == 'admin.vehicle_media_upload':
             media_limit = current_app.config['MEDIA_UPLOAD_MAX_CONTENT_LENGTH']
             return min(limit, media_limit) if limit is not None else media_limit
+        if self.endpoint == 'main.financing_apply':
+            form_limit = current_app.config['FINANCING_MAX_CONTENT_LENGTH']
+            return min(limit, form_limit) if limit is not None else form_limit
         return limit
 
 
@@ -84,6 +87,10 @@ def create_app(config_class=None):
     os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'carfax'), exist_ok=True)
     os.makedirs(os.path.join(app.config['PRIVATE_UPLOAD_FOLDER'], 'licenses'), mode=0o700, exist_ok=True)
     os.makedirs(os.path.join(app.config['PRIVATE_UPLOAD_FOLDER'], 'rebuild_receipts'), mode=0o700, exist_ok=True)
+    os.makedirs(
+        os.path.join(app.config['PRIVATE_UPLOAD_FOLDER'], 'financing_applications'),
+        mode=0o700, exist_ok=True,
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -188,6 +195,22 @@ def create_app(config_class=None):
         response.headers.setdefault('Content-Security-Policy', CONTENT_SECURITY_POLICY)
         if request.is_secure:
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        if request.endpoint in {
+            'main.financing', 'main.financing_apply', 'main.financing_received',
+        }:
+            response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Referrer-Policy'] = 'no-referrer'
+            response.headers['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com "
+                "https://cdn.jsdelivr.net; "
+                "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
+                "img-src 'self' data:; connect-src 'self'; "
+                "object-src 'none'; base-uri 'self'; form-action 'self'; "
+                "frame-src 'none'; frame-ancestors 'self';"
+            )
         if request.path.startswith('/static/uploads/carfax/'):
             response.headers['Cache-Control'] = 'private, no-store'
             response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'

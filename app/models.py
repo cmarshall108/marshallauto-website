@@ -1027,6 +1027,26 @@ class Lead(db.Model):
     vehicle = db.relationship('Vehicle', backref=db.backref('leads', lazy='dynamic'))
 
 
+class FinancingApplication(db.Model):
+    """Application metadata only; applicant information exists only in an encrypted PDF."""
+    __tablename__ = 'financing_applications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(
+        db.Integer, db.ForeignKey('vehicles.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    encrypted_pdf_filename = db.Column(db.String(64), unique=True, nullable=False)
+    joint_credit = db.Column(db.Boolean, default=False, nullable=False)
+    submitted_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        db.Index('uq_financing_applications_vehicle_id', 'vehicle_id', unique=True),
+    )
+
+    vehicle = db.relationship('Vehicle')
+
+
 class ChatPresence(db.Model):
     __tablename__ = 'chat_presence'
 

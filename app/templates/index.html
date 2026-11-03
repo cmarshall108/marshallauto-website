@@ -149,7 +149,7 @@
                         {% include "_price_display.html" %}
                     </div>
                 </a>
-                <p class="px-4 pb-3 mb-0 small text-muted">Interested in this vehicle? Visit us to complete a Lendmark Financial Services financing application. Approval and terms are determined by the lender.</p>
+                <p class="px-4 pb-3 mb-0 small text-muted">Interested in this vehicle? <a href="{{ url_for('main.financing', vehicle_id=vehicle.id) }}">Apply securely online</a>. Approval and terms are determined by the lender.</p>
             </div>
             {% else %}
             <div class="col-12 text-center text-muted">

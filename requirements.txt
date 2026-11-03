@@ -27,6 +27,8 @@ beautifulsoup4>=4.12,<5
 pyotp>=2.9,<3
 cryptography>=46,<49
 qrcode>=8,<9
+pypdf>=5.1,<7
+reportlab>=4.2,<5
 # Photo highlights (local OpenCV worker). Loose pins for broader Python/wheel support.
 numpy>=1.26,<3
 opencv-python-headless>=4.8,<5
