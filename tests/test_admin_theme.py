@@ -37,7 +37,7 @@ class AdminThemeTests(unittest.TestCase):
         styles = [link['href'].split('?')[0] for link in html.select('link[rel="stylesheet"]')]
         self.assertLess(styles.index('/static/css/main.css'), styles.index('/static/css/admin.css'))
         self.assertNotIn('/static/css/public.css', styles)
-        self.assertEqual(html.select_one('meta[name="theme-color"]')['content'], '#25282c')
+        self.assertEqual(html.select_one('meta[name="theme-color"]')['content'], '#142238')
 
     def test_login_uses_theme_and_preserves_authentication_fields(self):
         self.app.config['WTF_CSRF_ENABLED'] = True
@@ -84,11 +84,9 @@ class AdminThemeTests(unittest.TestCase):
         folder = Path(self.app.static_folder) / 'css'
         admin = (folder / 'admin.css').read_text()
         public = (folder / 'public.css').read_text()
-        for token in ('--dark: #25282c', '--light: #faf8f4', '--accent: #d6bc90',
-                      '--surface: #fffefa', '--primary: #353b42'):
-            self.assertIn(token, admin)
         for token in ('--dark: #142238', '--light: #f4f6f8', '--accent: #f2bc58',
                       '--surface: #fff', '--primary: #23354a'):
+            self.assertIn(token, admin)
             self.assertIn(token, public)
         for rule in (':focus-visible', 'prefers-reduced-motion: reduce', 'min-height: 44px',
                      '.admin-theme .btn-secondary:hover', '.admin-theme .table-primary'):

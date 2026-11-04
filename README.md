@@ -116,8 +116,8 @@ storefront navigation or promotional layouts to staff workflows. Semantic
 warning/danger controls keep their meanings, and printable agreements retain
 their dedicated print layout. Both themes include visible keyboard focus and
 reduced-motion rules.
-The palette uses graphite (`#25282c`), warm white (`#faf8f4`), and champagne
-(`#d6bc90`), with darker accents for readable text on light surfaces.
+The palette uses navy (`#142238`), cool gray (`#f4f6f8`), and gold
+(`#f2bc58`), with darker navy accents for readable text on light surfaces.
 
 The theme covers navigation, vehicle cards, forms, galleries, consent/compare
 bars, and the footer. Status badges retain distinct warning/success/error
