@@ -480,6 +480,51 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertNotIn('headers', result['request'])
         self.assertNotIn('user', result)
 
+    def test_salesman_can_view_and_download_but_not_delete_applications(self):
+        self.submit()
+        application = FinancingApplication.query.one()
+        salesman = User(
+            username='finance-sales', role=User.ROLE_SALESMAN,
+            profile_complete=True,
+        )
+        salesman.set_password('sales-test-password')
+        db.session.add(salesman)
+        db.session.commit()
+
+        with patch('app.admin.rate_limit_exceeded', return_value=False), patch(
+            'app.admin.requires_two_factor', return_value=False,
+        ):
+            login = self.client.post('/admin/login', data={
+                'username': 'finance-sales',
+                'password': 'sales-test-password',
+            }, base_url='https://localhost')
+        self.assertEqual(login.status_code, 302)
+
+        listing = self.client.get('/admin/financing-applications', base_url='https://localhost')
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn(b'Download PDF', listing.data)
+        self.assertNotIn(b'>Delete<', listing.data)
+        self.assertIn(b'href="/admin/financing-applications"', listing.data)
+        notifications = self.client.get(
+            '/admin/api/financing-applications/notifications?after=0',
+            base_url='https://localhost',
+        )
+        self.assertEqual(notifications.status_code, 200)
+        self.assertEqual(notifications.json['applications'][0]['id'], application.id)
+        download = self.client.get(
+            f'/admin/financing-applications/{application.id}/download',
+            base_url='https://localhost',
+        )
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(download.mimetype, 'application/pdf')
+        deleted = self.client.post(
+            f'/admin/financing-applications/{application.id}/delete',
+            base_url='https://localhost',
+        )
+        self.assertEqual(deleted.status_code, 302)
+        self.assertIn('dashboard', deleted.headers['Location'])
+        self.assertEqual(FinancingApplication.query.count(), 1)
+
     def test_admin_financing_access_requires_two_factor_policy(self):
         admin = User.query.filter_by(username='finance-admin').one()
         self.app.config['FINANCING_ADMIN_TWO_FACTOR_REQUIRED'] = True

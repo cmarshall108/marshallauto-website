@@ -666,7 +666,7 @@ def blog_post_delete(id):
 # ------------------------------ VEHICLES ------------------------------
 
 @admin_bp.get('/financing-applications')
-@admin_role_required
+@admin_required
 def financing_applications():
     page = request.args.get('page', 1, type=int)
     pagination = (
@@ -682,7 +682,7 @@ def financing_applications():
 
 
 @admin_bp.get('/api/financing-applications/notifications')
-@admin_role_required
+@admin_required
 def financing_application_notifications():
     raw_after = request.args.get('after')
     if raw_after is None:
@@ -715,7 +715,7 @@ def financing_application_notifications():
 
 
 @admin_bp.get('/financing-applications/<int:application_id>/download')
-@admin_role_required
+@admin_required
 def financing_application_download(application_id):
     application = db.get_or_404(FinancingApplication, application_id)
     try:
@@ -739,7 +739,7 @@ def financing_application_download(application_id):
         )
         abort(404)
     current_app.logger.info(
-        'Administrator %s downloaded financing application %s.',
+        'Staff user %s downloaded financing application %s.',
         current_user.id, application.id,
     )
     return send_file(

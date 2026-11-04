@@ -40,10 +40,12 @@
                         <a class="btn btn-sm btn-primary" href="{{ url_for('admin.financing_application_download', application_id=application.id) }}">
                             <i class="bi bi-download me-1" aria-hidden="true"></i>Download PDF
                         </a>
+                        {% if current_user.is_admin %}
                         <form class="d-inline" method="post" action="{{ url_for('admin.financing_application_delete', application_id=application.id) }}" onsubmit="return confirm('Permanently delete this application and its encrypted PDF?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

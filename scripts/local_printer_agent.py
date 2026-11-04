@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """List and scan printers on the computer viewing the admin page.
 
-The public site cannot see a Mac's printers. Run this beside the browser:
+The public site cannot see a Mac's printers, and a browser cannot browse
+Bonjour. Install this helper once so it starts at login:
 
-    python3 scripts/local_printer_agent.py
+    python3 scripts/install_local_printer_agent.py
 
 It listens only on 127.0.0.1 and returns scanned pages to the browser.
 """

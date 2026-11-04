@@ -1,5 +1,5 @@
 /**
- * Locate the local scanner agent, including its fallback ports.
+ * Locate the login-started scanner helper, including its fallback ports.
  */
 (function () {
     'use strict';
@@ -30,7 +30,7 @@
                 }
                 if (response.status === 503 && payload && payload.error) throw new Error(payload.error);
             }
-            throw new Error('Cannot connect to the local scanner service. Start it on this computer with “python3 scripts/local_printer_agent.py”, then refresh this page. The agent will use the next available port if 8765 is already in use.');
+            throw new Error('Cannot connect to the local scanner service. It starts automatically when you log in to this computer. If it has not been installed yet, run “python3 scripts/install_local_printer_agent.py” once on this computer, then refresh. It uses the next available port if 8765 is already in use.');
         })();
         try {
             return await connection;

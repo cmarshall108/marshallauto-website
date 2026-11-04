@@ -41,18 +41,19 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
 
 ### Local network scanner
 
-The admin browser uses a small local service to discover and scan Bonjour/eSCL
-devices on its network. Start it on the same computer as the browser, from the
-project directory, and leave it running while using scanner features:
+The admin browser discovers and scans Bonjour/eSCL devices through a small
+helper on the same computer. A browser cannot browse Bonjour, and the website
+server is not on the shop network, so the helper starts at login instead of
+being launched from a terminal. Install it once on each computer that uses
+scanner features:
 
 ```bash
-python3 scripts/local_printer_agent.py
+python3 scripts/install_local_printer_agent.py
 ```
 
-Refresh the admin page after the service starts. Scanner discovery is performed
-by that computer, not by the website server. If no scanner appears after startup,
-the service checks ports 8765 through 8775 and uses the first available one.
-Make sure Bonjour/mDNS traffic is allowed on the local network.
+Refresh the admin page after installing. The helper listens only on 127.0.0.1
+and uses the first available port from 8765 through 8775. Make sure
+Bonjour/mDNS traffic is allowed on the local network.
 
 ### Local IAAI Buy Now finder
 
@@ -335,13 +336,14 @@ be decrypted. The form refuses submissions without a valid key or over a non-HTT
 connection. It does not load analytics, advertising, or third-party browser scripts
 on the application page. Applicant fields, including SSN and ID numbers, are not
 written to the database; the completed lender PDF is encrypted before it is saved
-outside the public static directory. Administrators must sign in with authenticator
-two-factor verification to list, download, or delete application records. Downloads
-are plaintext PDFs, so use a trusted device and the lender-approved delivery channel,
-then delete the application when it is no longer needed.
+outside the public static directory. Signed-in staff with authenticator
+two-factor verification can list and download application records. Salesmen
+always use two-factor verification. Only administrators can delete records.
+Downloads are plaintext PDFs, so use a trusted device and the lender-approved
+delivery channel, then delete the application when it is no longer needed.
 
 Only one active application can be submitted per inventory vehicle; deleting it
-frees that vehicle for a future application. When an application arrives, admins
+frees that vehicle for a future application. When an application arrives, signed-in staff
 with an active admin-panel session receive an in-panel alert. If no admin is online,
 the site texts each active salesperson with a usable profile phone through Textbelt.
 Set `TEXTBELT_API_KEY` and keep every salesperson's phone number current for offline

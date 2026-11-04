@@ -111,7 +111,7 @@
         }
         async function pollFinancing() {
             if (
-                root.dataset.isAdmin !== 'true'
+                root.dataset.financingAlerts !== 'true'
                 || financingBusy
                 || !active
             ) return;
