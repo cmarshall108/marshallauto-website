@@ -88,20 +88,23 @@ can only download reports for available vehicles.
 ### Coming Soon stock photos
 
 Run `flask --app run.py generate-coming-soon-stock-photos` with `XAI_API_KEY`
-configured to generate a representative Grok Imagine image for each distinct
-make/model/body style currently shown as Coming Soon without an actual uploaded
-photo. Each generated WebP is saved under `app/static/images/coming-soon-stock/`
-and reused across model years of that same body style. Existing generated
-images are never regenerated unless `--force` is provided. No image-generation
-API is called while shoppers browse the site. Saving a new vehicle or marking
-one Coming Soon generates its shared image automatically after any uploaded
-vehicle photos are processed; CSV imports do the same. Run the command above
-to generate missing images for vehicles that were already marked Coming Soon.
-The deployment script also runs this backfill after each successful deploy.
+configured to generate a Grok Imagine image for each distinct Coming Soon
+configuration that has no uploaded photo. The prompt includes the vehicle's
+year, make, model, trim, body style, exterior and interior colors, doors,
+drivetrain, fuel type, engine, transmission, and listed equipment. Each
+generated WebP is saved under `app/static/images/coming-soon-stock/` and reused
+only when those details match. A change to color, trim, or other listed
+details gets a new image. Existing generated images are never regenerated
+unless `--force` is provided. No image-generation API is called while shoppers
+browse the site. Saving a new vehicle or marking one Coming Soon generates its
+image automatically after any uploaded vehicle photos are processed; CSV
+imports do the same. Run the command above to generate missing images for
+vehicles that were already marked Coming Soon. The deployment script also runs
+this backfill after each successful deploy.
 
-These are clearly labeled AI-generated reference images, not photos of the
-specific vehicles; color, trim, and equipment may differ. They are used only
-on Coming Soon cards, never on inventory listings, vehicle details, or feeds.
+These are clearly labeled AI-generated reference images matching the listed
+details, not photos of the specific vehicles. They are used only on Coming
+Soon cards, never on inventory listings, vehicle details, or feeds.
 Uploaded actual vehicle photos always take precedence. If an image has not yet
 been generated, the existing placeholder and disclaimer are shown.
 

@@ -41,7 +41,7 @@ from app.financing import (
     FinancingEncryptionUnavailable, delete_application_record, load_encrypted_pdf,
 )
 from app.coming_soon_stock_photos import (
-    ensure_stock_photo_for_vehicle, stock_photo_filename,
+    appearance_details, ensure_stock_photo_for_vehicle, stock_photo_filename,
 )
 from app.highlight_jobs import (
     enqueue_image_highlight_job, enqueue_vehicle_highlight_jobs, queue_stats,
@@ -1069,7 +1069,8 @@ def vehicle_import():
                 if not vehicle.is_coming_soon:
                     continue
                 photo_key = stock_photo_filename(
-                    vehicle.year, vehicle.make, vehicle.model, vehicle.body_style,
+                    vehicle.year, vehicle.make, vehicle.model,
+                    **appearance_details(vehicle),
                 )
                 if photo_key in attempted_photos:
                     continue
@@ -1079,7 +1080,7 @@ def vehicle_import():
             if photo_failures:
                 flash(
                     f'Could not generate AI reference photos for {photo_failures} '
-                    'Coming Soon vehicle model(s). Check the server log and try again.',
+                    'Coming Soon vehicle configuration(s). Check the server log and try again.',
                     'warning',
                 )
         if errors:

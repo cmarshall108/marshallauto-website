@@ -6,7 +6,7 @@
             <article class="coming-soon-card" id="vehicle-{{ vehicle.slug }}">
             <div class="position-relative">
                     <img src="{{ asset_url(generated_photo) if generated_photo else vehicle.primary_image_url() }}"
-                         alt="{{ vehicle.title }}{% if generated_photo %} representative AI-generated image, not the actual vehicle{% else %} coming soon at {{ business_name }}{% endif %}"
+                         alt="{{ vehicle.title }}{% if generated_photo %} AI-generated reference matching the listed color, trim, and equipment, not the actual vehicle{% else %} coming soon at {{ business_name }}{% endif %}"
                      loading="lazy" decoding="async" width="600" height="400">
                 <span class="badge text-bg-info coming-soon-badge">Coming Soon</span>
             </div>
@@ -14,7 +14,7 @@
                     {% if not actual_image %}
                 <p class="small text-muted mb-2 stock-photo-note" aria-live="polite">
                         {% if generated_photo %}
-                        AI-generated reference image only; not the actual vehicle. Color, trim, and equipment may differ.
+                        AI-generated reference image only; not a photo of the actual vehicle. It matches the listed color, trim, and equipment.
                         {% else %}
                         AI-generated reference image not available yet. Actual vehicle photos coming soon.
                         {% endif %}
@@ -22,7 +22,14 @@
                     {% endif %}
                 <h3 class="h5 fw-bold mb-2">{{ vehicle.title }}</h3>
                 <p class="text-muted mb-3">
-                    {% if vehicle.exterior_color %}{{ vehicle.exterior_color }}{% if vehicle.body_style %} {{ vehicle.body_style|lower }}{% endif %}.{% elif vehicle.body_style %}{{ vehicle.body_style }}.{% endif %}
+                    {% if vehicle.exterior_color %}{{ vehicle.exterior_color }}{% if vehicle.interior_color %} exterior, {{ vehicle.interior_color }} interior{% endif %}{% elif vehicle.interior_color %}{{ vehicle.interior_color }} interior{% endif %}
+                    {% if vehicle.body_style %}{% if vehicle.exterior_color or vehicle.interior_color %} · {% endif %}{{ vehicle.body_style }}{% endif %}
+                    {% if vehicle.doors %} · {{ vehicle.doors }}-door{% endif %}
+                    {% if vehicle.drivetrain %} · {{ vehicle.drivetrain }}{% endif %}
+                    {% if vehicle.engine %} · {{ vehicle.engine }}{% endif %}
+                    {% if vehicle.transmission %} · {{ vehicle.transmission }}{% endif %}
+                    {% if vehicle.fuel_type %} · {{ vehicle.fuel_type }}{% endif %}
+                    {% if vehicle.exterior_color or vehicle.interior_color or vehicle.body_style or vehicle.doors or vehicle.drivetrain or vehicle.engine or vehicle.transmission or vehicle.fuel_type %}.{% endif %}
                     {% if vehicle.description %} {{ vehicle.description|striptags|truncate(145, True, '...') }}{% else %}Details are being prepared. Ask us when this vehicle will be ready.{% endif %}
                 </p>
                 <a href="{{ url_for('main.contact', vehicle_id=vehicle.id) }}" class="btn btn-outline-primary">

@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import json
 import os
 import tempfile
@@ -19,20 +20,74 @@ from app.utils import slugify
 _IMAGE_GENERATION_URL = 'https://api.x.ai/v1/images/generations'
 _IMAGE_MODEL = 'grok-imagine-image-2.0'
 _MAX_RESPONSE_BYTES = 20 * 1024 * 1024
+_APPEARANCE_FIELDS = (
+    'trim', 'body_style', 'exterior_color', 'interior_color', 'doors',
+    'drivetrain', 'fuel_type', 'engine', 'transmission', 'exterior_features',
+    'features',
+)
+_PROMPT_LABELS = (
+    ('trim', 'Trim'),
+    ('body_style', 'Body style'),
+    ('exterior_color', 'Exterior color'),
+    ('interior_color', 'Interior color'),
+    ('doors', 'Doors'),
+    ('drivetrain', 'Drivetrain'),
+    ('fuel_type', 'Fuel type'),
+    ('engine', 'Engine'),
+    ('transmission', 'Transmission'),
+    ('exterior_features', 'Exterior equipment'),
+    ('features', 'Equipment'),
+)
 
 
-def stock_photo_filename(year, make, model, body_style=None):
-    """Return a shared asset path for a make/model/body-style reference image."""
+def _clean_detail(value):
+    return ' '.join(str(value or '').replace('\n', ', ').split())
+
+
+def appearance_details(vehicle):
+    """Visible configuration used to depict one Coming Soon vehicle."""
+    return {field: getattr(vehicle, field, None) for field in _APPEARANCE_FIELDS}
+
+
+def _filled_details(body_style=None, **details):
+    filled = {}
+    if body_style and not _clean_detail(details.get('body_style')):
+        details['body_style'] = body_style
+    for field in _APPEARANCE_FIELDS:
+        token = _clean_detail(details.get(field))
+        if token:
+            filled[field] = token
+    if filled.get('exterior_features'):
+        filled.pop('features', None)
+    return filled
+
+
+def stock_photo_filename(year, make, model, body_style=None, **details):
+    """Return an asset path unique to this vehicle's listed configuration."""
     if not str(make or '').strip() or not str(model or '').strip():
         raise ValueError('A make and model are required to name a stock photo.')
-    body = str(body_style or '').strip() or 'vehicle'
-    name = f'{str(make).strip()}-{str(model).strip()}-{body}'
-    return f'images/coming-soon-stock/{slugify(name)}.webp'
+    filled = _filled_details(body_style, **details)
+    signature = '|'.join([
+        _clean_detail(year),
+        _clean_detail(make).casefold(),
+        _clean_detail(model).casefold(),
+        *(
+            f'{field}:{filled[field].casefold()}'
+            for field in _APPEARANCE_FIELDS
+            if field in filled
+        ),
+    ])
+    digest = hashlib.sha256(signature.encode('utf-8')).hexdigest()[:12]
+    label = slugify(
+        f'{year}-{make}-{model}-{filled.get("body_style") or "vehicle"}',
+    )
+    return f'images/coming-soon-stock/{label}-{digest}.webp'
 
 
 def existing_stock_photo_filename(vehicle):
     filename = stock_photo_filename(
-        vehicle.year, vehicle.make, vehicle.model, vehicle.body_style,
+        vehicle.year, vehicle.make, vehicle.model,
+        **appearance_details(vehicle),
     )
     if (Path(current_app.static_folder) / filename).is_file():
         return filename
@@ -40,7 +95,7 @@ def existing_stock_photo_filename(vehicle):
 
 
 def ensure_stock_photo_for_vehicle(vehicle):
-    """Generate a shared reference image only when a teaser has no real photo."""
+    """Generate a configuration image only when a teaser has no real photo."""
     if (
         vehicle.status != 'available'
         or not vehicle.is_coming_soon
@@ -48,7 +103,7 @@ def ensure_stock_photo_for_vehicle(vehicle):
     ):
         return None
     filename = stock_photo_filename(
-        vehicle.year, vehicle.make, vehicle.model, vehicle.body_style,
+        vehicle.year, vehicle.make, vehicle.model, **appearance_details(vehicle),
     )
     if (Path(current_app.static_folder) / filename).is_file():
         return filename
@@ -61,19 +116,34 @@ def ensure_stock_photo_for_vehicle(vehicle):
         vehicle.model,
         api_key,
         current_app.static_folder,
-        vehicle.body_style,
+        **appearance_details(vehicle),
     )
 
 
-def _image_prompt(year, make, model, body_style=None):
-    body = f' with a {body_style} body style' if body_style else ''
+def _image_prompt(year, make, model, body_style=None, **details):
+    filled = _filled_details(body_style, **details)
+    body = filled.get('body_style')
+    body_phrase = f' with a {body} body style' if body else ''
+    listed = [f'Year: {year}', f'Make: {make}', f'Model: {model}']
+    for field, label in _PROMPT_LABELS:
+        token = filled.get(field)
+        if not token:
+            continue
+        if field in {'exterior_features', 'features'} and len(token) > 400:
+            token = token[:400].rsplit(' ', 1)[0]
+        listed.append(f'{label}: {token}')
     return (
-        f'Create one photorealistic automotive catalog reference image representing a '
-        f'{year} {make} {model}{body}. Show a single complete vehicle in a front three-quarter '
-        f'view on a clean neutral studio background, soft even lighting, realistic '
-        f'proportions, no people, no text, no watermark, no visible logos or badges, '
-        f'and no readable license plate. Use a neutral factory-style paint color. '
-        f'This is an illustrative reference image, not a depiction of a specific car.'
+        f'Create one photorealistic automotive catalog reference image of a '
+        f'{year} {make} {model}{body_phrase}. Match every listed detail exactly, '
+        f'including trim, exterior color, interior color, doors, drivetrain, fuel '
+        f'type, engine, transmission, and visible equipment. Do not substitute a '
+        f'generic or neutral paint color when an exterior color is listed. Show one '
+        f'complete vehicle in a front three-quarter view on a clean neutral studio '
+        f'background, soft even lighting, and realistic proportions. Show the listed '
+        f'interior color through the glass. No people, no text, no watermark, no '
+        f'visible logos or badges, and no readable license plate. This is an '
+        f'illustrative reference of the listed configuration, not a photo of one '
+        f'specific car.\n' + '\n'.join(listed)
     )
 
 
@@ -101,8 +171,8 @@ def _response_image_bytes(image):
     return image_bytes
 
 
-def generate_stock_photo(year, make, model, api_key, static_folder, body_style=None):
-    prompt = _image_prompt(year, make, model, body_style)
+def generate_stock_photo(year, make, model, api_key, static_folder, body_style=None, **details):
+    prompt = _image_prompt(year, make, model, body_style, **details)
     request_data = json.dumps({
         'model': _IMAGE_MODEL,
         'prompt': prompt,
@@ -140,7 +210,7 @@ def generate_stock_photo(year, make, model, api_key, static_folder, body_style=N
         raise ValueError('Grok did not return a generated image.')
 
     image_bytes = _response_image_bytes(images[0])
-    filename = stock_photo_filename(year, make, model, body_style)
+    filename = stock_photo_filename(year, make, model, body_style, **details)
     destination = Path(static_folder) / filename
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = None
@@ -168,47 +238,54 @@ def generate_stock_photo(year, make, model, api_key, static_folder, body_style=N
 
 def register_commands(app):
     @app.cli.command('generate-coming-soon-stock-photos')
-    @click.option('--force', is_flag=True, help='Regenerate existing model/body-style images.')
+    @click.option('--force', is_flag=True, help='Regenerate existing configuration images.')
     @with_appcontext
     def generate_coming_soon_stock_photos(force):
-        """Generate representative Grok images for Coming Soon vehicles."""
+        """Generate Grok images matching each Coming Soon vehicle's details."""
         api_key = current_app.config.get('XAI_API_KEY', '').strip()
         if not api_key:
             raise click.ClickException('Set XAI_API_KEY to generate Coming Soon stock photos.')
 
         from app.models import Vehicle
 
-        models = {}
+        configurations = {}
         vehicles = (
-            Vehicle.query.with_entities(
-                Vehicle.year, Vehicle.make, Vehicle.model, Vehicle.body_style,
-            )
+            Vehicle.query
             .filter_by(status='available', is_coming_soon=True)
             .filter(~Vehicle.images.any())
-            .order_by(Vehicle.year, Vehicle.make, Vehicle.model, Vehicle.body_style)
-            .distinct()
+            .order_by(Vehicle.year, Vehicle.make, Vehicle.model, Vehicle.id)
             .all()
         )
-        for year, make, model, body_style in vehicles:
-            filename = stock_photo_filename(year, make, model, body_style)
-            models.setdefault(filename, (year, make, model, body_style))
+        for vehicle in vehicles:
+            details = appearance_details(vehicle)
+            filename = stock_photo_filename(
+                vehicle.year, vehicle.make, vehicle.model, **details,
+            )
+            configurations.setdefault(
+                filename, (vehicle.year, vehicle.make, vehicle.model, details),
+            )
 
         generated = 0
         skipped = 0
-        for filename, (year, make, model, body_style) in sorted(models.items()):
+        for filename, (year, make, model, details) in sorted(configurations.items()):
             destination = Path(current_app.static_folder) / filename
+            label = ' '.join(
+                str(part) for part in (
+                    year, make, model, details.get('trim'), details.get('exterior_color'),
+                ) if _clean_detail(part)
+            )
             if destination.is_file() and not force:
                 skipped += 1
                 continue
             try:
                 generate_stock_photo(
-                    year, make, model, api_key, current_app.static_folder, body_style,
+                    year, make, model, api_key, current_app.static_folder, **details,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 raise click.ClickException(
-                    f'Could not generate a stock photo for {year} {make} {model}: {exc}'
+                    f'Could not generate a stock photo for {label}: {exc}'
                 ) from exc
-            click.echo(f'Generated reference photo for {year} {make} {model}.')
+            click.echo(f'Generated reference photo for {label}.')
             generated += 1
 
         click.echo(

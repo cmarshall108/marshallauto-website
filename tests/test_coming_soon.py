@@ -127,13 +127,21 @@ class ComingSoonTests(unittest.TestCase):
         page = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')
         self.assertIsNone(page.select_one('.stock-photo-note'))
 
-    def test_grok_command_generates_one_image_per_model_and_body_style(self):
+    def test_grok_command_generates_one_image_per_listed_configuration(self):
         duplicate = self.add_vehicle(
             '2020-Toyota-RAV4-coming-soon-duplicate',
             is_coming_soon=True,
             price=23000,
         )
-        duplicate.year = 2019
+        duplicate.exterior_color = 'Blue'
+        self.teaser.exterior_color = 'Blue'
+        different = self.add_vehicle(
+            '2020-Toyota-RAV4-coming-soon-red',
+            is_coming_soon=True,
+            price=24000,
+        )
+        different.exterior_color = 'Red'
+        different.trim = 'XLE'
         image_vehicle = self.add_vehicle(
             '2019-Acura-MDX-coming-soon',
             is_coming_soon=True,
@@ -154,18 +162,38 @@ class ComingSoonTests(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0, result.output)
-        generate.assert_called_once_with(
-            2019, 'Toyota', 'RAV4', 'test-api-key', self.app.static_folder, 'SUV',
+        self.assertEqual(generate.call_count, 2)
+        generated_colors = {
+            call.kwargs['exterior_color'] for call in generate.call_args_list
+        }
+        self.assertEqual(generated_colors, {'Blue', 'Red'})
+        red_call = next(
+            call for call in generate.call_args_list
+            if call.kwargs['exterior_color'] == 'Red'
         )
+        self.assertEqual(red_call.args[:5], (
+            2020, 'Toyota', 'RAV4', 'test-api-key', self.app.static_folder,
+        ))
+        self.assertEqual(red_call.kwargs['trim'], 'XLE')
+        self.assertEqual(red_call.kwargs['body_style'], 'SUV')
 
-    def test_grok_command_reuses_saved_image_for_other_years(self):
-        self.add_vehicle(
-            '2019-Toyota-RAV4-coming-soon',
+    def test_grok_command_reuses_saved_image_for_the_same_configuration(self):
+        twin = self.add_vehicle(
+            '2020-Toyota-RAV4-coming-soon-twin',
             is_coming_soon=True,
             price=23000,
-        ).year = 2019
+        )
+        self.teaser.exterior_color = 'Blueprint'
+        self.teaser.trim = 'XLE'
+        twin.exterior_color = 'Blueprint'
+        twin.trim = 'XLE'
         filename = stock_photo_filename(
-            2020, 'Toyota', 'RAV4', 'SUV',
+            self.teaser.year, self.teaser.make, self.teaser.model,
+            **{
+                'body_style': self.teaser.body_style,
+                'exterior_color': 'Blueprint',
+                'trim': 'XLE',
+            },
         )
         image_path = Path(self.app.static_folder) / filename
         image_path.parent.mkdir(parents=True)
@@ -179,12 +207,10 @@ class ComingSoonTests(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0, result.output)
         generate.assert_not_called()
-        self.assertEqual(
-            existing_stock_photo_filename(self.teaser),
-            filename,
-        )
+        self.assertEqual(existing_stock_photo_filename(self.teaser), filename)
+        self.assertEqual(existing_stock_photo_filename(twin), filename)
 
-    def test_vehicle_save_reuses_generated_image_for_equivalent_model_year(self):
+    def test_vehicle_save_regenerates_when_color_or_trim_changes(self):
         self.app.config['XAI_API_KEY'] = 'test-api-key'
         filename = stock_photo_filename(
             self.teaser.year, self.teaser.make, self.teaser.model,
@@ -192,20 +218,26 @@ class ComingSoonTests(unittest.TestCase):
         )
         image_path = Path(self.app.static_folder) / filename
 
-        def save_generated_image(*_args):
-            image_path.parent.mkdir(parents=True, exist_ok=True)
-            image_path.write_bytes(b'generated image placeholder')
-            return filename
+        def save_generated_image(*args, **kwargs):
+            generated = stock_photo_filename(*args[:3], **kwargs)
+            path = Path(self.app.static_folder) / generated
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'generated image placeholder')
+            return generated
 
         with patch(
             'app.coming_soon_stock_photos.generate_stock_photo',
             side_effect=save_generated_image,
         ) as generate:
             self.assertEqual(ensure_stock_photo_for_vehicle(self.teaser), filename)
-            self.teaser.year = 2019
             self.assertEqual(ensure_stock_photo_for_vehicle(self.teaser), filename)
+            self.teaser.exterior_color = 'Silver'
+            self.teaser.trim = 'Limited'
+            updated = ensure_stock_photo_for_vehicle(self.teaser)
 
-        generate.assert_called_once()
+        self.assertEqual(generate.call_count, 2)
+        self.assertNotEqual(updated, filename)
+        self.assertEqual(existing_stock_photo_filename(self.teaser), updated)
 
     def test_teaser_is_not_in_sale_inventory_homepage_or_feed(self):
         inventory = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')

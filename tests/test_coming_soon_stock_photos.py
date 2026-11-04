@@ -18,18 +18,37 @@ from config import TestingConfig
 
 
 class ComingSoonStockPhotoTests(unittest.TestCase):
-    def test_filename_is_shared_across_years_for_the_same_model_and_body_style(self):
-        self.assertEqual(
-            stock_photo_filename(2014, 'Chevrolet', 'Cruze', 'Sedan'),
-            'images/coming-soon-stock/chevrolet-cruze-sedan.webp',
+    def test_filename_changes_when_color_trim_or_year_changes(self):
+        silver = stock_photo_filename(
+            2014, 'Chevrolet', 'Cruze', 'Sedan',
+            trim='LT', exterior_color='Silver Ice', interior_color='Jet Black',
         )
         self.assertEqual(
-            stock_photo_filename(2015, 'Chevrolet', 'Cruze', 'Sedan'),
-            'images/coming-soon-stock/chevrolet-cruze-sedan.webp',
+            stock_photo_filename(
+                2014, 'Chevrolet', 'Cruze', 'Sedan',
+                trim='LT', exterior_color='silver ice', interior_color='Jet Black',
+            ),
+            silver,
+        )
+        self.assertTrue(silver.startswith('images/coming-soon-stock/2014-chevrolet-cruze-sedan-'))
+        self.assertTrue(silver.endswith('.webp'))
+        self.assertNotEqual(
+            stock_photo_filename(
+                2015, 'Chevrolet', 'Cruze', 'Sedan',
+                trim='LT', exterior_color='Silver Ice',
+            ),
+            silver,
         )
         self.assertNotEqual(
-            stock_photo_filename(2015, 'Chevrolet', 'Cruze', 'Hatchback'),
-            stock_photo_filename(2015, 'Chevrolet', 'Cruze', 'Sedan'),
+            stock_photo_filename(
+                2014, 'Chevrolet', 'Cruze', 'Sedan',
+                trim='LT', exterior_color='Red',
+            ),
+            silver,
+        )
+        self.assertNotEqual(
+            stock_photo_filename(2014, 'Chevrolet', 'Cruze', 'Hatchback', trim='LT'),
+            stock_photo_filename(2014, 'Chevrolet', 'Cruze', 'Sedan', trim='LT'),
         )
 
     def test_generated_photo_is_cached_as_optimized_webp(self):
@@ -59,7 +78,10 @@ class ComingSoonStockPhotoTests(unittest.TestCase):
             ) as urlopen:
                 filename = generate_stock_photo(
                     2014, 'Chevrolet', 'Cruze', 'test-api-key', static_folder,
-                    'Sedan',
+                    'Sedan', trim='LT', exterior_color='Silver Ice',
+                    interior_color='Jet Black', doors=4, drivetrain='FWD',
+                    fuel_type='Gasoline', engine='1.4L Turbo',
+                    transmission='6-speed automatic',
                 )
 
             request = urlopen.call_args.args[0]
@@ -69,6 +91,15 @@ class ComingSoonStockPhotoTests(unittest.TestCase):
             self.assertEqual(body['model'], 'grok-imagine-image-2.0')
             self.assertEqual(body['response_format'], 'b64_json')
             self.assertIn('2014 Chevrolet Cruze with a Sedan body style', body['prompt'])
+            self.assertIn('Trim: LT', body['prompt'])
+            self.assertIn('Exterior color: Silver Ice', body['prompt'])
+            self.assertIn('Interior color: Jet Black', body['prompt'])
+            self.assertIn('Doors: 4', body['prompt'])
+            self.assertIn('Drivetrain: FWD', body['prompt'])
+            self.assertIn('Fuel type: Gasoline', body['prompt'])
+            self.assertIn('Engine: 1.4L Turbo', body['prompt'])
+            self.assertIn('Transmission: 6-speed automatic', body['prompt'])
+            self.assertNotIn('neutral factory-style paint color', body['prompt'])
 
             image_path = Path(static_folder) / filename
             self.assertTrue(image_path.is_file())
