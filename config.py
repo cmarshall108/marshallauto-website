@@ -40,6 +40,10 @@ class Config:
     LENDMARK_APPLICATION_PDF = os.path.join(
         basedir, 'app', 'private_assets', 'lendmark_credit_application.pdf',
     )
+    # Official NC DMV blanks. Filled copies are generated per vehicle; these files
+    # are never written and are outside app/static so they are not web-served.
+    MVR_180_PDF = os.path.join(basedir, 'app', 'private_assets', 'MVR-180.pdf')
+    MVR_181_PDF = os.path.join(basedir, 'app', 'private_assets', 'MVR-181.pdf')
     # Generate with Fernet.generate_key(); back up securely and keep stable while
     # encrypted applications exist. No application data is accepted without it.
     FINANCING_ENCRYPTION_KEY = os.environ.get('FINANCING_ENCRYPTION_KEY')

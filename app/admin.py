@@ -29,6 +29,7 @@ from app.forms import (
     SalesmanEditForm, ServiceRecordForm, SiteSettingForm, TestDriveEditForm,
     TestDriveForm, TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm,
     VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm, VehicleSaleReceiptForm,
+    MvrOdometerForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, PageView,
@@ -52,6 +53,9 @@ from app.facebook_publish import (
     maybe_auto_post_vehicle, post_vehicle_to_page,
 )
 from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
+from app.mvr_forms import (
+    build_mvr_180, build_mvr_181, download_name, normalize_reconstructed,
+)
 from app.marketplace_import import (
     MarketplaceError, attach_import, discard_photos, fetch_listing,
     photo_thumbnail, photo_token, preview_token, read_preview, stage_photos,
@@ -847,9 +851,48 @@ def vehicle_bill_of_sale(id):
     )
 
 
+def _mvr_pdf_response(vehicle, form_code, builder):
+    try:
+        pdf_bytes = builder(vehicle, current_app.config)
+    except FileNotFoundError:
+        flash(f'The {form_code} form template is missing.', 'danger')
+        return redirect(url_for('admin.vehicle_edit', id=vehicle.id))
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=download_name(form_code, vehicle),
+        max_age=0,
+    )
+
+
+@admin_bp.route('/vehicles/<int:id>/mvr-180', methods=['GET', 'POST'])
+@login_required
+def vehicle_mvr_180(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    form = MvrOdometerForm()
+    if request.method == 'GET':
+        form.odometer.data = vehicle.mileage
+    if form.validate_on_submit():
+        reading = form.odometer.data
+        return _mvr_pdf_response(
+            vehicle,
+            'MVR-180',
+            lambda item, config: build_mvr_180(item, config, mileage=reading),
+        )
+    return render_template('admin/mvr_180_form.html', vehicle=vehicle, form=form)
+
+
+@admin_bp.get('/vehicles/<int:id>/mvr-181')
+@login_required
+def vehicle_mvr_181(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    return _mvr_pdf_response(vehicle, 'MVR-181', build_mvr_181)
+
+
 CSV_IMPORT_FIELDS = [
     'year', 'make', 'model', 'trim', 'vin', 'stock_number', 'price', 'sale_price',
-    'mileage', 'condition', 'title_status', 'status', 'is_coming_soon', 'body_style', 'exterior_color',
+    'mileage', 'condition', 'title_status', 'reconstructed', 'status', 'is_coming_soon', 'body_style', 'exterior_color',
     'interior_color', 'engine', 'transmission', 'drivetrain', 'fuel_type',
     'mpg_city', 'mpg_highway', 'mpg_combined', 'doors', 'passenger_capacity', 'gvwr',
     'description', 'features', 'exterior_features', 'interior_features',
@@ -857,6 +900,10 @@ CSV_IMPORT_FIELDS = [
     'additional_specifications',
 ]
 CSV_REQUIRED_FIELDS = ['year', 'make', 'model', 'price', 'mileage']
+
+
+def _csv_reconstructed(value):
+    return normalize_reconstructed(value)
 
 
 @admin_bp.route('/vehicles/import', methods=['GET', 'POST'])
@@ -899,6 +946,7 @@ def vehicle_import():
                     mileage=int(row['mileage']),
                     condition=(row.get('condition') or 'used').lower() or 'used',
                     title_status=(row.get('title_status') or 'clean').lower() or 'clean',
+                    reconstructed=_csv_reconstructed(row.get('reconstructed')),
                     status=(row.get('status') or 'available').lower() or 'available',
                     is_coming_soon=(
                         (row.get('is_coming_soon') or '').lower() in {'1', 'true', 'yes', 'on'}
@@ -2980,6 +3028,7 @@ def _vehicle_from_form(form):
         mileage=form.mileage.data,
         condition=form.condition.data,
         title_status=form.title_status.data,
+        reconstructed=form.reconstructed.data or 'auto',
         status=form.status.data,
         is_coming_soon=bool(form.is_coming_soon.data and form.status.data == 'available'),
         body_style=form.body_style.data.strip() if form.body_style.data else None,
@@ -3025,6 +3074,7 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.mileage = form.mileage.data
     vehicle.condition = form.condition.data
     vehicle.title_status = form.title_status.data
+    vehicle.reconstructed = form.reconstructed.data or 'auto'
     vehicle.status = form.status.data
     vehicle.is_coming_soon = bool(form.is_coming_soon.data and form.status.data == 'available')
     vehicle.body_style = form.body_style.data.strip() if form.body_style.data else None

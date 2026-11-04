@@ -5,13 +5,19 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">{{ title }}</h2>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap justify-content-end gap-2">
         {% if vehicle %}
         <a href="{{ url_for('admin.vehicle_hold_deposit', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-printer me-1"></i>Print Hold Deposit
         </a>
         <a href="{{ url_for('admin.vehicle_bill_of_sale', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-printer me-1"></i>Print Bill of Sale
+        </a>
+        <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" class="btn btn-outline-success" title="Confirm the odometer reading, then fill the NC disclosure. It starts from the saved mileage. Signatures are left blank.">
+            <i class="bi bi-file-earmark-text me-1"></i>MVR-180
+        </a>
+        <a href="{{ url_for('admin.vehicle_mvr_181', id=vehicle.id) }}" class="btn btn-outline-success" title="Fill the NC damage disclosure from this vehicle's title status. Salvage is marked reconstructed unless specifically set otherwise.">
+            <i class="bi bi-file-earmark-text me-1"></i>MVR-181
         </a>
         <a href="{{ url_for('admin.vehicle_qr_print', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-qr-code me-1"></i>Print Window QR
@@ -167,6 +173,11 @@
         <div class="col-md-4">
             <label class="form-label" for="title_status">Title Status</label>
             {{ form.title_status(class="form-select", id="title_status") }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="reconstructed">Reconstructed</label>
+            {{ form.reconstructed(class="form-select", id="reconstructed") }}
+            <div class="form-text">{{ form.reconstructed.description }}</div>
         </div>
         <div class="col-md-4">
             <label class="form-label" for="body_style">Body Style</label>

@@ -281,6 +281,8 @@ class Vehicle(db.Model):
     mileage = db.Column(db.Integer, nullable=False)
     condition = db.Column(db.String(20), default='used', nullable=False)  # used, certified, rebuilt
     title_status = db.Column(db.String(20), default='clean', nullable=False, index=True)  # clean, rebuilt, salvage
+    # MVR-181 reconstructed answer. auto follows title status: yes when salvage.
+    reconstructed = db.Column(db.String(8), nullable=False, default='auto', server_default='auto')
     status = db.Column(db.String(20), default='available', nullable=False, index=True)  # available, sold, pending
     is_coming_soon = db.Column(db.Boolean, default=False, nullable=False, index=True)
     # Set automatically the first time status transitions to 'sold' — powers days-on-lot / sell-through stats

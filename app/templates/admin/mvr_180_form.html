@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% block title %}MVR-180 - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">MVR-180 Odometer Disclosure</h2>
+        <div>{{ vehicle.title }}{% if vehicle.stock_number %} &middot; Stock #{{ vehicle.stock_number }}{% endif %}</div>
+    </div>
+    <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">Back to Vehicle</a>
+</div>
+
+<div class="alert alert-info">
+    Enter the mileage to print on the disclosure. It starts as the mileage saved on this vehicle and can be changed for this form only.
+</div>
+
+<form method="POST" class="card border-0 shadow p-4">
+    {{ form.hidden_tag() }}
+    <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+            {{ form.odometer.label(class="form-label") }}
+            {{ form.odometer(class="form-control", type="number", min="0", max="9999999", step="1", inputmode="numeric", required=true) }}
+            <div class="form-text">{{ form.odometer.description }} Saved mileage: {{ vehicle.mileage }}.</div>
+            {% for error in form.odometer.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </div>
+</form>
+{% endblock %}
