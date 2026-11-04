@@ -14,7 +14,7 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
 
-_FONT = 'Helvetica'
+_FONT = 'Helvetica-Bold'
 _MAX_FONT = 11
 _MIN_FONT = 8.5
 _MIN_SCALE = 0.72
@@ -116,7 +116,7 @@ def text_fits(text, field_width, font_size, min_scale=_MIN_SCALE):
 
 
 def fit_font_size(text, field_width, max_size=_MAX_FONT, min_size=_MIN_FONT):
-    """Largest Helvetica size that fits, allowing slight horizontal condensing."""
+    """Largest bold size that fits, allowing slight horizontal condensing."""
     size = float(max_size)
     while size > min_size and not text_fits(text, field_width, size):
         size = round(size - 0.25, 2)
