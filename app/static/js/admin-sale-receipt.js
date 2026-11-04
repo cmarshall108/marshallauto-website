@@ -6,13 +6,27 @@
     const addChargeButton = document.getElementById('receipt-add-charge');
     const chargesField = document.getElementById('other_charges_data');
     const totalDisplay = document.getElementById('receipt-total');
+    const otdField = document.getElementById('otd_price');
+    const taxDisplay = document.getElementById('receipt-sales-tax');
+    const agreedDisplay = document.getElementById('receipt-agreed-price');
     if (!form || !chargesRoot || !addChargeButton || !chargesField || !totalDisplay) return;
 
     const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
     function amountInCents(value) {
-        const amount = Number.parseFloat(value);
-        return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) : 0;
+        const text = String(value || '').trim();
+        if (!text) return 0;
+        const match = text.match(/^(-?)(\d+)(?:\.(\d{1,2}))?$/);
+        if (!match) {
+            const amount = Number.parseFloat(text);
+            return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
+        }
+        const cents = Number(match[2]) * 100 + Number((match[3] || '').padEnd(2, '0'));
+        return match[1] ? -cents : cents;
+    }
+
+    function formatCents(cents) {
+        return money.format(cents / 100);
     }
 
     function addCharge(description = '', amount = '') {
@@ -64,7 +78,12 @@
     }
 
     function updateTotal() {
-        let cents = 0;
+        const otdCents = Math.max(0, amountInCents(otdField && otdField.value));
+        const taxCents = Math.round(otdCents * 3 / 100);
+        const agreedCents = otdCents - taxCents;
+        if (taxDisplay) taxDisplay.textContent = formatCents(taxCents);
+        if (agreedDisplay) agreedDisplay.textContent = formatCents(agreedCents);
+        let cents = otdCents;
         form.querySelectorAll('.receipt-amount').forEach((field) => {
             cents += amountInCents(field.value);
         });
@@ -75,7 +94,7 @@
             cents -= amountInCents(field.value);
         });
         cents = Math.max(0, cents);
-        totalDisplay.textContent = money.format(cents / 100);
+        totalDisplay.textContent = formatCents(cents);
     }
 
     try {
@@ -92,7 +111,7 @@
     }
 
     addChargeButton.addEventListener('click', () => addCharge());
-    form.querySelectorAll('.receipt-amount, .receipt-credit').forEach((field) => {
+    form.querySelectorAll('.receipt-otd, .receipt-amount, .receipt-credit').forEach((field) => {
         field.addEventListener('input', updateTotal);
     });
     form.addEventListener('submit', () => {

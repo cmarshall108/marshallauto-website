@@ -26,6 +26,21 @@ def highway_use_tax(price):
     return (money(price) * NC_HIGHWAY_USE_TAX_RATE).quantize(MONEY)
 
 
+def split_otd_sale_price(otd_price):
+    """Split an out-the-door sale price into 3% sales tax and the agreed price.
+
+    Sales tax is 3% of the OTD amount. The agreed vehicle price is the OTD
+    amount minus that tax, so the two lines add back to the OTD price.
+    """
+    total = money(otd_price)
+    tax = highway_use_tax(total)
+    return {
+        'otd_price': total,
+        'sales_tax': tax,
+        'agreed_vehicle_price': (total - tax).quantize(MONEY),
+    }
+
+
 def out_the_door_estimate(price):
     """Legacy government-charge breakdown. Not shown as the customer price.
 

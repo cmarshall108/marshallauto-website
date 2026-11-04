@@ -11,7 +11,7 @@
 </div>
 
 <div class="alert alert-info">
-    Enter the actual amounts for this sale. Sales tax and fees are entered manually. Cash Due is calculated after the down payment and trade allowance.
+    Enter the out-the-door sale price. Sales tax is 3% of that amount, and the agreed vehicle price is the OTD amount minus that tax. Fees are entered separately. Cash Due is the OTD price plus fees, minus the down payment and trade allowance.
 </div>
 <div class="alert alert-secondary">
     The printed receipt states that the vehicle is sold as-is, that no liability or collision insurance is included, and that title is guaranteed to the purchaser by the seller.
@@ -40,16 +40,20 @@
             {% endif %}
             {% for error in form.salesman.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
-        <div class="col-md-6">
-            {{ form.vehicle_price.label(class="form-label") }}
-            {{ form.vehicle_price(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01", required=true) }}
-            <div class="form-text">Verify the negotiated vehicle price before tax and fees.</div>
-            {% for error in form.vehicle_price.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        <div class="col-md-4">
+            {{ form.otd_price.label(class="form-label") }}
+            {{ form.otd_price(class="form-control receipt-otd", id="otd_price", min="0", max="99999999.99", step="0.01", required=true) }}
+            <div class="form-text">{{ form.otd_price.description }}</div>
+            {% for error in form.otd_price.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
-        <div class="col-md-6">
-            {{ form.sales_tax.label(class="form-label") }}
-            {{ form.sales_tax(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
-            {% for error in form.sales_tax.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        <div class="col-md-4">
+            <label class="form-label" for="receipt-sales-tax">Sales Tax (3%)</label>
+            <div class="form-control bg-body-secondary" id="receipt-sales-tax" aria-live="polite">{{ sales_tax_preview }}</div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="receipt-agreed-price">Agreed Vehicle Price</label>
+            <div class="form-control bg-body-secondary" id="receipt-agreed-price" aria-live="polite">{{ agreed_price_preview }}</div>
+            <div class="form-text">OTD sale price minus the 3% sales tax.</div>
         </div>
         <div class="col-md-6">
             {{ form.document_fee.label(class="form-label") }}
@@ -85,7 +89,7 @@
         <div class="col-md-6">
             <label class="form-label">Cash Due</label>
             <div class="form-control bg-body-secondary fw-bold" id="receipt-total" aria-live="polite">$0.00</div>
-            <div class="form-text">Vehicle price, sales tax, and fees, minus the down payment and trade allowance.</div>
+            <div class="form-text">OTD sale price plus fees, minus the down payment and trade allowance.</div>
         </div>
         <div class="col-md-6">
             {{ form.payment_method.label(class="form-label") }}

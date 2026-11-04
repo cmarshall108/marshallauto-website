@@ -282,14 +282,13 @@ class VehicleSaleReceiptForm(FlaskForm):
     buyer_name = StringField('Customer Name', validators=[Optional(), Length(max=128)])
     buyer_address = TextAreaField('Customer Address', validators=[Optional(), Length(max=512)])
     salesman = StringField('Salesman', validators=[Optional(), Length(max=128)])
-    vehicle_price = DecimalField(
-        'Agreed Vehicle Price ($)',
+    otd_price = DecimalField(
+        'OTD Sale Price ($)',
         validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
-    )
-    sales_tax = DecimalField(
-        'Sales Tax ($)',
-        validators=[Optional(), NumberRange(min=0, max=99999999.99)],
-        default=0,
+        description=(
+            'Out-the-door sale price. Sales tax is 3% of this amount. '
+            'Agreed vehicle price is this amount minus that tax.'
+        ),
     )
     document_fee = DecimalField(
         'Doc Fee ($)',

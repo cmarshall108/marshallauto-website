@@ -24,6 +24,7 @@
             <div><strong>Receipt date:</strong> {{ receipt.created_at.strftime('%m/%d/%Y') }}</div>
             <div><strong>Customer:</strong> {{ receipt.buyer_name or 'Customer' }}</div>
             <div><strong>Salesman:</strong> {{ receipt.salesman or 'Not recorded' }}</div>
+            <div><strong>OTD sale price:</strong> {{ otd_price }}</div>
             {% if receipt.buyer_address %}<div class="receipt-address"><strong>Address:</strong> {{ receipt.buyer_address }}</div>{% endif %}
         </div>
 

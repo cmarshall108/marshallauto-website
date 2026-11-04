@@ -8,6 +8,7 @@ from flask.globals import _cv_app
 
 from app import create_app, db
 from app.models import User, Vehicle, VehicleSaleReceipt
+from app.pricing import split_otd_sale_price
 from config import TestingConfig
 
 
@@ -54,16 +55,17 @@ class SaleReceiptTests(unittest.TestCase):
     def test_saves_and_prints_manual_itemized_receipt(self):
         editor = self.client.get(self.path)
         self.assertEqual(editor.status_code, 200)
-        self.assertIn(b'Sales tax and fees are entered manually', editor.data)
+        self.assertIn(b'3% of that amount', editor.data)
         self.assertIn(b'value="18000.00"', editor.data)
+        self.assertIn(b'$540.00', editor.data)
+        self.assertIn(b'$17,460.00', editor.data)
         self.assertIn(b'value="Alex Seller"', editor.data)
 
         response = self.client.post(self.path, data={
             'buyer_name': 'Jordan Customer',
             'buyer_address': '123 Main Street, Sanford, NC',
             'salesman': 'Alex Seller',
-            'vehicle_price': '17000.00',
-            'sales_tax': '600.00',
+            'otd_price': '18000.00',
             'document_fee': '150.00',
             'warranty_fee': '250.00',
             'tags_fee': '200.00',
@@ -80,7 +82,9 @@ class SaleReceiptTests(unittest.TestCase):
         receipt = VehicleSaleReceipt.query.one()
         self.assertEqual(receipt.vehicle_id, self.vehicle.id)
         self.assertEqual(receipt.salesman, 'Alex Seller')
-        self.assertEqual(receipt.cash_due, Decimal('16775.00'))
+        self.assertEqual(receipt.vehicle_price, Decimal('17460.00'))
+        self.assertEqual(receipt.sales_tax, Decimal('540.00'))
+        self.assertEqual(receipt.cash_due, Decimal('17175.00'))
         self.assertEqual(receipt.charges[0].description, 'Inspection')
 
         printed = self.client.get(response.headers['Location'])
@@ -91,7 +95,12 @@ class SaleReceiptTests(unittest.TestCase):
         self.assertIn('Receipt #:', text)
         self.assertIn('Jordan Customer', text)
         self.assertIn('Salesman: Alex Seller', text)
+        self.assertIn('Agreed Vehicle Price', text)
         self.assertIn('Sales Tax', text)
+        self.assertIn('OTD sale price:', text)
+        self.assertIn('$18,000.00', text)
+        self.assertIn('$540.00', text)
+        self.assertIn('$17,460.00', text)
         self.assertIn('Doc Fee', text)
         self.assertIn('Warranty Fee', text)
         self.assertIn('Tags Fee', text)
@@ -99,7 +108,7 @@ class SaleReceiptTests(unittest.TestCase):
         self.assertIn('Trade-Allow', text)
         self.assertIn('Cash Due', text)
         self.assertIn('Inspection', text)
-        self.assertIn('$16,775.00', text)
+        self.assertIn('$17,175.00', text)
         self.assertIn('sold as-is', text)
         self.assertIn('No liability or collision insurance is included.', text)
         self.assertIn('Title is guaranteed to the purchaser by the seller.', text)
@@ -114,8 +123,7 @@ class SaleReceiptTests(unittest.TestCase):
             'buyer_name': 'Jordan C.',
             'buyer_address': '',
             'salesman': 'Pat Sales',
-            'vehicle_price': '16900.00',
-            'sales_tax': '600.00',
+            'otd_price': '16900.00',
             'document_fee': '150.00',
             'warranty_fee': '0',
             'tags_fee': '200.00',
@@ -128,14 +136,15 @@ class SaleReceiptTests(unittest.TestCase):
         })
         self.assertEqual(updated.status_code, 302)
         self.assertEqual(VehicleSaleReceipt.query.count(), 1)
-        self.assertEqual(receipt.cash_due, Decimal('17440.00'))
+        self.assertEqual(receipt.vehicle_price, Decimal('16393.00'))
+        self.assertEqual(receipt.sales_tax, Decimal('507.00'))
+        self.assertEqual(receipt.cash_due, Decimal('16840.00'))
         self.assertEqual(receipt.salesman, 'Pat Sales')
         self.assertEqual([charge.description for charge in receipt.charges], ['Dealer preparation'])
 
     def test_rejects_credits_that_exceed_total(self):
         response = self.client.post(self.path, data={
-            'vehicle_price': '100.00',
-            'sales_tax': '0',
+            'otd_price': '100.00',
             'document_fee': '0',
             'warranty_fee': '0',
             'tags_fee': '0',
@@ -150,8 +159,7 @@ class SaleReceiptTests(unittest.TestCase):
 
     def test_limits_extra_charge_count(self):
         response = self.client.post(self.path, data={
-            'vehicle_price': '100.00',
-            'sales_tax': '0',
+            'otd_price': '100.00',
             'document_fee': '0',
             'warranty_fee': '0',
             'tags_fee': '0',
@@ -166,6 +174,21 @@ class SaleReceiptTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn(b'Enter no more than 20 additional charges.', response.data)
         self.assertEqual(VehicleSaleReceipt.query.count(), 0)
+
+
+class OtdSaleSplitTests(unittest.TestCase):
+    def test_tax_is_three_percent_and_agreed_price_is_the_remainder(self):
+        split = split_otd_sale_price('18000.00')
+        self.assertEqual(split['sales_tax'], Decimal('540.00'))
+        self.assertEqual(split['agreed_vehicle_price'], Decimal('17460.00'))
+        self.assertEqual(
+            split['agreed_vehicle_price'] + split['sales_tax'],
+            split['otd_price'],
+        )
+
+        half_cent = split_otd_sale_price('100.50')
+        self.assertEqual(half_cent['sales_tax'], Decimal('3.02'))
+        self.assertEqual(half_cent['agreed_vehicle_price'], Decimal('97.48'))
 
 
 if __name__ == '__main__':

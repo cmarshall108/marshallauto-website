@@ -26,7 +26,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Per-vehicle rebuild cost tracker for acquisition, parts, labor, services, and other expenses, with private receipt-photo uploads (including phone camera capture) and projected/actual profit and margin calculations
   - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
-  - Printable customer sale receipts with sales tax, doc, warranty, and tags fees, down payment, trade allowance, calculated cash due, salesman, and as-is/title terms
+  - Printable customer sale receipts. Sales tax is 3% of the entered OTD sale price, and the agreed vehicle price is that OTD amount minus the tax. Doc, warranty, and tags fees, down payment, trade allowance, calculated cash due, salesman, and as-is/title terms are included
   - Filled NC MVR-180 odometer and MVR-181 damage disclosure PDFs from an inventory vehicle. The odometer reading is entered before printing and starts from the mileage saved on the vehicle. Blank DMV templates stay unchanged. Salvage titles are marked reconstructed unless staff specifically select otherwise. Signatures and unknown damage answers are left blank
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
   - VIN decode (NHTSA vPIC + EPA) to prefill vehicle specifications, MPG, and default safety features; optional conservative Grok estimates for missing data and free reuse of completed Grok photo annotations; resumable bulk backfill for existing inventory
