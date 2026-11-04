@@ -452,36 +452,38 @@ def _date_text(value):
     return value.strftime('%m/%d/%Y') if value else ''
 
 
-def _money_text(value):
+def _money_text(value, include_symbol=True):
     if value is None:
         return ''
-    return f'${value:,.2f}'
+    amount = f'{value:,.2f}'
+    return f'${amount}' if include_symbol else amount
 
 
 def _draw_text(pdf, x_px, baseline_px, text, width_px, max_font=7.2):
     text = _pdf_safe(text).replace('\n', ' ')
     if not text:
         return
+    font_name = 'Helvetica-Bold'
     font_size = max_font
     available_width = width_px * 0.6
     while (
         font_size > 4.4
-        and pdfmetrics.stringWidth(text, 'Helvetica', font_size) > available_width
+        and pdfmetrics.stringWidth(text, font_name, font_size) > available_width
     ):
         font_size -= 0.2
-    if pdfmetrics.stringWidth(text, 'Helvetica', font_size) > available_width:
+    if pdfmetrics.stringWidth(text, font_name, font_size) > available_width:
         while text and pdfmetrics.stringWidth(
-            f'{text}...', 'Helvetica', font_size,
+            f'{text}...', font_name, font_size,
         ) > available_width:
             text = text[:-1]
         text = f'{text}...' if text else ''
     if text:
-        pdf.setFont('Helvetica', font_size)
+        pdf.setFont(font_name, font_size)
         pdf.drawString(x_px * 0.6, 792 - baseline_px * 0.6, text)
 
 
 def _draw_check(pdf, x_px, baseline_px):
-    pdf.setFont('Helvetica-Bold', 9)
+    pdf.setFont('Helvetica-Bold', 8)
     pdf.drawString(x_px * 0.6, 792 - baseline_px * 0.6, 'X')
 
 
@@ -493,129 +495,164 @@ def _person_tenure(person, prefix=''):
     return f'{years} yr {months} mo'
 
 
-def _draw_income(pdf, x_px, baseline_px, gross, net, width_px):
+def _draw_income(
+    pdf, x_px, baseline_px, gross, net, width_px,
+    include_symbol=True, max_font=6.4,
+):
     _draw_text(
-        pdf, x_px + width_px * 0.4, baseline_px,
-        f'{_money_text(gross)} / {_money_text(net)}',
-        width_px * 0.6, max_font=5,
+        pdf, x_px, baseline_px,
+        (
+            f'{_money_text(gross, include_symbol)} / '
+            f'{_money_text(net, include_symbol)}'
+        ),
+        width_px, max_font=max_font,
     )
 
 
 def _draw_person_on_original(pdf, person, coapplicant=False):
+    # Coordinates are 120 dpi image pixels. Single-line labels sit at the top
+    # of each cell, so those values use a baseline just above the bottom rule.
+    # Payment and income labels are two lines and fill the cell; those amounts
+    # go in the blank space to the right of "/Mo" or "GROSS:" / "NET:".
     if not coapplicant:
         rows = {
-            'name': 244, 'residence': 275, 'mailing': 305, 'previous': 336,
-            'housing': 378, 'employer': 414, 'work': 452, 'other_income': 490,
-            'support': 537, 'auto1': 562, 'auto2': 592, 'signature': 1122,
+            'name': 248, 'residence': 279, 'mailing': 310, 'previous': 342,
+            'housing': 387, 'employer': 417, 'work': 457, 'other_income': 493,
+            'support': 542, 'auto1': 577, 'auto2': 606, 'signature': 1116,
         }
-        name_x, ssn_x, dob_x = 50, 650, 817
-        address_width = 760
-        home_x, cell_x = 650, 817
-        email_x, landlord_x, payment_x = 50, 522, 817
-        employer_x, occupation_x, employment_date_x = 50, 650, 817
-        work_x, extension_x, earnings_x = 50, 160, 252
-        previous_employer_x, previous_date_x = 456, 817
-        other_income_x, other_source_x = 50, 261
-        auto_x, auto_financer_x = 50, 425
+        name_x, ssn_x, dob_x = 52, 652, 822
+        address_width = 580
+        home_x, cell_x = 652, 822
+        email_x, landlord_x, payment_x = 52, 526, 844
+        employer_x, occupation_x, employment_date_x = 52, 652, 822
+        work_x, extension_x, earnings_x = 52, 168, 334
+        previous_employer_x, previous_date_x = 458, 822
+        other_income_x, other_source_x = 102, 264
+        total_income_x, total_income_width = 830, 140
+        other_value_baseline = 490
+        total_value_baseline = 490
+        employer_income_baseline = 450
+        employer_income_width = 116
+        payment_baseline = 375
+        auto_x, auto_financer_x = 52, 430
+        housing_checks = {
+            'buy': (330, 361), 'rent': (435, 361),
+            'own': (330, 382), 'other': (435, 382),
+        }
+        support_checks = (810, 512)
+        support_yes = (892, 512)
     else:
         rows = {
-            'name': 631, 'residence': 665, 'mailing': 0, 'previous': 0,
-            'housing': 702, 'employer': 748, 'work': 790, 'previous_work': 821,
-            'other_income': 858,
-            'support': 896, 'auto1': 0, 'auto2': 0, 'signature': 1163,
+            'name': 638, 'residence': 668, 'mailing': 0, 'previous': 0,
+            'housing': 708, 'employer': 752, 'work': 790, 'previous_work': 827,
+            'other_income': 865, 'support': 916, 'auto1': 0, 'auto2': 0,
+            'signature': 1155,
         }
-        name_x, ssn_x, dob_x = 50, 650, 817
-        address_width = 760
-        home_x, cell_x = 50, 215
-        email_x, landlord_x, payment_x = 50, 0, 817
-        employer_x, occupation_x, employment_date_x = 325, 50, 325
-        work_x, extension_x, earnings_x = 815, 925, 50
-        previous_employer_x, previous_date_x = 325, 800
-        other_income_x, other_source_x = 50, 261
+        name_x, ssn_x, dob_x = 52, 652, 822
+        address_width = 750
+        home_x, cell_x = 52, 220
+        email_x, landlord_x, payment_x = 52, 0, 846
+        employer_x, occupation_x, employment_date_x = 330, 52, 332
+        work_x, extension_x, earnings_x = 656, 788, 134
+        previous_employer_x, previous_date_x = 332, 806
+        other_income_x, other_source_x = 102, 264
+        total_income_x, total_income_width = 844, 126
+        other_value_baseline = 861
+        total_value_baseline = 861
+        employer_income_baseline = 824
+        employer_income_width = 186
+        payment_baseline = 701
+        housing_checks = {
+            'buy': (651, 687), 'rent': (734, 687),
+            'own': (651, 708), 'other': (734, 708),
+        }
+        support_checks = (817, 884)
+        support_yes = (900, 884)
 
-    _draw_text(pdf, name_x, rows['name'], person['name'], 590)
+    _draw_text(pdf, name_x, rows['name'], person['name'], 585)
     _draw_text(pdf, ssn_x, rows['name'], person['ssn'], 155)
     _draw_text(pdf, dob_x, rows['name'], _date_text(person['dob']), 150)
     _draw_text(
-        pdf, 50, rows['residence'], person['residence_address'], address_width,
+        pdf, 52, rows['residence'], person['residence_address'], address_width,
     )
-    _draw_text(pdf, 817, rows['residence'], _person_tenure(person), 150)
+    _draw_text(pdf, 822, rows['residence'], _person_tenure(person), 118)
 
     if not coapplicant:
-        _draw_text(pdf, 50, rows['mailing'], person['mailing_address'], 590)
+        _draw_text(pdf, 52, rows['mailing'], person['mailing_address'], 585)
         _draw_text(pdf, home_x, rows['mailing'], person['home_phone'], 155)
         _draw_text(pdf, cell_x, rows['mailing'], person['cell_phone'], 150)
-        _draw_text(pdf, 50, rows['previous'], person['previous_address'], 590)
+        _draw_text(pdf, 52, rows['previous'], person['previous_address'], 585)
         _draw_text(
-            pdf, 650, rows['previous'],
+            pdf, 652, rows['previous'],
             _person_tenure({
                 'residence_years': person['previous_residence_years'],
                 'residence_months': person['previous_residence_months'],
             }),
-            155,
+            120,
         )
-        _draw_text(pdf, 817, rows['previous'], person['dependents'], 150)
-        _draw_text(pdf, email_x, rows['housing'], person['email'], 270)
-        housing_checks = {'buy': (327, 361), 'rent': (435, 361),
-                          'own': (327, 382), 'other': (435, 382)}
+        _draw_text(pdf, 822, rows['previous'], person['dependents'], 145)
+        _draw_text(pdf, email_x, rows['housing'], person['email'], 265)
     else:
         _draw_text(pdf, home_x, rows['housing'], person['home_phone'], 155)
-        _draw_text(pdf, cell_x, rows['housing'], person['cell_phone'], 145)
-        _draw_text(pdf, 365, rows['housing'], person['dependents'], 100)
-        _draw_text(pdf, email_x, rows['employer'], person['email'], 270)
-        housing_checks = {'buy': (652, 682), 'rent': (734, 682),
-                          'own': (652, 704), 'other': (734, 704)}
+        _draw_text(pdf, cell_x, rows['housing'], person['cell_phone'], 130)
+        _draw_text(pdf, 368, rows['housing'], person['dependents'], 90)
+        _draw_text(pdf, email_x, rows['employer'], person['email'], 265)
+        _draw_text(
+            pdf, payment_x, payment_baseline,
+            _money_text(person['housing_payment']), 125,
+        )
 
     _draw_check(pdf, *housing_checks[person['housing_status']])
     if not coapplicant:
-        _draw_text(pdf, landlord_x, rows['housing'], person['landlord'], 285)
+        _draw_text(pdf, landlord_x, rows['housing'], person['landlord'], 275)
         _draw_text(
-            pdf, payment_x, rows['housing'], _money_text(person['housing_payment']), 150,
+            pdf, payment_x, payment_baseline,
+            _money_text(person['housing_payment']), 125,
         )
         _draw_text(
-            pdf, employer_x, rows['employer'], person['employer_name_address'], 590,
+            pdf, employer_x, rows['employer'], person['employer_name_address'], 585,
         )
-        _draw_text(pdf, occupation_x, rows['employer'], person['occupation'], 160)
+        _draw_text(pdf, occupation_x, rows['employer'], person['occupation'], 155)
         _draw_text(
             pdf, employment_date_x, rows['employer'],
-            _date_text(person['employment_date']), 150,
+            _date_text(person['employment_date']), 145,
         )
-        _draw_text(pdf, work_x, rows['work'], person['work_phone'], 105)
-        _draw_text(pdf, extension_x, rows['work'], person['work_extension'], 75)
+        _draw_text(pdf, work_x, rows['work'], person['work_phone'], 100)
+        _draw_text(pdf, extension_x, rows['work'], person['work_extension'], 70)
         _draw_income(
-            pdf, earnings_x, rows['work'], person['employment_gross'],
-            person['employment_net'], 195,
+            pdf, earnings_x, employer_income_baseline, person['employment_gross'],
+            person['employment_net'], employer_income_width,
         )
         _draw_text(
             pdf, previous_employer_x, rows['work'],
-            person['previous_employer'], 350,
+            person['previous_employer'], 345,
         )
         _draw_text(
             pdf, previous_date_x, rows['work'],
-            _date_text(person['previous_employment_date']), 150,
+            _date_text(person['previous_employment_date']), 145,
         )
         _draw_text(
-            pdf, other_income_x + 55, rows['other_income'],
-            _money_text(person['other_income_gross']), 145,
+            pdf, other_income_x, other_value_baseline,
+            _money_text(person['other_income_gross']), 150,
         )
         _draw_text(
             pdf, other_source_x, rows['other_income'],
-            person['other_income_source'], 470,
+            person['other_income_source'], 460,
         )
     else:
         _draw_text(
-            pdf, employer_x, rows['employer'], person['employer_name_address'], 460,
+            pdf, employer_x, rows['employer'], person['employer_name_address'], 630,
         )
-        _draw_text(pdf, occupation_x, rows['work'], person['occupation'], 150)
+        _draw_text(pdf, occupation_x, rows['work'], person['occupation'], 260)
         _draw_text(
             pdf, employment_date_x, rows['work'],
-            _date_text(person['employment_date']), 250,
+            _date_text(person['employment_date']), 300,
         )
-        _draw_text(pdf, work_x, rows['work'], person['work_phone'], 100)
-        _draw_text(pdf, extension_x, rows['work'], person['work_extension'], 75)
+        _draw_text(pdf, work_x, rows['work'], person['work_phone'], 120)
+        _draw_text(pdf, extension_x, rows['work'], person['work_extension'], 70)
         _draw_income(
-            pdf, earnings_x, rows['previous_work'], person['employment_gross'],
-            person['employment_net'], 260,
+            pdf, earnings_x, employer_income_baseline, person['employment_gross'],
+            person['employment_net'], employer_income_width, max_font=7.2,
         )
         _draw_text(
             pdf, previous_employer_x, rows['previous_work'],
@@ -626,50 +663,57 @@ def _draw_person_on_original(pdf, person, coapplicant=False):
             _date_text(person['previous_employment_date']), 160,
         )
         _draw_text(
-            pdf, other_income_x + 55, rows['other_income'],
-            _money_text(person['other_income_gross']), 145,
+            pdf, other_income_x, other_value_baseline,
+            _money_text(person['other_income_gross']), 150,
         )
         _draw_text(
             pdf, other_source_x, rows['other_income'],
-            person['other_income_source'], 470,
+            person['other_income_source'], 460,
         )
 
-    support_row = rows['support']
+    _draw_income(
+        pdf, total_income_x, total_value_baseline,
+        person['total_gross_income'], person['total_net_income'],
+        total_income_width, include_symbol=False, max_font=7.2,
+    )
+
     if person['alimony_obligation'] == 'no':
-        _draw_check(pdf, 816, support_row - 19)
+        _draw_check(pdf, *support_checks)
     else:
-        _draw_check(pdf, 891, support_row - 19)
+        _draw_check(pdf, *support_yes)
         _draw_text(
-            pdf, 522, support_row,
-            _money_text(person['alimony_amount']), 440,
+            pdf, 616, rows['support'],
+            _money_text(person['alimony_amount'], include_symbol=False), 250,
         )
 
     if not coapplicant:
         for number, row in ((1, rows['auto1']), (2, rows['auto2'])):
             _draw_text(
-                pdf, auto_x, row, person[f'auto_{number}_year_model'], 365,
+                pdf, auto_x, row, person[f'auto_{number}_year_model'], 360,
             )
             _draw_text(
                 pdf, auto_financer_x, row,
-                person[f'auto_{number}_financed_by'], 330,
+                person[f'auto_{number}_financed_by'], 320,
             )
             responsibility = person[f'auto_{number}_responsibility']
-            if responsibility:
+            if responsibility in {'applicant', 'coapplicant'}:
                 _draw_check(
-                    pdf, 777 if responsibility == 'applicant' else 868, row - 5,
+                    pdf,
+                    774 if responsibility == 'applicant' else 868,
+                    565 if number == 1 else 595,
                 )
 
     if not coapplicant:
         _draw_text(
-            pdf, 50, 1120,
+            pdf, 52, 1116,
             f"{person['license_number']}  {person['license_state'].upper()}",
-            250,
+            240,
         )
-        _draw_text(pdf, 50, 1162, person['other_qualifying_id'], 250)
-    _draw_text(pdf, 432, rows['signature'], person['signature'], 360)
+        _draw_text(pdf, 52, 1155, person['other_qualifying_id'], 240)
+    _draw_text(pdf, 438, rows['signature'], person['signature'], 360)
     _draw_text(
-        pdf, 817, rows['signature'],
-        date.today().strftime('%m/%d/%Y'), 150,
+        pdf, 820, rows['signature'],
+        date.today().strftime('%m/%d/%Y'), 145,
     )
 
 
@@ -801,19 +845,15 @@ def build_lender_pdf(application):
         overlay_buffer = BytesIO()
         overlay = canvas.Canvas(overlay_buffer, pagesize=(612, 792))
         overlay.setTitle('Lendmark Financial Services Application')
-        overlay.setFont('Helvetica', 7)
-        overlay.drawString(
-            70, 792 - 207 * 0.6,
-            _pdf_safe('Vehicle purchase'),
-        )
+        _draw_text(overlay, 120, 216, 'Vehicle purchase', 245)
         _draw_text(
-            overlay, 498, 209, _money_text(application['requested_amount']), 115,
+            overlay, 502, 216, _money_text(application['requested_amount']), 110,
         )
-        _draw_text(overlay, 677, 209, 'Marshall Auto website', 132)
+        _draw_text(overlay, 682, 216, 'Marshall Auto website', 112)
         if application['joint_credit']:
-            _draw_check(overlay, 774, 99)
+            _draw_check(overlay, 775, 99)
         else:
-            _draw_check(overlay, 774, 122)
+            _draw_check(overlay, 775, 124)
         _draw_person_on_original(overlay, application['applicant'])
         if application['coapplicant']:
             _draw_person_on_original(
