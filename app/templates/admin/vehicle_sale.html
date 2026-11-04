@@ -11,7 +11,7 @@
     <div class="d-flex flex-wrap justify-content-end gap-2">
         <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">Edit Vehicle</a>
         <a href="{{ url_for('admin.vehicles', status='sold') }}" class="btn btn-outline-secondary">Sold Vehicles</a>
-        <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" class="btn btn-outline-success" title="Confirm the odometer reading before printing. It starts from the saved mileage. Buyer details come from the customer receipt.">MVR-180</a>
+        <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" class="btn btn-outline-success" title="Review the form on the official blank. Buyer details start from the customer receipt.">MVR-180</a>
         <a href="{{ url_for('admin.vehicle_mvr_181', id=vehicle.id) }}" class="btn btn-outline-success" title="Damage answers follow the stored title status. Salvage is marked reconstructed unless specifically set otherwise.">MVR-181</a>
         <a href="{{ url_for('admin.vehicle_sale_receipt', id=vehicle.id) }}" class="btn btn-primary">
             {{ 'Edit Customer Receipt' if vehicle.sale_receipt else 'Create Customer Receipt' }}

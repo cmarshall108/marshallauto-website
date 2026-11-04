@@ -5,7 +5,7 @@ import base64
 import binascii
 import secrets
 from io import BytesIO
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import wraps
 
@@ -29,7 +29,6 @@ from app.forms import (
     SalesmanEditForm, ServiceRecordForm, SiteSettingForm, TestDriveEditForm,
     TestDriveForm, TestDriveReturnForm, TwoFactorForm, TwoFactorRecoveryForm,
     VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm, VehicleSaleReceiptForm,
-    MvrOdometerForm,
 )
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, PageView,
@@ -54,7 +53,9 @@ from app.facebook_publish import (
 )
 from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
 from app.mvr_forms import (
-    build_mvr_180, build_mvr_181, download_name, normalize_reconstructed,
+    blank_form_image, build_overlay_pdf,
+    default_overlay_values, download_name, normalize_reconstructed,
+    overlay_fields, parse_overlay_submission,
 )
 from app.pricing import split_otd_sale_price
 from app.marketplace_import import (
@@ -852,43 +853,113 @@ def vehicle_bill_of_sale(id):
     )
 
 
-def _mvr_pdf_response(vehicle, form_code, builder):
+_MVR_PREVIEW_TTL = timedelta(minutes=30)
+_MVR_FORMS = {
+    'MVR-180': {
+        'config': 'MVR_180_PDF',
+        'title': 'MVR-180 Odometer Disclosure',
+    },
+    'MVR-181': {
+        'config': 'MVR_181_PDF',
+        'title': 'MVR-181 Damage Disclosure',
+    },
+}
+
+
+def _mvr_previews():
+    store = current_app.extensions.setdefault('mvr_previews', {})
+    cutoff = datetime.now(timezone.utc) - _MVR_PREVIEW_TTL
+    expired = [token for token, item in store.items() if item['created_at'] < cutoff]
+    for token in expired:
+        store.pop(token, None)
+    return store
+
+
+def _store_mvr_preview(vehicle_id, form_code, pdf_bytes, filename):
+    token = secrets.token_urlsafe(24)
+    _mvr_previews()[token] = {
+        'vehicle_id': vehicle_id,
+        'form_code': form_code,
+        'pdf': pdf_bytes,
+        'filename': filename,
+        'created_at': datetime.now(timezone.utc),
+    }
+    return token
+
+
+def _mvr_editor(vehicle, form_code, values=None, errors=None, preview_token=None):
+    spec = _MVR_FORMS[form_code]
+    template_path = current_app.config[spec['config']]
+    if values is None:
+        values = default_overlay_values(form_code, vehicle, current_app.config)
     try:
-        pdf_bytes = builder(vehicle, current_app.config)
+        fields = overlay_fields(form_code, template_path, values)
     except FileNotFoundError:
         flash(f'The {form_code} form template is missing.', 'danger')
         return redirect(url_for('admin.vehicle_edit', id=vehicle.id))
-    return send_file(
-        BytesIO(pdf_bytes),
-        mimetype='application/pdf',
-        as_attachment=False,
-        download_name=download_name(form_code, vehicle),
-        max_age=0,
+    preview_url = None
+    filename = download_name(form_code, vehicle)
+    if preview_token:
+        preview_url = url_for('admin.mvr_preview', token=preview_token)
+    return render_template(
+        'admin/mvr_overlay.html',
+        vehicle=vehicle,
+        form_code=form_code,
+        form_title=spec['title'],
+        blank_image=blank_form_image(form_code),
+        fields=fields,
+        errors=errors or [],
+        preview_url=preview_url,
+        download_name=filename,
     )
+
+
+def _mvr_form_page(vehicle, form_code):
+    if request.method == 'GET':
+        return _mvr_editor(vehicle, form_code)
+    values, errors = parse_overlay_submission(form_code, request.form)
+    if errors:
+        return _mvr_editor(vehicle, form_code, values=values, errors=errors)
+    try:
+        pdf_bytes = build_overlay_pdf(
+            form_code, current_app.config[_MVR_FORMS[form_code]['config']], values,
+        )
+    except FileNotFoundError:
+        flash(f'The {form_code} form template is missing.', 'danger')
+        return redirect(url_for('admin.vehicle_edit', id=vehicle.id))
+    token = _store_mvr_preview(
+        vehicle.id, form_code, pdf_bytes, download_name(form_code, vehicle),
+    )
+    return _mvr_editor(vehicle, form_code, values=values, preview_token=token)
 
 
 @admin_bp.route('/vehicles/<int:id>/mvr-180', methods=['GET', 'POST'])
 @login_required
 def vehicle_mvr_180(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
-    form = MvrOdometerForm()
-    if request.method == 'GET':
-        form.odometer.data = vehicle.mileage
-    if form.validate_on_submit():
-        reading = form.odometer.data
-        return _mvr_pdf_response(
-            vehicle,
-            'MVR-180',
-            lambda item, config: build_mvr_180(item, config, mileage=reading),
-        )
-    return render_template('admin/mvr_180_form.html', vehicle=vehicle, form=form)
+    return _mvr_form_page(vehicle, 'MVR-180')
 
 
-@admin_bp.get('/vehicles/<int:id>/mvr-181')
+@admin_bp.route('/vehicles/<int:id>/mvr-181', methods=['GET', 'POST'])
 @login_required
 def vehicle_mvr_181(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
-    return _mvr_pdf_response(vehicle, 'MVR-181', build_mvr_181)
+    return _mvr_form_page(vehicle, 'MVR-181')
+
+
+@admin_bp.get('/mvr-preview/<token>')
+@login_required
+def mvr_preview(token):
+    item = current_app.extensions.get('mvr_previews', {}).get(token)
+    if item is None or item['created_at'] < datetime.now(timezone.utc) - _MVR_PREVIEW_TTL:
+        abort(404)
+    return send_file(
+        BytesIO(item['pdf']),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=item['filename'],
+        max_age=0,
+    )
 
 
 CSV_IMPORT_FIELDS = [

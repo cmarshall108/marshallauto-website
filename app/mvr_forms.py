@@ -495,11 +495,15 @@ def _widget_rects(page):
     for annot in page.get('/Annots') or []:
         obj = annot.get_object()
         name = obj.get('/T')
+        if not name:
+            parent = obj.get('/Parent')
+            if parent is not None:
+                name = parent.get_object().get('/T')
         if not name or str(name) in _SIGNATURE_FIELDS:
             continue
         rect = [float(value) for value in obj.get('/Rect')]
-        rects[str(name)] = rect
-    return rects
+        rects.setdefault(str(name), []).append(rect)
+    return {name: max(values, key=lambda rect: rect[1]) for name, values in rects.items()}
 
 
 def _draw_fitted(pdf, text, rect):
@@ -511,7 +515,7 @@ def _draw_fitted(pdf, text, rect):
     font_size = fit_font_size(text, (x1 - x0), max_font, min_font)
     natural = pdfmetrics.stringWidth(text, _FONT, font_size)
     scale = 1 if natural <= available else available / natural
-    baseline = y0 + (height - font_size) / 2 + 1.55
+    baseline = y0 + (height - font_size) / 2 + (2.35 if height < 16 else 1.55)
     baseline = min(max(baseline, y0 + 1.1), y1 - 1.4)
     pdf.saveState()
     pdf.translate(x0 + 1.6, baseline)
@@ -542,7 +546,35 @@ def _text_overlay(rects, text_values):
     return buffer
 
 
-def _fill_template(template_path, text_values, checks):
+def _draw_rects(draws, checks=()):
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=(612, 792))
+    drew = False
+    for rect, text in draws:
+        text = pdf_text(text)
+        if not text:
+            continue
+        _draw_fitted(pdf, text, rect)
+        drew = True
+    for rect in checks:
+        x0, y0, x1, y1 = rect
+        box = min(x1 - x0, y1 - y0)
+        pdf.setFillColorRGB(0, 0, 0)
+        font_size = box * 0.82
+        mark = 'n'
+        mark_width = pdfmetrics.stringWidth(mark, 'ZapfDingbats', font_size)
+        pdf.setFillColorRGB(0, 0, 0)
+        pdf.setFont('ZapfDingbats', font_size)
+        pdf.drawString((x0 + x1 - mark_width) / 2, y0 + box * 0.12, mark)
+        drew = True
+    if not drew:
+        return None
+    pdf.save()
+    buffer.seek(0)
+    return buffer
+
+
+def _fill_template(template_path, text_values, checks, draws=None, check_rects=None):
     path = Path(template_path)
     if not path.is_file():
         raise FileNotFoundError(f'MVR form template is missing: {path.name}')
@@ -555,12 +587,26 @@ def _fill_template(template_path, text_values, checks):
     writer.append(reader)
     page = writer.pages[0]
     rects = _widget_rects(page)
-    resolved_checks = {name: _on_state(page, name) for name in checks}
-    if resolved_checks:
-        writer.update_page_form_field_values(
-            page, resolved_checks, auto_regenerate=False, flatten=True,
-        )
-    overlay = _text_overlay(rects, text_values)
+    named_check_rects = [rects[name] for name in checks if name in rects]
+    if check_rects is not None:
+        named_check_rects = list(check_rects)
+    if draws is not None:
+        overlay = _draw_rects(draws, named_check_rects)
+    else:
+        overlay = _text_overlay(rects, text_values)
+        if named_check_rects:
+            check_overlay = _draw_rects([], named_check_rects)
+            if overlay is None:
+                overlay = check_overlay
+            elif check_overlay is not None:
+                base = PdfReader(overlay).pages[0]
+                base.merge_page(PdfReader(check_overlay).pages[0])
+                merged = BytesIO()
+                holder = PdfWriter()
+                holder.add_page(base)
+                holder.write(merged)
+                overlay = merged
+                overlay.seek(0)
     if overlay is not None:
         page.merge_page(PdfReader(overlay).pages[0])
     # Painted values are part of the page. Drop the widgets so a viewer cannot
@@ -572,3 +618,260 @@ def _fill_template(template_path, text_values, checks):
     output = BytesIO()
     writer.write(output)
     return output.getvalue()
+
+
+_PAGE_WIDTH = 612.0
+_PAGE_HEIGHT = 792.0
+_FORM_DATE = re.compile(r'^(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])/\d{4}$')
+_BLANK_IMAGES = {
+    'MVR-180': 'images/mvr-180-blank.png',
+    'MVR-181': 'images/mvr-181-blank.png',
+}
+
+
+def _percent_box(rect):
+    x0, y0, x1, y1 = rect
+    return {
+        'left': round(x0 / _PAGE_WIDTH * 100, 3),
+        'top': round((_PAGE_HEIGHT - y1) / _PAGE_HEIGHT * 100, 3),
+        'width': round((x1 - x0) / _PAGE_WIDTH * 100, 3),
+        'height': round((y1 - y0) / _PAGE_HEIGHT * 100, 3),
+    }
+
+
+def _page_widgets(template_path):
+    reader = PdfReader(str(template_path))
+    widgets = []
+    for annot in reader.pages[0].get('/Annots') or []:
+        obj = annot.get_object()
+        parent = obj.get('/Parent')
+        parent_obj = parent.get_object() if parent is not None else None
+        name = obj.get('/T') or (parent_obj.get('/T') if parent_obj is not None else None)
+        field_type = obj.get('/FT') or (parent_obj.get('/FT') if parent_obj is not None else None)
+        if not name or str(name) in _SIGNATURE_FIELDS:
+            continue
+        widgets.append({
+            'name': str(name),
+            'type': str(field_type or ''),
+            'rect': [float(value) for value in obj.get('/Rect')],
+        })
+    return widgets
+
+
+def _widget(widgets, name, index=0):
+    matches = [widget for widget in widgets if widget['name'] == name]
+    matches.sort(key=lambda widget: widget['rect'][1], reverse=True)
+    if index >= len(matches):
+        raise KeyError(name)
+    return matches[index]
+
+
+def _text_field(key, label, name, max_length, index=0):
+    return {
+        'key': key, 'kind': 'text', 'label': label, 'pdf': name,
+        'group': '', 'max_length': max_length, 'index': index,
+    }
+
+
+def _check_field(key, label, name, group):
+    return {
+        'key': key, 'kind': 'checkbox', 'label': label, 'pdf': name,
+        'group': group, 'max_length': 0, 'index': 0,
+    }
+
+
+def _overlay_specs(form_code):
+    if form_code == 'MVR-180':
+        return [
+            _text_field('year', 'Year', ODOMETER_YEAR, 4),
+            _text_field('make', 'Make', ODOMETER_MAKE, 24),
+            _text_field('body', 'Body style', ODOMETER_BODY, 24),
+            _text_field('series', 'Series model', ODOMETER_SERIES, 32),
+            _text_field('vin', 'VIN', ODOMETER_VIN, 17),
+            _text_field('seller_sentence', 'Seller name in disclosure', ODOMETER_SELLER_SENTENCE, 80),
+            _text_field('odometer', 'Odometer reading', ODOMETER_READING, 11),
+            _check_field('excess', 'Mileage exceeds mechanical limits', ODOMETER_EXCESS, 'odometer_status'),
+            _check_field('discrepancy', 'Odometer discrepancy', ODOMETER_DISCREPANCY, 'odometer_status'),
+            _text_field('seller_name', 'Seller printed name', ODOMETER_SELLER_NAME, 80),
+            _text_field('seller_street', 'Seller street', ODOMETER_SELLER_STREET, 80),
+            _text_field('seller_city', 'Seller city', ODOMETER_SELLER_CITY, 40),
+            _text_field('seller_state', 'Seller state', ODOMETER_SELLER_STATE, 2),
+            _text_field('seller_zip', 'Seller ZIP', ODOMETER_SELLER_ZIP, 10),
+            _text_field('seller_date', 'Seller certification date', ODOMETER_SELLER_DATE, 10),
+            _text_field('buyer_name', 'Buyer printed name', ODOMETER_BUYER_NAME, 80),
+            _text_field('buyer_street', 'Buyer street', ODOMETER_BUYER_STREET, 80),
+            _text_field('buyer_city', 'Buyer city', ODOMETER_BUYER_CITY, 40),
+            _text_field('buyer_state', 'Buyer state', ODOMETER_BUYER_STATE, 2),
+            _text_field('buyer_zip', 'Buyer ZIP', ODOMETER_BUYER_ZIP, 10),
+            _text_field('buyer_date', 'Buyer certification date', ODOMETER_BUYER_DATE, 10),
+        ]
+    if form_code == 'MVR-181':
+        return [
+            _text_field('year', 'Year', DAMAGE_YEAR, 4),
+            _text_field('make', 'Make', DAMAGE_MAKE, 24),
+            _text_field('body', 'Body style', DAMAGE_BODY, 32),
+            _text_field('vin', 'VIN', DAMAGE_VIN, 17),
+            _check_field('damage_yes', 'Damage over 25% — yes', DAMAGE_25_YES, 'damage_25'),
+            _check_field('damage_no', 'Damage over 25% — no', DAMAGE_25_NO, 'damage_25'),
+            _text_field('damage_parts', 'Damaged parts', DAMAGE_PARTS, 70),
+            _text_field('damage_parts_extra', 'Additional damaged parts', DAMAGE_PARTS_EXTRA, 80),
+            _check_field('salvage_yes', 'Was salvage — yes', SALVAGE_YES, 'salvage'),
+            _check_field('salvage_no', 'Was salvage — no', SALVAGE_NO, 'salvage'),
+            _text_field('salvage_state', 'Salvage title state', DAMAGE_SALVAGE_STATE, 20),
+            _check_field('flood_yes', 'Flood vehicle — yes', FLOOD_YES, 'flood'),
+            _check_field('flood_no', 'Flood vehicle — no', FLOOD_NO, 'flood'),
+            _check_field('theft_yes', 'Recovered theft — yes', THEFT_YES, 'theft'),
+            _check_field('theft_no', 'Recovered theft — no', THEFT_NO, 'theft'),
+            _text_field('theft_parts', 'Theft damage parts', DAMAGE_PARTS, 70, index=1),
+            _check_field('reconstructed_yes', 'Reconstructed — yes', RECONSTRUCTED_YES, 'reconstructed'),
+            _check_field('reconstructed_no', 'Reconstructed — no', RECONSTRUCTED_NO, 'reconstructed'),
+            _text_field('date', 'Seller date', DAMAGE_DATE, 10),
+            _text_field('seller_address', 'Seller address', DAMAGE_SELLER_ADDRESS, 90),
+        ]
+    raise ValueError(f'Unknown MVR form {form_code}.')
+
+
+def _positioned_fields(form_code, template_path):
+    widgets = _page_widgets(template_path)
+    positioned = []
+    for spec in _overlay_specs(form_code):
+        widget = _widget(widgets, spec['pdf'], spec['index'])
+        field = dict(spec)
+        field.update(_percent_box(widget['rect']))
+        field['rect_pts'] = widget['rect']
+        positioned.append(field)
+    return positioned
+
+
+def blank_form_image(form_code):
+    return _BLANK_IMAGES[form_code]
+
+
+def default_overlay_values(form_code, vehicle, config):
+    if form_code == 'MVR-180':
+        raw = _odometer_values(vehicle, config)
+        seller = _seller(config)
+        buyer = _buyer(vehicle) or {}
+        certified = format_form_date(_certification_date(vehicle))
+        return {
+            'year': raw.get(ODOMETER_YEAR, ''),
+            'make': raw.get(ODOMETER_MAKE, ''),
+            'body': raw.get(ODOMETER_BODY, ''),
+            'series': raw.get(ODOMETER_SERIES, ''),
+            'vin': raw.get(ODOMETER_VIN, ''),
+            'seller_sentence': raw.get(ODOMETER_SELLER_SENTENCE, seller['name']),
+            'odometer': (
+                '' if getattr(vehicle, 'mileage', None) is None
+                else str(int(vehicle.mileage))
+            ),
+            'seller_name': raw.get(ODOMETER_SELLER_NAME, seller['name']),
+            'seller_street': raw.get(ODOMETER_SELLER_STREET, seller['street']),
+            'seller_city': raw.get(ODOMETER_SELLER_CITY, seller['city']),
+            'seller_state': raw.get(ODOMETER_SELLER_STATE, seller['state']),
+            'seller_zip': raw.get(ODOMETER_SELLER_ZIP, seller['zip']),
+            'seller_date': certified,
+            'buyer_name': buyer.get('name', ''),
+            'buyer_street': buyer.get('street', ''),
+            'buyer_city': buyer.get('city', ''),
+            'buyer_state': buyer.get('state', ''),
+            'buyer_zip': buyer.get('zip', ''),
+            'buyer_date': certified if buyer.get('name') else '',
+        }
+    raw = _damage_text_values(vehicle, config, date.today())
+    checks = _damage_checks(vehicle, date.today())
+    selected = {
+        'damage_yes': DAMAGE_25_YES in checks,
+        'damage_no': DAMAGE_25_NO in checks,
+        'salvage_yes': SALVAGE_YES in checks,
+        'salvage_no': SALVAGE_NO in checks,
+        'flood_yes': FLOOD_YES in checks,
+        'flood_no': FLOOD_NO in checks,
+        'theft_yes': THEFT_YES in checks,
+        'theft_no': THEFT_NO in checks,
+        'reconstructed_yes': RECONSTRUCTED_YES in checks,
+        'reconstructed_no': RECONSTRUCTED_NO in checks,
+    }
+    values = {
+        'year': raw.get(DAMAGE_YEAR, ''),
+        'make': raw.get(DAMAGE_MAKE, ''),
+        'body': raw.get(DAMAGE_BODY, ''),
+        'vin': raw.get(DAMAGE_VIN, ''),
+        'damage_parts': '',
+        'damage_parts_extra': '',
+        'salvage_state': '',
+        'theft_parts': '',
+        'date': raw.get(DAMAGE_DATE, ''),
+        'seller_address': raw.get(DAMAGE_SELLER_ADDRESS, ''),
+    }
+    values.update(selected)
+    return values
+
+
+def overlay_fields(form_code, template_path, values):
+    fields = []
+    for field in _positioned_fields(form_code, template_path):
+        item = {
+            'key': field['key'],
+            'kind': field['kind'],
+            'label': field['label'],
+            'group': field['group'],
+            'max_length': field['max_length'],
+            'left': field['left'],
+            'top': field['top'],
+            'width': field['width'],
+            'height': field['height'],
+        }
+        if field['kind'] == 'text':
+            item['value'] = values.get(field['key'], '') or ''
+            item['checked'] = False
+        else:
+            item['value'] = ''
+            item['checked'] = bool(values.get(field['key']))
+        fields.append(item)
+    return fields
+
+
+def parse_overlay_submission(form_code, submitted):
+    errors = []
+    values = {}
+    grouped = {}
+    for spec in _overlay_specs(form_code):
+        if spec['kind'] == 'checkbox':
+            grouped.setdefault(spec['group'], []).append(spec['key'])
+            continue
+        value = pdf_text(submitted.get(spec['key']))
+        if len(value) > spec['max_length']:
+            errors.append(f'{spec["label"]} must be {spec["max_length"]} characters or fewer.')
+            value = value[:spec['max_length']]
+        if spec['key'] == 'odometer':
+            digits = value.replace(',', '')
+            if not digits.isdigit() or int(digits) > 9999999:
+                errors.append('Enter the odometer as a whole number of miles, with no tenths.')
+            else:
+                value = format_mileage(int(digits))
+                if len(value) > spec['max_length']:
+                    errors.append('Enter a mileage from 0 to 9,999,999.')
+        elif spec['key'] in {'seller_date', 'buyer_date', 'date'} and value and not _FORM_DATE.fullmatch(value):
+            errors.append(f'{spec["label"]} must use MM/DD/YYYY.')
+        values[spec['key']] = value
+    for group, keys in grouped.items():
+        selected = pdf_text(submitted.get(group))
+        if selected and selected not in keys:
+            errors.append('Choose only one answer for each yes/no question.')
+            selected = ''
+        for key in keys:
+            values[key] = selected == key
+    return values, errors
+
+
+def build_overlay_pdf(form_code, template_path, values):
+    draws = []
+    checks = []
+    for field in _positioned_fields(form_code, template_path):
+        if field['kind'] == 'text':
+            text = values.get(field['key']) or ''
+            if text:
+                draws.append((field['rect_pts'], text))
+        elif values.get(field['key']):
+            checks.append(field['rect_pts'])
+    return _fill_template(template_path, {}, {}, draws=draws, check_rects=checks)

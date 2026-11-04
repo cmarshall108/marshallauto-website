@@ -291,6 +291,70 @@
         border-radius: 6px;
     }
 }
+.mvr-sheet-wrap {
+    overflow-x: auto;
+    background: #d8d4cc;
+    border-radius: 12px;
+    padding: 1rem;
+}
+.mvr-sheet {
+    position: relative;
+    width: min(100%, 816px);
+    margin: 0 auto;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(37, 40, 44, 0.12);
+}
+.mvr-sheet-image {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.mvr-field,
+.mvr-check {
+    position: absolute;
+    margin: 0;
+    box-sizing: border-box;
+}
+.mvr-field {
+    border: 1px solid rgba(53, 91, 168, 0.35);
+    background: rgba(255, 255, 255, 0.72);
+    color: #111;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: clamp(8px, 1.15vw, 12px);
+    line-height: 1;
+    padding: 0 2px;
+}
+.mvr-field:focus,
+.mvr-check:focus-visible {
+    outline: 2px solid #1d4f91;
+    outline-offset: 1px;
+    background: #fff;
+    z-index: 2;
+}
+.mvr-check {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+.mvr-check:checked {
+    background:
+        linear-gradient(#111, #111) center / 68% 68% no-repeat;
+}
+.mvr-preview {
+    display: block;
+    width: 100%;
+    height: 90vh;
+    min-height: 720px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+}
+@media print {
+    .mvr-field,
+    .mvr-check { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .admin-theme *, .admin-theme *::before, .admin-theme *::after {
         animation: none !important;

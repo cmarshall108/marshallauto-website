@@ -1,4 +1,5 @@
 import hashlib
+import re
 import unittest
 from datetime import datetime
 from decimal import Decimal
@@ -50,6 +51,32 @@ def _content(pdf_bytes):
     if contents is not None:
         pieces.append(contents.get_data().decode('latin1', 'replace'))
     return '\n'.join(pieces)
+
+
+def _mark_near(pdf_bytes, field_name, template_path):
+    template = PdfReader(template_path)
+    rect = None
+    for annot in template.pages[0].get('/Annots') or []:
+        obj = annot.get_object()
+        name = obj.get('/T')
+        if not name:
+            parent = obj.get('/Parent')
+            name = parent.get_object().get('/T') if parent is not None else None
+        if str(name or '') != field_name:
+            continue
+        candidate = [float(value) for value in obj.get('/Rect')]
+        if rect is None or candidate[1] > rect[1]:
+            rect = candidate
+    if rect is None:
+        raise AssertionError(field_name)
+    contents = PdfReader(BytesIO(pdf_bytes)).pages[0].get_contents().get_data().decode('latin1', 'replace')
+    return any(
+        rect[0] - 0.5 <= float(x_pos) <= rect[2] + 0.5
+        and rect[1] - 0.5 <= float(y_pos) <= rect[3] + 0.5
+        for x_pos, y_pos in re.findall(
+            r'1 0 0 1 ([0-9.]+) ([0-9.]+) Tm\s+\(n\) Tj', contents,
+        )
+    )
 
 
 def _xobject(field_name):
@@ -213,10 +240,35 @@ class MvrFormPdfTests(unittest.TestCase):
         self.assertEqual(invalid.status_code, 200)
         self.assertEqual(invalid.mimetype, 'text/html')
         self.assertIn(b'whole number', invalid.data.lower())
+        self.assertIsNone(BeautifulSoup(invalid.data, 'html.parser').select_one('#mvr-output'))
 
-        response = self.client.post(f'/admin/vehicles/{self.vehicle.id}/mvr-180', data={
+        page = self.client.post(f'/admin/vehicles/{self.vehicle.id}/mvr-180', data={
             'odometer': '82550',
+            'odometer_status': 'excess',
+            'year': '2024',
+            'make': 'TOYOTA',
+            'body': 'SEDAN',
+            'series': 'CAMRY SE',
+            'vin': '4T1BF1FK5JU000001',
+            'seller_sentence': 'Marshall Auto, LLC',
+            'seller_name': 'Marshall Auto, LLC',
+            'seller_street': '360 Wilson Rd',
+            'seller_city': 'Sanford',
+            'seller_state': 'NC',
+            'seller_zip': '27332',
+            'seller_date': '11/04/2026',
+            'buyer_name': 'Jane Q. Buyer',
+            'buyer_street': '100 Main St, Apt 2',
+            'buyer_city': 'Sanford',
+            'buyer_state': 'NC',
+            'buyer_zip': '27330',
+            'buyer_date': '11/04/2026',
         })
+        self.assertEqual(page.status_code, 200)
+        html = BeautifulSoup(page.data, 'html.parser')
+        preview = html.select_one('#mvr-output iframe')
+        self.assertIsNotNone(preview)
+        response = self.client.get(preview['src'])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, 'application/pdf')
         self.assertIn('MVR-180-A-100.pdf', response.headers.get('Content-Disposition', ''))
@@ -229,8 +281,8 @@ class MvrFormPdfTests(unittest.TestCase):
             '27332', '11/04/2026', 'Jane Q. Buyer', '100 Main St, Apt 2', '27330',
         ):
             self.assertIn(value, content)
-        self.assertNotIn(_xobject(ODOMETER_EXCESS), content)
-        self.assertNotIn(_xobject(ODOMETER_DISCREPANCY), content)
+        self.assertTrue(_mark_near(response.data, ODOMETER_EXCESS, self.app.config['MVR_180_PDF']))
+        self.assertFalse(_mark_near(response.data, ODOMETER_DISCREPANCY, self.app.config['MVR_180_PDF']))
         reader = PdfReader(BytesIO(response.data))
         self.assertIsNone(reader.pages[0].get('/Annots'))
         self.assertEqual(len(reader.pages), 1)
@@ -242,12 +294,12 @@ class MvrFormPdfTests(unittest.TestCase):
         self.assertIn('360 Wilson Rd, Sanford, NC 27332', content)
         self.assertIn('11/04/2026', content)
         for checked in (DAMAGE_25_YES, SALVAGE_YES, RECONSTRUCTED_NO):
-            self.assertIn(_xobject(checked), content)
+            self.assertTrue(_mark_near(pdf_bytes, checked, self.app.config['MVR_181_PDF']))
         for blank in (
             DAMAGE_25_NO, SALVAGE_NO, FLOOD_YES, FLOOD_NO, THEFT_YES, THEFT_NO,
             RECONSTRUCTED_YES,
         ):
-            self.assertNotIn(_xobject(blank), content)
+            self.assertFalse(_mark_near(pdf_bytes, blank, self.app.config['MVR_181_PDF']))
         self.assertNotIn('Front bumper', content)
 
     def test_clean_and_older_titles_do_not_invent_damage(self):
@@ -260,25 +312,65 @@ class MvrFormPdfTests(unittest.TestCase):
             slug='old-truck', year=2010, make='Ford', model='F-150',
             price=4000, mileage=150000, title_status='salvage', status='available',
         )
-        clean_content = _content(build_mvr_181(clean, self.app.config, on_date))
-        self.assertIn(_xobject(SALVAGE_NO), clean_content)
-        self.assertIn(_xobject(RECONSTRUCTED_NO), clean_content)
-        self.assertNotIn(_xobject(DAMAGE_25_YES), clean_content)
-        self.assertNotIn(_xobject(DAMAGE_25_NO), clean_content)
-        self.assertNotIn(_xobject(FLOOD_NO), clean_content)
+        clean_pdf = build_mvr_181(clean, self.app.config, on_date)
+        clean_content = _content(clean_pdf)
+        self.assertTrue(_mark_near(clean_pdf, SALVAGE_NO, self.app.config['MVR_181_PDF']))
+        self.assertTrue(_mark_near(clean_pdf, RECONSTRUCTED_NO, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(clean_pdf, DAMAGE_25_YES, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(clean_pdf, DAMAGE_25_NO, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(clean_pdf, FLOOD_NO, self.app.config['MVR_181_PDF']))
         self.assertNotIn('11/04/2026', clean_content)
 
-        old_content = _content(build_mvr_181(old, self.app.config, on_date))
-        self.assertIn(_xobject(SALVAGE_YES), old_content)
-        self.assertIn(_xobject(RECONSTRUCTED_YES), old_content)
-        self.assertNotIn(_xobject(RECONSTRUCTED_NO), old_content)
-        self.assertNotIn(_xobject(DAMAGE_25_YES), old_content)
-        self.assertNotIn(_xobject(DAMAGE_25_NO), old_content)
+        old_pdf = build_mvr_181(old, self.app.config, on_date)
+        old_content = _content(old_pdf)
+        self.assertTrue(_mark_near(old_pdf, SALVAGE_YES, self.app.config['MVR_181_PDF']))
+        self.assertTrue(_mark_near(old_pdf, RECONSTRUCTED_YES, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(old_pdf, RECONSTRUCTED_NO, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(old_pdf, DAMAGE_25_YES, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(old_pdf, DAMAGE_25_NO, self.app.config['MVR_181_PDF']))
 
         old.reconstructed = 'no'
-        overridden = _content(build_mvr_181(old, self.app.config, on_date))
-        self.assertIn(_xobject(RECONSTRUCTED_NO), overridden)
-        self.assertNotIn(_xobject(RECONSTRUCTED_YES), overridden)
+        overridden_pdf = build_mvr_181(old, self.app.config, on_date)
+        self.assertTrue(_mark_near(overridden_pdf, RECONSTRUCTED_NO, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(overridden_pdf, RECONSTRUCTED_YES, self.app.config['MVR_181_PDF']))
+
+    def test_damage_overlay_defaults_reconstructed_and_accepts_a_salesman_choice(self):
+        self.vehicle.title_status = 'salvage'
+        self.vehicle.year = 2010
+        db.session.commit()
+        self.login()
+        page = BeautifulSoup(
+            self.client.get(f'/admin/vehicles/{self.vehicle.id}/mvr-181').data,
+            'html.parser',
+        )
+        reconstructed = page.select_one('input[name="reconstructed"][value="reconstructed_yes"]')
+        self.assertIsNotNone(reconstructed)
+        self.assertIsNotNone(reconstructed.get('checked'))
+        flood = page.select_one('input[name="flood"][checked]')
+        self.assertIsNone(flood)
+
+        preview_page = self.client.post(f'/admin/vehicles/{self.vehicle.id}/mvr-181', data={
+            'year': '2010',
+            'make': 'TOYOTA',
+            'body': 'SEDAN',
+            'vin': '4T1BF1FK5JU000001',
+            'salvage': 'salvage_yes',
+            'flood': 'flood_yes',
+            'reconstructed': 'reconstructed_no',
+            'date': '11/04/2026',
+            'seller_address': '360 Wilson Rd, Sanford, NC 27332',
+        })
+        preview = BeautifulSoup(preview_page.data, 'html.parser').select_one('#mvr-output iframe')
+        content = _content(self.client.get(preview['src']).data)
+        preview_pdf = self.client.get(preview['src']).data
+        content = _content(preview_pdf)
+        self.assertTrue(_mark_near(preview_pdf, FLOOD_YES, self.app.config['MVR_181_PDF']))
+        self.assertTrue(_mark_near(preview_pdf, RECONSTRUCTED_NO, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(preview_pdf, RECONSTRUCTED_YES, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(preview_pdf, FLOOD_NO, self.app.config['MVR_181_PDF']))
+        unchanged = build_mvr_181(self.vehicle, self.app.config, datetime(2026, 11, 4).date())
+        self.assertTrue(_mark_near(unchanged, RECONSTRUCTED_YES, self.app.config['MVR_181_PDF']))
+        self.assertFalse(_mark_near(unchanged, FLOOD_YES, self.app.config['MVR_181_PDF']))
 
     def test_missing_template_redirects_without_writing_a_file(self):
         self.login()

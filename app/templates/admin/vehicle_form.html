@@ -13,7 +13,7 @@
         <a href="{{ url_for('admin.vehicle_bill_of_sale', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-printer me-1"></i>Print Bill of Sale
         </a>
-        <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" class="btn btn-outline-success" title="Confirm the odometer reading, then fill the NC disclosure. It starts from the saved mileage. Signatures are left blank.">
+        <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" class="btn btn-outline-success" title="Review the form on the official blank, then fill this copy. Signatures stay blank.">
             <i class="bi bi-file-earmark-text me-1"></i>MVR-180
         </a>
         <a href="{{ url_for('admin.vehicle_mvr_181', id=vehicle.id) }}" class="btn btn-outline-success" title="Fill the NC damage disclosure from this vehicle's title status. Salvage is marked reconstructed unless specifically set otherwise.">

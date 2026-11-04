@@ -230,30 +230,6 @@ class VehicleForm(FlaskForm):
     submit = SubmitField('Save Vehicle')
 
 
-class WholeMilesField(IntegerField):
-    def process_formdata(self, valuelist):
-        if not valuelist or not str(valuelist[0]).strip():
-            self.data = None
-            return
-        raw = str(valuelist[0]).strip().replace(',', '')
-        if not raw.isdigit():
-            self.data = None
-            raise ValueError('Enter a whole number of miles, with no tenths.')
-        self.data = int(raw)
-
-
-class MvrOdometerForm(FlaskForm):
-    odometer = WholeMilesField(
-        'Odometer reading',
-        validators=[
-            InputRequired(message='Enter the odometer reading.'),
-            NumberRange(min=0, max=9999999, message='Enter a mileage from 0 to 9,999,999.'),
-        ],
-        description='Whole miles, no tenths. Starts from the mileage saved on this vehicle.',
-    )
-    submit = SubmitField('Fill MVR-180')
-
-
 class VehicleSaleForm(FlaskForm):
     sold_price = DecimalField(
         'Actual Amount Received ($)',
