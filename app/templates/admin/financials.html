@@ -13,7 +13,7 @@
 {% if value is not none %}
 <span class="{% if (value >= 0) != invert %}text-success{% else %}text-danger{% endif %}">
     <i class="bi bi-caret-{% if value >= 0 %}up{% else %}down{% endif %}-fill"></i>
-    {{ value }}% vs prior period
+    {{ value }}% vs {% if is_single_month %}prior month{% else %}prior period{% endif %}
 </span>
 {% endif %}
 {%- endmacro %}
@@ -24,7 +24,7 @@
         <p class="text-muted mb-0">
             Profit, costs, and cash expenses
             · {{ period_label }}
-            · compared with {{ prior_label }}
+            · compared with {{ prior_label }}{% if is_single_month %} (prior month){% endif %}
         </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -38,25 +38,37 @@
 </div>
 
 <div class="table-card p-3 p-md-4 mb-4">
-    <form method="get" class="row g-3 align-items-end">
-        <div class="col-8 col-md-4 col-lg-3">
-            <label class="form-label small text-muted mb-1" for="financial-range">Date range</label>
-            <select id="financial-range" name="range" class="form-select form-select-sm" onchange="this.form.submit()">
+    <form method="get" class="row g-3 align-items-end" id="financial-filters">
+        <div class="col-6 col-md-3 col-lg-2">
+            <label class="form-label small text-muted mb-1" for="financial-range">View</label>
+            <select id="financial-range" name="range" class="form-select form-select-sm">
                 {% for key, label in range_choices %}
                 <option value="{{ key }}" {% if range_key == key %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-4 col-md-3 col-lg-2">
+        <div class="col-6 col-md-3 col-lg-2" id="financial-month-wrap">
+            <label class="form-label small text-muted mb-1" for="financial-month">Month</label>
+            <select id="financial-month" name="month" class="form-select form-select-sm" {% if range_key != 'month' %}disabled{% endif %}>
+                {% for key, label in month_choices %}
+                <option value="{{ key }}" {% if month_key == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
             <button type="submit" class="btn btn-primary btn-sm w-100">Apply</button>
         </div>
-        {% if range_key != '12m' %}
-        <div class="col-12 col-lg-auto">
+        {% if range_key != '12m' or month_key %}
+        <div class="col-6 col-md-3 col-lg-auto">
             <a href="{{ url_for('admin.financials') }}" class="btn btn-link btn-sm text-decoration-none">Last 12 months</a>
         </div>
         {% endif %}
     </form>
-    {% if truncated %}
+    {% if is_single_month %}
+    <p class="small text-muted mb-0 mt-3">
+        Per-month view shows only {{ period_label }}. KPIs and charts are that month alone, compared with {{ prior_label }}.
+    </p>
+    {% elif truncated %}
     <p class="small text-warning mb-0 mt-3">All-time view is limited to the latest 48 months so the chart stays readable.</p>
     {% endif %}
 </div>
@@ -113,7 +125,7 @@
             <div class="stat-value">{{ pct(kpis.margin) }}</div>
             {% if kpis.margin_delta is not none %}
             <div class="small mt-1 {{ 'text-success' if kpis.margin_delta >= 0 else 'text-danger' }}">
-                {{ kpis.margin_delta }} pts vs prior period
+                {{ kpis.margin_delta }} pts vs {% if is_single_month %}prior month{% else %}prior period{% endif %}
             </div>
             {% endif %}
             <p class="small text-muted mb-0 mt-2">Gross profit ÷ kept revenue</p>
@@ -252,7 +264,7 @@
     <div class="col-lg-5">
         <div class="table-card p-3 p-md-4 h-100">
             <h5 class="fw-bold mb-1">Cumulative gross profit</h5>
-            <p class="small text-muted mb-3">Running total inside this range, not all-time</p>
+            <p class="small text-muted mb-3">{% if is_single_month %}This month only (no multi-month run){% else %}Running total inside this range, not all-time{% endif %}</p>
             <div class="analytics-chart-wrap">
                 <canvas id="chartCumulative" height="130" aria-label="Cumulative profit chart"></canvas>
             </div>
@@ -639,6 +651,30 @@
 <script>
 (function () {
     'use strict';
+    const rangeSelect = document.getElementById('financial-range');
+    const monthSelect = document.getElementById('financial-month');
+    const filterForm = document.getElementById('financial-filters');
+    function syncMonthPicker() {
+        if (!rangeSelect || !monthSelect) return;
+        const perMonth = rangeSelect.value === 'month';
+        monthSelect.disabled = !perMonth;
+        monthSelect.closest('#financial-month-wrap')?.classList.toggle('opacity-50', !perMonth);
+    }
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', function () {
+            syncMonthPicker();
+            if (filterForm) filterForm.submit();
+        });
+    }
+    if (monthSelect) {
+        monthSelect.addEventListener('change', function () {
+            if (rangeSelect) rangeSelect.value = 'month';
+            syncMonthPicker();
+            if (filterForm) filterForm.submit();
+        });
+    }
+    syncMonthPicker();
+
     const charts = {{ charts | tojson }};
     const grid = { color: 'rgba(0,0,0,0.06)' };
     const money = (value) => Number(value || 0).toLocaleString('en-US', {

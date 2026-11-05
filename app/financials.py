@@ -28,6 +28,7 @@ CENT = Decimal('0.01')
 POINT = Decimal('0.1')
 
 RANGE_CHOICES = (
+    ('month', 'Per month'),
     ('6m', 'Last 6 months'),
     ('12m', 'Last 12 months'),
     ('24m', 'Last 24 months'),
@@ -36,6 +37,7 @@ RANGE_CHOICES = (
 )
 _RANGE_MONTHS = {'6m': 6, '12m': 12, '24m': 24}
 _MAX_ALL_MONTHS = 48
+_MONTH_CHOICE_SPAN = 36
 
 CATEGORY_LABELS = {
     'parts': 'Parts & Materials',
@@ -301,12 +303,51 @@ def _median(values):
     return round((ordered[mid - 1] + ordered[mid]) / 2)
 
 
-def _resolve_window(range_key, today, earliest):
+def _parse_month(value, fallback):
+    """Parse YYYY-MM or YYYY-MM-DD into the first day of that month."""
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    if len(text) < 7 or text[4] != '-':
+        return fallback
+    try:
+        year = int(text[0:4])
+        month = int(text[5:7])
+        if year < 2000 or year > 2100 or month < 1 or month > 12:
+            return fallback
+        return date(year, month, 1)
+    except ValueError:
+        return fallback
+
+
+def _month_choices(today, earliest=None, selected=None):
+    """Newest-first month picker options covering recent activity."""
+    current = date(today.year, today.month, 1)
+    start = _add_months(current, -(_MONTH_CHOICE_SPAN - 1))
+    if earliest is not None and earliest < start:
+        start = max(earliest, _add_months(current, -(_MAX_ALL_MONTHS - 1)))
+    if selected is not None and selected < start:
+        start = selected
+    choices = [
+        (month.strftime('%Y-%m'), _month_label(month))
+        for month in _iter_months(start, current)
+    ]
+    choices.reverse()
+    return choices
+
+
+def _resolve_window(range_key, today, earliest, selected_month=None):
     current = date(today.year, today.month, 1)
     truncated = False
+    if range_key == 'month':
+        target = selected_month or current
+        if target > current:
+            target = current
+        return 'month', target, target, False
     if range_key == 'ytd':
         start = date(today.year, 1, 1)
         key = 'ytd'
+        end = current
     elif range_key == 'all':
         start = earliest or _add_months(current, -5)
         if start > current:
@@ -317,10 +358,12 @@ def _resolve_window(range_key, today, earliest):
             start = _add_months(current, -(_MAX_ALL_MONTHS - 1))
             truncated = True
         key = 'all'
+        end = current
     else:
         key = range_key if range_key in _RANGE_MONTHS else '12m'
         start = _add_months(current, -(_RANGE_MONTHS[key] - 1))
-    return key, start, current, truncated
+        end = current
+    return key, start, end, truncated
 
 
 def build_financial_dashboard(args=None, today=None):
@@ -510,7 +553,13 @@ def build_financial_dashboard(args=None, today=None):
         })
 
     earliest = min(earliest_dates) if earliest_dates else None
-    range_key, start, end, truncated = _resolve_window(args.get('range'), today, earliest)
+    current_month = date(today.year, today.month, 1)
+    selected_month = _parse_month(args.get('month'), current_month)
+    range_key, start, end, truncated = _resolve_window(
+        args.get('range'), today, earliest, selected_month=selected_month,
+    )
+    if range_key == 'month':
+        selected_month = start
     months = [_blank_month(month) for month in _iter_months(start, end)]
     by_month = {row['month']: row for row in months}
     span = len(months)
@@ -518,6 +567,8 @@ def build_financial_dashboard(args=None, today=None):
     prior_end = _add_months(start, -1)
     prior_months = [_blank_month(month) for month in _iter_months(prior_start, prior_end)]
     prior_by_month = {row['month']: row for row in prior_months}
+    month_choices = _month_choices(today, earliest=earliest, selected=selected_month)
+    is_single_month = range_key == 'month'
 
     def _bucket(month):
         if month in by_month:
@@ -811,6 +862,9 @@ def build_financial_dashboard(args=None, today=None):
     return {
         'range_key': range_key,
         'range_choices': RANGE_CHOICES,
+        'month_key': selected_month.strftime('%Y-%m'),
+        'month_choices': month_choices,
+        'is_single_month': is_single_month,
         'period_label': _period_label(start, end),
         'prior_label': _period_label(prior_start, prior_end),
         'truncated': truncated,

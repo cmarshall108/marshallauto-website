@@ -60,8 +60,11 @@ class FinancialReportTests(unittest.TestCase):
         db.session.commit()
         return entry
 
-    def report(self, range_key='12m'):
-        return build_financial_dashboard({'range': range_key}, today=self.today)
+    def report(self, range_key='12m', month=None):
+        args = {'range': range_key}
+        if month is not None:
+            args['month'] = month
+        return build_financial_dashboard(args, today=self.today)
 
     def test_sale_month_keeps_profit_and_receipt_month_keeps_expenses(self):
         sold = self._vehicle(
@@ -146,6 +149,26 @@ class FinancialReportTests(unittest.TestCase):
         ytd = self.report('ytd')
         self.assertEqual(ytd['period_label'], 'Jan 2026 – Nov 2026')
         self.assertEqual(ytd['kpis']['units'], 2)
+
+        per_month = self.report('month', month='2026-01')
+        self.assertEqual(per_month['range_key'], 'month')
+        self.assertTrue(per_month['is_single_month'])
+        self.assertEqual(per_month['month_key'], '2026-01')
+        self.assertEqual(per_month['period_label'], 'Jan 2026')
+        self.assertEqual(per_month['prior_label'], 'Dec 2025')
+        self.assertEqual(len(per_month['months']), 1)
+        self.assertEqual(per_month['months'][0]['label'], 'Jan 2026')
+        self.assertEqual(per_month['kpis']['units'], 2)
+        self.assertTrue(any(key == '2026-01' for key, _ in per_month['month_choices']))
+
+        invalid_month = self.report('month', month='not-a-month')
+        self.assertEqual(invalid_month['month_key'], '2026-11')
+        self.assertEqual(invalid_month['period_label'], 'Nov 2026')
+        self.assertEqual(invalid_month['kpis']['units'], 0)
+
+        october_only = self.report('month', month='2025-10')
+        self.assertEqual(october_only['period_label'], 'Oct 2025')
+        self.assertEqual(october_only['kpis']['units'], 1)
 
     def test_receipt_fees_inventory_and_missing_cost_do_not_distort_profit(self):
         sold = self._vehicle(
@@ -261,7 +284,7 @@ class FinancialPageTests(unittest.TestCase):
             })
         self.assertEqual(response.status_code, 302)
 
-    def test_financials_page_renders_chart_data_for_admin_only(self):
+    def test_financials_page_is_available_to_staff(self):
         sold_at = datetime.now(timezone.utc).replace(tzinfo=None)
         vehicle = Vehicle(
             year=2019, make='Nissan', model='Sentra', price=Decimal('10000.00'),
@@ -278,8 +301,6 @@ class FinancialPageTests(unittest.TestCase):
         db.session.commit()
         expected = split_otd_sale_price(Decimal('10000.00'))['agreed_vehicle_price'] - Decimal('6100.00')
 
-        # Flask's test client cookie jar is process-wide, so keep role checks on
-        # one client and clear the session between salesman and admin.
         anonymous = self.client.get('/admin/financials')
         self.assertEqual(anonymous.status_code, 302)
         self.assertIn('/admin/login', anonymous.headers['Location'])
@@ -288,14 +309,18 @@ class FinancialPageTests(unittest.TestCase):
             self.client.get(f'/_test_force_login/{self.salesman.id}').status_code,
             200,
         )
-        blocked = self.client.get('/admin/financials')
-        self.assertEqual(blocked.status_code, 302)
-        self.assertIn('/admin/dashboard', blocked.headers['Location'])
+        salesman_page = self.client.get('/admin/financials')
+        self.assertEqual(salesman_page.status_code, 200)
+        salesman_body = salesman_page.get_data(as_text=True)
+        self.assertIn('Monthly profit', salesman_body)
+        self.assertIn('id="chartProfit"', salesman_body)
+        self.assertIn(format_currency(expected), salesman_body)
+        self.assertIn('href="/admin/financials"', salesman_body)
         salesman_dashboard = self.client.get('/admin/dashboard')
         self.assertEqual(salesman_dashboard.status_code, 200)
-        salesman_body = salesman_dashboard.get_data(as_text=True)
-        self.assertNotIn('chartDashboardProfit', salesman_body)
-        self.assertNotIn('href="/admin/financials"', salesman_body)
+        salesman_dash = salesman_dashboard.get_data(as_text=True)
+        self.assertIn('chartDashboardProfit', salesman_dash)
+        self.assertIn('Full financials', salesman_dash)
 
         self.client.get('/admin/logout')
         self._login_admin()
@@ -305,9 +330,21 @@ class FinancialPageTests(unittest.TestCase):
         self.assertIn('Monthly profit', body)
         self.assertIn('id="chartProfit"', body)
         self.assertIn('id="chartExpenses"', body)
+        self.assertIn('name="month"', body)
+        self.assertIn('Per month', body)
         self.assertIn(format_currency(expected), body)
         self.assertIn('Service / Repair', body)
         self.assertIn('href="/admin/financials"', body)
+
+        month_page = self.client.get('/admin/financials?range=month&month=' + sold_at.strftime('%Y-%m'))
+        self.assertEqual(month_page.status_code, 200)
+        month_body = month_page.get_data(as_text=True)
+        self.assertIn('Per-month view shows only', month_body)
+        self.assertIn('(prior month)', month_body)
+        self.assertIn(format_currency(expected), month_body)
+        self.assertIn('name="month"', month_body)
+        self.assertIn('value="' + sold_at.strftime('%Y-%m') + '"', month_body)
+
         dashboard = self.client.get('/admin/dashboard')
         dash_body = dashboard.get_data(as_text=True)
         self.assertIn('chartDashboardProfit', dash_body)
