@@ -1,0 +1,894 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Financials{% endblock %}
+
+{% block content %}
+{% macro money(value) -%}
+{% if value is not none %}{{ value | format_currency }}{% else %}—{% endif %}
+{%- endmacro %}
+{% macro pct(value) -%}
+{% if value is not none %}{{ value }}%{% else %}—{% endif %}
+{%- endmacro %}
+{% macro delta(value, invert=false) -%}
+{% if value is not none %}
+<span class="{% if (value >= 0) != invert %}text-success{% else %}text-danger{% endif %}">
+    <i class="bi bi-caret-{% if value >= 0 %}up{% else %}down{% endif %}-fill"></i>
+    {{ value }}% vs prior period
+</span>
+{% endif %}
+{%- endmacro %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Monthly Financials</h2>
+        <p class="text-muted mb-0">
+            Profit, costs, and cash expenses
+            · {{ period_label }}
+            · compared with {{ prior_label }}
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+        </a>
+        <a href="{{ url_for('admin.vehicles') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-car-front me-1"></i> Vehicles
+        </a>
+    </div>
+</div>
+
+<div class="table-card p-3 p-md-4 mb-4">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-8 col-md-4 col-lg-3">
+            <label class="form-label small text-muted mb-1" for="financial-range">Date range</label>
+            <select id="financial-range" name="range" class="form-select form-select-sm" onchange="this.form.submit()">
+                {% for key, label in range_choices %}
+                <option value="{{ key }}" {% if range_key == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-4 col-md-3 col-lg-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Apply</button>
+        </div>
+        {% if range_key != '12m' %}
+        <div class="col-12 col-lg-auto">
+            <a href="{{ url_for('admin.financials') }}" class="btn btn-link btn-sm text-decoration-none">Last 12 months</a>
+        </div>
+        {% endif %}
+    </form>
+    {% if truncated %}
+    <p class="small text-warning mb-0 mt-3">All-time view is limited to the latest 48 months so the chart stays readable.</p>
+    {% endif %}
+</div>
+
+<div class="alert alert-light border mb-4">
+    <div class="fw-semibold mb-1">How these numbers are counted</div>
+    <ul class="small text-muted mb-0 ps-3">
+        <li>Closed-deal profit is booked in the month the vehicle sold, using Eastern Time.</li>
+        <li>Sale amounts are out-the-door. Kept revenue removes the 3% highway-use tax, because that tax is remitted. A saved receipt supplies the split; otherwise the same split is estimated from the amount received.</li>
+        <li>Acquisition and prep costs of a sold car reduce that sale month, even if the receipts are older. The per-vehicle rebuild tracker still shows profit before this tax split.</li>
+        <li>Cash expense bars use the purchase date on each cost item and include cars still in inventory. Undated costs are listed separately.</li>
+        <li>Doc, warranty, and tag fees are added only to contribution, not to vehicle gross profit. Trade allowances are shown, but not subtracted, because the trade-in vehicle is not valued here.</li>
+    </ul>
+</div>
+
+{% if not has_data %}
+<div class="table-card p-4 p-md-5 text-center mb-4">
+    <div class="display-6 text-primary mb-3"><i class="bi bi-bar-chart-line"></i></div>
+    <h4 class="fw-bold">No financial activity yet</h4>
+    <p class="text-muted mb-0 mx-auto" style="max-width: 38rem;">
+        Mark a vehicle sold and enter the amount received, or add acquisition and rebuild costs.
+        Monthly profit, expenses, and margins will appear here.
+    </p>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Gross Profit</p>
+            <div class="stat-value {{ 'text-danger' if kpis.gross_profit < 0 else '' }}">{{ money(kpis.gross_profit) }}</div>
+            <div class="small mt-1">{{ delta(kpis.profit_delta) }}</div>
+            <p class="small text-muted mb-0 mt-2">Kept revenue minus acquisition and prep</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Vehicle Revenue</p>
+            <div class="stat-value">{{ money(kpis.revenue) }}</div>
+            <div class="small mt-1">{{ delta(kpis.revenue_delta) }}</div>
+            <p class="small text-muted mb-0 mt-2">After 3% tax · customer paid {{ money(kpis.otd) }}</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Cost of Cars Sold</p>
+            <div class="stat-value">{{ money(kpis.cogs) }}</div>
+            <p class="small text-muted mb-0 mt-2">Acquisition {{ money(kpis.acquisition) }} · prep {{ money(kpis.prep) }}</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Profit Margin</p>
+            <div class="stat-value">{{ pct(kpis.margin) }}</div>
+            {% if kpis.margin_delta is not none %}
+            <div class="small mt-1 {{ 'text-success' if kpis.margin_delta >= 0 else 'text-danger' }}">
+                {{ kpis.margin_delta }} pts vs prior period
+            </div>
+            {% endif %}
+            <p class="small text-muted mb-0 mt-2">Gross profit ÷ kept revenue</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Units Sold</p>
+            <div class="stat-value">{{ kpis.units }}</div>
+            <div class="small mt-1">{{ delta(kpis.units_delta) }}</div>
+            <p class="small text-muted mb-0 mt-2">{{ kpis.priced_units }} with a sale price · {{ kpis.below_cost }} below cost</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Avg. Profit / Priced Sale</p>
+            <div class="stat-value">{{ money(kpis.avg_profit) }}</div>
+            <p class="small text-muted mb-0 mt-2">Avg. kept revenue {{ money(kpis.avg_sale) }}</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Cash Expenses</p>
+            <div class="stat-value">{{ money(kpis.expense_spend) }}</div>
+            <div class="small mt-1">{{ delta(kpis.expense_delta, true) }}</div>
+            <p class="small text-muted mb-0 mt-2">Rebuild costs by receipt date, including unsold cars</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+        <div class="stat-card h-100">
+            <p class="text-muted small mb-1">Tax to Remit</p>
+            <div class="stat-value">{{ money(kpis.tax) }}</div>
+            <p class="small text-muted mb-0 mt-2">
+                {{ kpis.receipt_count }} from receipts · {{ kpis.estimated_tax_count }} estimated
+            </p>
+        </div>
+    </div>
+</div>
+
+{% if data_quality %}
+<div class="table-card p-3 p-md-4 mb-4">
+    <h5 class="fw-bold mb-1">Records that change the totals</h5>
+    <p class="small text-muted mb-3">Fix these on the vehicle or its rebuild tracker when the chart should be exact.</p>
+    <ul class="list-unstyled mb-0">
+        {% for item in data_quality %}
+        <li class="d-flex justify-content-between gap-3 py-2 border-bottom">
+            <div>
+                <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=item.vehicle_id) }}">{{ item.title }}</a>
+                <div class="small text-muted">{{ item.detail }}</div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if data_quality_extra %}
+    <p class="small text-muted mb-0 mt-2">{{ data_quality_extra }} more note{{ '' if data_quality_extra == 1 else 's' }} not shown.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Monthly profit</h5>
+            <p class="small text-muted mb-3">Kept revenue, cost of cars sold that month, and gross profit</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartProfit" height="140" aria-label="Monthly profit chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Cost of cars sold</h5>
+            <p class="small text-muted mb-3">Acquisition plus prep on priced sales in this range</p>
+            <div class="analytics-chart-wrap analytics-chart-sm">
+                <canvas id="chartCostMix" aria-label="Sold vehicle cost mix chart"></canvas>
+            </div>
+            {% if sold_cost_mix %}
+            <ul class="list-unstyled small mt-3 mb-0">
+                {% for item in sold_cost_mix %}
+                <li class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{{ item.label }}</span>
+                    <span class="text-muted">{{ money(item.amount) }} · {{ pct(item.share) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="small text-muted mb-0 mt-3">No acquisition or prep costs on cars sold in this range.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Cash expenses by month</h5>
+            <p class="small text-muted mb-3">Parts, labor, service, and other rebuild costs on the date they were bought</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartExpenses" height="140" aria-label="Monthly expenses chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Expense mix</h5>
+            <p class="small text-muted mb-3">Share of dated cash expenses in this range</p>
+            {% if cash_categories %}
+            <ul class="list-unstyled small mb-0">
+                {% for item in cash_categories %}
+                <li class="d-flex justify-content-between py-2 border-bottom">
+                    <span>{{ item.label }}</span>
+                    <span class="text-muted">{{ money(item.amount) }} · {{ pct(item.share) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if kpis.undated_expenses %}
+            <p class="small text-muted mb-0 mt-3">Undated costs, not in the bars: {{ money(kpis.undated_expenses) }}</p>
+            {% endif %}
+            {% else %}
+            <p class="small text-muted mb-0">No dated rebuild costs in this range.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Units sold and margin</h5>
+            <p class="small text-muted mb-3">Bars are units. The line is gross margin on priced sales.</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartMargin" height="130" aria-label="Units and margin chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Cumulative gross profit</h5>
+            <p class="small text-muted mb-3">Running total inside this range, not all-time</p>
+            <div class="analytics-chart-wrap">
+                <canvas id="chartCumulative" height="130" aria-label="Cumulative profit chart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-card p-3 p-md-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+        <div>
+            <h5 class="fw-bold mb-1">Month-by-month detail</h5>
+            <p class="small text-muted mb-0">Profit columns follow the sale date. Cash columns follow the receipt or vehicle-added date.</p>
+        </div>
+        <div class="small text-muted">
+            Avg. days to sell {{ kpis.avg_days if kpis.avg_days is not none else '—' }}
+            · median {{ kpis.median_days if kpis.median_days is not none else '—' }}
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th class="text-end">Units</th>
+                    <th class="text-end">Customer paid</th>
+                    <th class="text-end">Tax</th>
+                    <th class="text-end">Revenue</th>
+                    <th class="text-end">Acquisition</th>
+                    <th class="text-end">Prep</th>
+                    <th class="text-end">Gross profit</th>
+                    <th class="text-end">Margin</th>
+                    <th class="text-end">Avg. profit</th>
+                    <th class="text-end">Fees</th>
+                    <th class="text-end">Contribution</th>
+                    <th class="text-end">Cash expenses</th>
+                    <th class="text-end">Cars added</th>
+                    <th class="text-end">Acquisition added</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in months | reverse %}
+                <tr>
+                    <td class="fw-semibold">{{ row.label }}</td>
+                    <td class="text-end">{{ row.units }}</td>
+                    <td class="text-end">{{ money(row.otd) }}</td>
+                    <td class="text-end">{{ money(row.tax) }}</td>
+                    <td class="text-end">{{ money(row.revenue) }}</td>
+                    <td class="text-end">{{ money(row.acquisition) }}</td>
+                    <td class="text-end">{{ money(row.prep) }}</td>
+                    <td class="text-end fw-semibold {{ 'text-danger' if row.gross_profit < 0 else 'text-success' if row.gross_profit > 0 else '' }}">{{ money(row.gross_profit) }}</td>
+                    <td class="text-end">{{ pct(row.margin) }}</td>
+                    <td class="text-end">{{ money(row.avg_profit) }}</td>
+                    <td class="text-end">{{ money(row.dealer_fees) }}</td>
+                    <td class="text-end">{{ money(row.contribution) }}</td>
+                    <td class="text-end">{{ money(row.expense_spend) }}</td>
+                    <td class="text-end">{{ row.vehicles_added }}</td>
+                    <td class="text-end">{{ money(row.acquisition_added) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="fw-semibold">
+                    <td>Range total</td>
+                    <td class="text-end">{{ kpis.units }}</td>
+                    <td class="text-end">{{ money(kpis.otd) }}</td>
+                    <td class="text-end">{{ money(kpis.tax) }}</td>
+                    <td class="text-end">{{ money(kpis.revenue) }}</td>
+                    <td class="text-end">{{ money(kpis.acquisition) }}</td>
+                    <td class="text-end">{{ money(kpis.prep) }}</td>
+                    <td class="text-end">{{ money(kpis.gross_profit) }}</td>
+                    <td class="text-end">{{ pct(kpis.margin) }}</td>
+                    <td class="text-end">{{ money(kpis.avg_profit) }}</td>
+                    <td class="text-end">{{ money(kpis.dealer_fees) }}</td>
+                    <td class="text-end">{{ money(kpis.contribution) }}</td>
+                    <td class="text-end">{{ money(kpis.expense_spend) }}</td>
+                    <td class="text-end">{{ kpis.vehicles_added }}</td>
+                    <td class="text-end">{{ money(kpis.acquisition_added) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <p class="small text-muted mb-0 mt-3">
+        Profit before the tax split for this range is {{ money(kpis.profit_before_tax) }}.
+        That is the figure closer to the per-vehicle rebuild tracker, which uses the full sold or asking amount.
+    </p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="table-card p-3 p-md-4 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h5 class="fw-bold mb-1">Closed deals</h5>
+                    <p class="small text-muted mb-0">{{ deal_count }} priced sale{{ '' if deal_count == 1 else 's' }} in this range</p>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Sold</th>
+                            <th>Vehicle</th>
+                            <th>Salesperson</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Costs</th>
+                            <th class="text-end">Profit</th>
+                            <th class="text-end">Margin</th>
+                            <th class="text-end">Days</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for deal in deals %}
+                        <tr>
+                            <td class="text-nowrap">{{ deal.sold_on.strftime('%m/%d/%Y') if deal.sold_on else '—' }}</td>
+                            <td>
+                                <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=deal.id) }}">{{ deal.title }}</a>
+                                {% if deal.stock_number %}<div class="small text-muted">Stock #{{ deal.stock_number }}</div>{% endif %}
+                                {% if deal.tax_estimated %}<span class="badge bg-light text-dark border">Tax estimated</span>{% endif %}
+                                {% if deal.acquisition_missing %}<span class="badge bg-warning-subtle text-warning-emphasis border">No acquisition cost</span>{% endif %}
+                            </td>
+                            <td>{{ deal.salesperson }}</td>
+                            <td class="text-end text-nowrap">{{ money(deal.revenue) }}</td>
+                            <td class="text-end text-nowrap">{{ money(deal.acquisition + deal.prep) }}</td>
+                            <td class="text-end text-nowrap fw-semibold {{ 'text-danger' if deal.gross_profit < 0 else 'text-success' if deal.gross_profit > 0 else '' }}">{{ money(deal.gross_profit) }}</td>
+                            <td class="text-end">{{ pct(deal.margin) }}</td>
+                            <td class="text-end">{{ deal.days if deal.days is not none else '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8" class="text-muted">No priced sales in this range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if deals_truncated %}
+            <p class="small text-muted mb-0 mt-2">Showing the 40 most recent priced sales. {{ deals_truncated }} older sale{{ '' if deals_truncated == 1 else 's' }} are still included in the totals.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 mb-4">
+            <h5 class="fw-bold mb-3">Best profit</h5>
+            {% for deal in best_deals %}
+            <div class="d-flex justify-content-between gap-2 py-2 border-bottom">
+                <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=deal.id) }}" class="small">{{ deal.title }}</a>
+                <span class="small fw-semibold text-success text-nowrap">{{ money(deal.gross_profit) }}</span>
+            </div>
+            {% else %}
+            <p class="small text-muted mb-0">No priced sales in this range.</p>
+            {% endfor %}
+        </div>
+        <div class="table-card p-3 p-md-4">
+            <h5 class="fw-bold mb-3">Lowest profit</h5>
+            {% for deal in worst_deals %}
+            <div class="d-flex justify-content-between gap-2 py-2 border-bottom">
+                <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=deal.id) }}" class="small">{{ deal.title }}</a>
+                <span class="small fw-semibold text-nowrap {{ 'text-danger' if deal.gross_profit < 0 else '' }}">{{ money(deal.gross_profit) }}</span>
+            </div>
+            {% else %}
+            <p class="small text-muted mb-0">No priced sales in this range.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Profit by salesperson</h5>
+            <p class="small text-muted mb-3">Priced sales in this range</p>
+            {% if salespeople %}
+            <div class="analytics-chart-wrap mb-3">
+                <canvas id="chartSalespeople" height="140" aria-label="Profit by salesperson chart"></canvas>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Salesperson</th>
+                            <th class="text-end">Units</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Profit</th>
+                            <th class="text-end">Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in salespeople %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td class="text-end">{{ row.units }}</td>
+                            <td class="text-end">{{ money(row.revenue) }}</td>
+                            <td class="text-end fw-semibold">{{ money(row.gross_profit) }}</td>
+                            <td class="text-end">{{ pct(row.margin) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="small text-muted mb-0">No priced sales in this range.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Profit by make</h5>
+            <p class="small text-muted mb-3">Where closed deals made or lost money</p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Make</th>
+                            <th class="text-end">Units</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Profit</th>
+                            <th class="text-end">Avg. profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in makes %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td class="text-end">{{ row.units }}</td>
+                            <td class="text-end">{{ money(row.revenue) }}</td>
+                            <td class="text-end fw-semibold">{{ money(row.gross_profit) }}</td>
+                            <td class="text-end">{{ money(row.avg_profit) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted">No priced sales in this range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Inventory still owned</h5>
+            <p class="small text-muted mb-3">Current capital, not limited to the selected months</p>
+            <dl class="row small mb-0">
+                <dt class="col-7 text-muted fw-normal">Unsold vehicles</dt>
+                <dd class="col-5 text-end mb-2">{{ inventory.units }}</dd>
+                <dt class="col-7 text-muted fw-normal">Available / pending / coming soon</dt>
+                <dd class="col-5 text-end mb-2">{{ inventory.available }} / {{ inventory.pending }} / {{ inventory.coming_soon }}</dd>
+                <dt class="col-7 text-muted fw-normal">Acquisition recorded</dt>
+                <dd class="col-5 text-end mb-2">{{ money(inventory.acquisition) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Prep spent</dt>
+                <dd class="col-5 text-end mb-2">{{ money(inventory.prep) }}</dd>
+                <dt class="col-7 fw-semibold">Capital tied up</dt>
+                <dd class="col-5 text-end mb-2 fw-semibold">{{ money(inventory.capital) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Asking price, OTD</dt>
+                <dd class="col-5 text-end mb-2">{{ money(inventory.asking_otd) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Estimated tax if sold at asking</dt>
+                <dd class="col-5 text-end mb-2">{{ money(inventory.estimated_tax) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Estimated profit after tax</dt>
+                <dd class="col-5 text-end mb-2">{{ money(inventory.estimated_profit) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Missing acquisition cost</dt>
+                <dd class="col-5 text-end mb-0">{{ inventory.missing_acquisition }}</dd>
+            </dl>
+            <p class="small text-muted mb-0 mt-3">Estimated profit includes only unsold cars with an acquisition cost or at least one prep expense. Cars with no cost basis are left out so asking price is not treated as profit.</p>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Receipt cash detail</h5>
+            <p class="small text-muted mb-3">From sale receipts on priced deals in this range. Fees are not vehicle gross profit.</p>
+            <dl class="row small mb-0">
+                <dt class="col-7 text-muted fw-normal">Doc fees</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.document_fee) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Warranty fees</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.warranty_fee) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Tag fees</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.tags_fee) }}</dd>
+                <dt class="col-7 fw-semibold">Contribution</dt>
+                <dd class="col-5 text-end mb-2 fw-semibold">{{ money(kpis.contribution) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Other receipt charges</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.other_charges) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Title / registration</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.title_fee) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Down payments</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.down_payment) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Trade allowances</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.trade_allow) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Credits</dt>
+                <dd class="col-5 text-end mb-2">{{ money(receipts.credits) }}</dd>
+                <dt class="col-7 text-muted fw-normal">Receipt cash due</dt>
+                <dd class="col-5 text-end mb-0">{{ money(receipts.amount_received) }}</dd>
+            </dl>
+            <p class="small text-muted mb-0 mt-3">Other charges, title fees, trades, credits, and cash due are shown for review. They are not added to gross profit.</p>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Payment method</h5>
+            <p class="small text-muted mb-3">Kept revenue by how the sale was paid</p>
+            {% if payments %}
+            <div class="analytics-chart-wrap analytics-chart-sm mb-3">
+                <canvas id="chartPayments" aria-label="Payment method chart"></canvas>
+            </div>
+            <ul class="list-unstyled small mb-0">
+                {% for row in payments %}
+                <li class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{{ row.label }}</span>
+                    <span class="text-muted">{{ row.units }} · {{ money(row.revenue) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="small text-muted mb-0">No priced sales in this range.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Top vendors</h5>
+            <p class="small text-muted mb-3">Dated rebuild costs in this range</p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Vendor</th>
+                            <th class="text-end">Items</th>
+                            <th class="text-end">Spent</th>
+                            <th class="text-end">Share</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in vendors %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td class="text-end">{{ row.count }}</td>
+                            <td class="text-end">{{ money(row.amount) }}</td>
+                            <td class="text-end">{{ pct(row.share) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-muted">No dated expenses in this range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="table-card p-3 p-md-4 h-100">
+            <h5 class="fw-bold mb-1">Recent expenses</h5>
+            <p class="small text-muted mb-3">Latest dated cost items in this range</p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Item</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recent_expenses %}
+                        <tr>
+                            <td class="text-nowrap">{{ item.purchased_on.strftime('%m/%d/%Y') if item.purchased_on else '—' }}</td>
+                            <td>
+                                <a href="{{ url_for('admin.vehicle_rebuild_tracker', id=item.vehicle_id) }}">{{ item.description }}</a>
+                                <div class="small text-muted">{{ item.vehicle }} · {{ item.label }}{% if item.vendor != 'Not recorded' %} · {{ item.vendor }}{% endif %}</div>
+                            </td>
+                            <td class="text-end text-nowrap">{{ money(item.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">No dated expenses in this range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    'use strict';
+    const charts = {{ charts | tojson }};
+    const grid = { color: 'rgba(0,0,0,0.06)' };
+    const money = (value) => Number(value || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+    });
+    const axisMoney = (value) => Number(value || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+    });
+    const tooltip = {
+        callbacks: {
+            label(context) {
+                const label = context.dataset.label ? context.dataset.label + ': ' : '';
+                return label + money(context.parsed.y ?? context.parsed.x ?? context.parsed);
+            },
+        },
+    };
+    const common = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: tooltip,
+        },
+    };
+    const el = (id) => document.getElementById(id);
+
+    if (el('chartProfit')) {
+        new Chart(el('chartProfit'), {
+            type: 'bar',
+            data: {
+                labels: charts.labels || [],
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Revenue kept',
+                        data: charts.revenue || [],
+                        backgroundColor: 'rgba(13,110,253,0.75)',
+                        borderRadius: 3,
+                        order: 2,
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Acquisition',
+                        data: charts.acquisition || [],
+                        backgroundColor: 'rgba(253,126,20,0.8)',
+                        borderRadius: 3,
+                        order: 3,
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Prep costs',
+                        data: charts.prep || [],
+                        backgroundColor: 'rgba(111,66,193,0.75)',
+                        borderRadius: 3,
+                        order: 4,
+                    },
+                    {
+                        type: 'line',
+                        label: 'Gross profit',
+                        data: charts.gross_profit || [],
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25,135,84,0.12)',
+                        tension: 0.25,
+                        pointRadius: 3,
+                        fill: false,
+                        order: 1,
+                    },
+                ],
+            },
+            options: Object.assign({}, common, {
+                scales: {
+                    x: { grid: { display: false } },
+                    y: {
+                        grid: grid,
+                        ticks: { callback: axisMoney },
+                    },
+                },
+            }),
+        });
+    }
+
+    if (el('chartExpenses')) {
+        const categories = charts.expense_categories || [];
+        new Chart(el('chartExpenses'), {
+            type: 'bar',
+            data: {
+                labels: charts.labels || [],
+                datasets: categories.length ? categories.map((category) => ({
+                    label: category.label,
+                    data: category.data || [],
+                    backgroundColor: category.color,
+                    stack: 'spend',
+                    borderRadius: 2,
+                })) : [{
+                    label: 'Cash expenses',
+                    data: charts.expense_spend || [],
+                    backgroundColor: '#6c757d',
+                    borderRadius: 3,
+                }],
+            },
+            options: Object.assign({}, common, {
+                scales: {
+                    x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, grid: grid, ticks: { callback: axisMoney } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartMargin')) {
+        new Chart(el('chartMargin'), {
+            data: {
+                labels: charts.labels || [],
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Units sold',
+                        data: charts.units || [],
+                        backgroundColor: 'rgba(13,110,253,0.55)',
+                        borderRadius: 3,
+                        yAxisID: 'y',
+                    },
+                    {
+                        type: 'line',
+                        label: 'Margin %',
+                        data: charts.margin || [],
+                        borderColor: '#198754',
+                        tension: 0.25,
+                        spanGaps: false,
+                        pointRadius: 3,
+                        yAxisID: 'y1',
+                    },
+                ],
+            },
+            options: Object.assign({}, common, {
+                plugins: {
+                    legend: common.plugins.legend,
+                    tooltip: {
+                        callbacks: {
+                            label(context) {
+                                if (context.dataset.yAxisID === 'y1') {
+                                    const value = context.parsed.y;
+                                    return context.dataset.label + ': ' + (value == null ? '—' : value.toFixed(2) + '%');
+                                }
+                                return context.dataset.label + ': ' + context.parsed.y;
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, position: 'left', grid: grid, title: { display: true, text: 'Units' }, ticks: { precision: 0 } },
+                    y1: {
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Margin' },
+                        ticks: { callback: (value) => value + '%' },
+                    },
+                },
+            }),
+        });
+    }
+
+    if (el('chartCumulative')) {
+        new Chart(el('chartCumulative'), {
+            type: 'line',
+            data: {
+                labels: charts.labels || [],
+                datasets: [{
+                    label: 'Cumulative gross profit',
+                    data: charts.cumulative_profit || [],
+                    borderColor: '#142238',
+                    backgroundColor: 'rgba(20,34,56,0.08)',
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: 2,
+                }],
+            },
+            options: Object.assign({}, common, {
+                plugins: { legend: { display: false }, tooltip: tooltip },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { grid: grid, ticks: { callback: axisMoney } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartCostMix') && (charts.sold_cost_amounts || []).some((value) => value > 0)) {
+        new Chart(el('chartCostMix'), {
+            type: 'doughnut',
+            data: {
+                labels: charts.sold_cost_labels || [],
+                datasets: [{
+                    data: charts.sold_cost_amounts || [],
+                    backgroundColor: charts.sold_cost_colors || [],
+                    borderWidth: 0,
+                }],
+            },
+            options: Object.assign({}, common, {
+                plugins: { legend: { display: false }, tooltip: tooltip },
+                cutout: '58%',
+            }),
+        });
+    }
+
+    if (el('chartSalespeople') && (charts.salesperson_labels || []).length) {
+        new Chart(el('chartSalespeople'), {
+            type: 'bar',
+            data: {
+                labels: charts.salesperson_labels,
+                datasets: [{
+                    label: 'Gross profit',
+                    data: charts.salesperson_profit || [],
+                    backgroundColor: 'rgba(25,135,84,0.75)',
+                    borderRadius: 3,
+                }],
+            },
+            options: Object.assign({}, common, {
+                indexAxis: 'y',
+                plugins: { legend: { display: false }, tooltip: tooltip },
+                scales: {
+                    x: { grid: grid, ticks: { callback: axisMoney } },
+                    y: { grid: { display: false } },
+                },
+            }),
+        });
+    }
+
+    if (el('chartPayments') && (charts.payment_revenue || []).length) {
+        new Chart(el('chartPayments'), {
+            type: 'doughnut',
+            data: {
+                labels: charts.payment_labels || [],
+                datasets: [{
+                    data: charts.payment_revenue || [],
+                    backgroundColor: ['#0d6efd', '#198754', '#fd7e14', '#6f42c1', '#20c997', '#dc3545', '#0dcaf0', '#6c757d'],
+                    borderWidth: 0,
+                }],
+            },
+            options: Object.assign({}, common, {
+                plugins: { legend: { display: false }, tooltip: tooltip },
+                cutout: '58%',
+            }),
+        });
+    }
+})();
+</script>
+{% endblock %}

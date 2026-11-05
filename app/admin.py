@@ -510,12 +510,18 @@ def dashboard():
         for r in top_vehicle_rows if vehicles_by_id.get(r.vehicle_id)
     ]
 
+    financials = None
+    if getattr(current_user, 'is_admin', False):
+        from app.financials import build_financial_summary
+        financials = build_financial_summary()
+
     return render_template(
         'admin/dashboard.html',
         stats=stats,
         recent_leads=recent_leads,
         top_searches=top_searches,
         most_viewed_vehicles=most_viewed_vehicles,
+        financials=financials,
     )
 
 
@@ -2605,6 +2611,18 @@ def analytics():
         'admin/analytics.html',
         **data,
         format_duration=format_duration,
+    )
+
+
+@admin_bp.route('/financials')
+@admin_role_required
+def financials():
+    """Monthly profit, cost, and expense charts. Administrators only."""
+    from app.financials import build_financial_dashboard
+
+    return render_template(
+        'admin/financials.html',
+        **build_financial_dashboard(request.args),
     )
 
 

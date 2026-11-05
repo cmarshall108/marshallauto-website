@@ -24,6 +24,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Add/edit/delete vehicles with image uploads
   - Print per-vehicle window sheets with QR codes linking to the public listing, without printing the price so sheets stay valid when the price changes
   - Per-vehicle rebuild cost tracker for acquisition, parts, labor, services, and other expenses, with private receipt-photo uploads (including phone camera capture) and projected/actual profit and margin calculations
+  - Administrator financials page with monthly profit, revenue, tax, acquisition, prep costs, cash expenses by category, margins, salesperson and make breakdowns, and unsold inventory capital
   - Mark available vehicles as Coming Soon to feature them without publishing sale pricing; clear the flag when ready to list
   - Private sold-vehicle records: actual amount received, payment method, sale notes, and buyer ID photos
   - Printable customer sale receipts. Sales tax is 3% of the entered OTD sale price, and the agreed vehicle price is that OTD amount minus the tax. Doc, warranty, and tags fees, down payment, trade allowance, calculated cash due, salesman, and as-is/title terms are included
@@ -282,7 +283,7 @@ Administrators can create **salesman** logins under **Admin → Salesmen**:
 4. They then complete **profile setup**: full name, email, phone, dealer tag, and a new password replacing the temporary one.
 5. After onboarding, the panel prefills their **dealer tag / salesperson name** on test drives, vehicle sale details, and the bill of sale. Saved **dealer tags** appear as quick-select chips on those forms.
 
-Only administrators can open Settings or manage salesman accounts and dealer tags. Deactivating a salesman blocks further logins and invalidates their sessions. Resetting a temporary password from the edit screen also clears 2FA so they re-enroll on the next login.
+Only administrators can open Financials, Settings, or manage salesman accounts and dealer tags. Deactivating a salesman blocks further logins and invalidates their sessions. Resetting a temporary password from the edit screen also clears 2FA so they re-enroll on the next login.
 
 ## Admin two-factor authentication
 

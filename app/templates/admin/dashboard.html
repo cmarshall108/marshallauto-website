@@ -74,6 +74,44 @@
     </div>
 </div>
 
+{% if financials %}
+<div class="table-card p-3 p-md-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h4 class="fw-bold mb-1">Monthly profit and expenses</h4>
+            <p class="text-muted small mb-0">
+                {{ financials.period_label }} · profit is booked when a car sells, after the 3% highway-use tax.
+                Expense bars use rebuild-cost receipt dates.
+            </p>
+        </div>
+        <a href="{{ url_for('admin.financials') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-bar-chart-line me-1"></i> Full financials
+        </a>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <p class="text-muted small mb-1">Gross profit</p>
+            <div class="h4 fw-bold mb-0 {{ 'text-danger' if financials.kpis.gross_profit < 0 else '' }}">{{ financials.kpis.gross_profit | format_currency }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <p class="text-muted small mb-1">Revenue kept</p>
+            <div class="h4 fw-bold mb-0">{{ financials.kpis.revenue | format_currency }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <p class="text-muted small mb-1">Cash expenses</p>
+            <div class="h4 fw-bold mb-0">{{ financials.kpis.expense_spend | format_currency }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <p class="text-muted small mb-1">{{ financials.current.label if financials.current else 'This month' }}</p>
+            <div class="h4 fw-bold mb-0">{{ financials.current.gross_profit | format_currency if financials.current else '$0.00' }}</div>
+        </div>
+    </div>
+    <div class="analytics-chart-wrap">
+        <canvas id="chartDashboardProfit" height="120" aria-label="Monthly profit and expenses chart"></canvas>
+    </div>
+</div>
+{% endif %}
+
 <div class="table-card p-4">
     <h4 class="fw-bold mb-3">Recent Leads</h4>
     {% if recent_leads %}
@@ -157,4 +195,74 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if financials %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const charts = {{ financials.charts | tojson }};
+    const canvas = document.getElementById('chartDashboardProfit');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const money = (value) => Number(value || 0).toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+    });
+    new Chart(canvas, {
+        data: {
+            labels: charts.labels || [],
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Revenue kept',
+                    data: charts.revenue || [],
+                    backgroundColor: 'rgba(13,110,253,0.7)',
+                    borderRadius: 3,
+                    order: 2,
+                },
+                {
+                    type: 'bar',
+                    label: 'Cash expenses',
+                    data: charts.expense_spend || [],
+                    backgroundColor: 'rgba(253,126,20,0.8)',
+                    borderRadius: 3,
+                    order: 3,
+                },
+                {
+                    type: 'line',
+                    label: 'Gross profit',
+                    data: charts.profit || [],
+                    borderColor: '#198754',
+                    backgroundColor: 'transparent',
+                    tension: 0.25,
+                    pointRadius: 2,
+                    order: 1,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            return context.dataset.label + ': ' + Number(context.parsed.y || 0).toLocaleString('en-US', {
+                                style: 'currency', currency: 'USD',
+                            });
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { callback: money } },
+            },
+        },
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

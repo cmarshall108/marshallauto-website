@@ -34,6 +34,7 @@
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'chat.inbox' %}active{% endif %}" href="{{ url_for('chat.inbox') }}"><i class="bi bi-chat-dots me-2"></i> Live Chat</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.analytics' %}active{% endif %}" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i> Analytics</a></li>
             {% if current_user.is_admin %}
+            <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.financials' %}active{% endif %}" href="{{ url_for('admin.financials') }}"><i class="bi bi-bar-chart-line me-2"></i> Financials</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint and (request.endpoint.startswith('admin.salesman') or 'dealer_tag' in request.endpoint) %}active{% endif %}" href="{{ url_for('admin.salesmen') }}"><i class="bi bi-people me-2"></i> Salesmen</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i> Settings</a></li>
             {% endif %}
@@ -67,6 +68,7 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('chat.inbox') }}"><i class="bi bi-chat-dots me-2"></i>Live Chat</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.analytics') }}"><i class="bi bi-graph-up-arrow me-2"></i>Analytics</a></li>
                     {% if current_user.is_admin %}
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.financials') }}"><i class="bi bi-bar-chart-line me-2"></i>Financials</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.salesmen') }}"><i class="bi bi-people me-2"></i>Salesmen</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear me-2"></i>Settings</a></li>
                     {% endif %}
