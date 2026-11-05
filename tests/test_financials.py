@@ -233,6 +233,19 @@ class FinancialPageTests(unittest.TestCase):
         db.session.commit()
         self.client = self.app.test_client()
 
+        @self.app.route('/_test_force_login/<int:user_id>')
+        def _test_force_login(user_id):
+            from flask import session as flask_session
+            from flask_login import login_user
+
+            user = db.session.get(User, user_id)
+            if user is None:
+                return 'missing', 404
+            login_user(user)
+            flask_session['admin_2fa_version'] = user.auth_version
+            flask_session['admin_2fa_at'] = time.time()
+            return 'ok'
+
     def tearDown(self):
         login_manager.session_protection = self._previous_session_protection
         db.session.remove()
@@ -265,23 +278,26 @@ class FinancialPageTests(unittest.TestCase):
         db.session.commit()
         expected = split_otd_sale_price(Decimal('10000.00'))['agreed_vehicle_price'] - Decimal('6100.00')
 
+        # Flask's test client cookie jar is process-wide, so keep role checks on
+        # one client and clear the session between salesman and admin.
         anonymous = self.client.get('/admin/financials')
         self.assertEqual(anonymous.status_code, 302)
         self.assertIn('/admin/login', anonymous.headers['Location'])
 
-        with self.client.session_transaction() as sess:
-            sess['_user_id'] = str(self.salesman.id)
-            sess['_fresh'] = True
-            sess['admin_2fa_version'] = self.salesman.auth_version
-            sess['admin_2fa_at'] = time.time()
+        self.assertEqual(
+            self.client.get(f'/_test_force_login/{self.salesman.id}').status_code,
+            200,
+        )
         blocked = self.client.get('/admin/financials')
         self.assertEqual(blocked.status_code, 302)
         self.assertIn('/admin/dashboard', blocked.headers['Location'])
         salesman_dashboard = self.client.get('/admin/dashboard')
         self.assertEqual(salesman_dashboard.status_code, 200)
-        self.assertNotIn('chartDashboardProfit', salesman_dashboard.get_data(as_text=True))
-        self.client.get('/admin/logout')
+        salesman_body = salesman_dashboard.get_data(as_text=True)
+        self.assertNotIn('chartDashboardProfit', salesman_body)
+        self.assertNotIn('href="/admin/financials"', salesman_body)
 
+        self.client.get('/admin/logout')
         self._login_admin()
         page = self.client.get('/admin/financials')
         self.assertEqual(page.status_code, 200)
@@ -291,6 +307,8 @@ class FinancialPageTests(unittest.TestCase):
         self.assertIn('id="chartExpenses"', body)
         self.assertIn(format_currency(expected), body)
         self.assertIn('Service / Repair', body)
+        self.assertIn('href="/admin/financials"', body)
         dashboard = self.client.get('/admin/dashboard')
-        self.assertIn('chartDashboardProfit', dashboard.get_data(as_text=True))
-        self.assertIn('Full financials', dashboard.get_data(as_text=True))
+        dash_body = dashboard.get_data(as_text=True)
+        self.assertIn('chartDashboardProfit', dash_body)
+        self.assertIn('Full financials', dash_body)
