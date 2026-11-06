@@ -140,8 +140,8 @@ def _image_prompt(year, make, model, body_style=None, **details):
         f'generic or neutral paint color when an exterior color is listed. Show one '
         f'complete vehicle in a front three-quarter view on a clean neutral studio '
         f'background, soft even lighting, and realistic proportions. Show the listed '
-        f'interior color through the glass. No people, no text, no watermark, no '
-        f'visible logos or badges, and no readable license plate. This is an '
+        f'interior color through the glass. No people, no text, no watermark, include '
+        f'visible logos and badges though, and no readable license plate. This is an '
         f'illustrative reference of the listed configuration, not a photo of one '
         f'specific car.\n' + '\n'.join(listed)
     )
