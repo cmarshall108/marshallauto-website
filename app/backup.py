@@ -91,6 +91,11 @@ def _database_uri() -> str:
 
 
 def _sqlite_path_from_uri(uri: str) -> Path | None:
+    """Resolve SQLite file paths the same way Flask-SQLAlchemy does.
+
+    Relative ``sqlite:///file.db`` URIs land under ``app.instance_path``, not the
+    process cwd/project root. Absolute ``sqlite:////abs/path.db`` URIs are kept as-is.
+    """
     if not uri.startswith('sqlite'):
         return None
     if uri in ('sqlite:///:memory:', 'sqlite://'):
@@ -100,9 +105,13 @@ def _sqlite_path_from_uri(uri: str) -> Path | None:
     if uri.startswith('sqlite:///'):
         relative = uri[len('sqlite:///'):]
         path = Path(relative)
-        if not path.is_absolute():
-            path = _project_root() / path
-        return path
+        if path.is_absolute():
+            return path
+        # Prefer the live Flask instance folder (production: <root>/instance/...).
+        instance_path = Path(getattr(current_app, 'instance_path', '') or '')
+        if instance_path.is_dir():
+            return instance_path / path
+        return _project_root() / 'instance' / path
     return None
 
 
