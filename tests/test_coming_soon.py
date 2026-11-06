@@ -251,6 +251,44 @@ class ComingSoonTests(unittest.TestCase):
         self.assertIn(self.available.slug, feed)
         self.assertEqual(self.client.get(f'/inventory/{self.teaser.slug}').status_code, 404)
 
+    def test_similar_vehicles_omit_coming_soon_teasers(self):
+        """Coming soon cards must not appear under Similar Vehicles (detail URLs 404)."""
+        sibling = self.add_vehicle(
+            '2019-Honda-Civic-available',
+            is_coming_soon=False,
+            price=14200,
+        )
+        teaser_sedan = self.add_vehicle(
+            '2017-Honda-Fit-coming-soon',
+            is_coming_soon=True,
+            price=9900,
+        )
+        # Match the listed car's make/body so both would otherwise rank as similar.
+        sibling.body_style = 'Sedan'
+        teaser_sedan.make = 'Honda'
+        teaser_sedan.model = 'Fit'
+        teaser_sedan.body_style = 'Sedan'
+        db.session.commit()
+
+        from app.shopper import similar_vehicles
+        related = similar_vehicles(self.available)
+        related_slugs = {vehicle.slug for vehicle in related}
+        self.assertIn(sibling.slug, related_slugs)
+        self.assertNotIn(teaser_sedan.slug, related_slugs)
+        self.assertNotIn(self.teaser.slug, related_slugs)
+
+        page = BeautifulSoup(
+            self.client.get(f'/inventory/{self.available.slug}').data,
+            'html.parser',
+        )
+        similar = page.find(string=lambda value: value and 'Similar Vehicles' in value)
+        self.assertIsNotNone(similar)
+        section = similar.find_parent('section') or similar.find_parent('div')
+        section_html = str(section) if section else page.decode()
+        self.assertIn(sibling.slug, section_html)
+        self.assertNotIn(teaser_sedan.slug, section_html)
+        self.assertNotIn(self.teaser.slug, section_html)
+
     def test_contact_link_prefills_the_vehicle_interest(self):
         response = self.client.get(f'/contact?vehicle_id={self.teaser.id}')
         self.assertEqual(response.status_code, 200)

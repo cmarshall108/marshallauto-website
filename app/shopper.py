@@ -155,12 +155,19 @@ def confirm_hold(hold):
 
 
 def similar_vehicles(vehicle, limit=4):
-    """Rank available alternatives by body style, price, and mileage proximity."""
+    """Rank available alternatives by body style, price, and mileage proximity.
+
+    Coming Soon teasers stay on /coming-soon only — their inventory detail URLs 404.
+    """
     price = float(vehicle.display_price or 0)
     mileage = vehicle.mileage or 0
     candidates = (
         Vehicle.query
-        .filter(Vehicle.id != vehicle.id, Vehicle.status == 'available')
+        .filter(
+            Vehicle.id != vehicle.id,
+            Vehicle.status == 'available',
+            Vehicle.is_coming_soon.is_(False),
+        )
         .all()
     )
 
