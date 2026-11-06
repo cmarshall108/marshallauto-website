@@ -29,7 +29,7 @@
         if (window.innerWidth < 992 && window.innerHeight < 540) return true;
         if (document.querySelector('.modal.show, .modal-backdrop, .offcanvas.show, #mainNav.show, #mainNav.collapsing')) return true;
         if (document.querySelector('#gallery-lightbox:not([hidden]), #gallery-hotspot-card:not([hidden])')) return true;
-        if (document.querySelector('#cookie-consent-banner:not(.d-none), #chat-widget-panel:not(.d-none), #compare-bar:not(.d-none)')) return true;
+        if (document.querySelector('#cookie-consent-banner:not(.d-none), #chat-widget-panel:not(.d-none), #compare-bar:not(.d-none), #engagement-nudge:not([hidden])')) return true;
         return Array.from(document.querySelectorAll('video')).some(function (video) {
             return !video.paused && !video.ended;
         });
@@ -120,7 +120,16 @@
     prompt.querySelectorAll('[data-visit-dismiss]').forEach(function (button) {
         button.addEventListener('click', dismiss);
     });
-    document.getElementById('visit-prompt-directions').addEventListener('click', dismiss);
+    var directions = document.getElementById('visit-prompt-directions');
+    if (directions) directions.addEventListener('click', dismiss);
+    var chatBtn = document.getElementById('visit-prompt-chat');
+    if (chatBtn) {
+        chatBtn.addEventListener('click', function () {
+            dismiss();
+            var toggle = document.getElementById('chat-widget-toggle');
+            if (toggle) toggle.click();
+        });
+    }
     document.addEventListener('focusin', function () {
         if (blocked()) prompt.hidden = true;
     });

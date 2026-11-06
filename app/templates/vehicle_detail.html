@@ -860,16 +860,24 @@ bi-check-circle
         <img src="{{ visit_image.variant_url('thumbnail') if visit_image else vehicle.primary_image_url() }}" alt="" width="72" height="54" loading="lazy">
         <div>
             <h2 id="visit-prompt-title">Want a closer look?</h2>
-            <p>Come see this {{ vehicle.make }} {{ vehicle.model }} at Marshall Auto.</p>
+            <p>Come see this {{ vehicle.make }} {{ vehicle.model }} at {{ business_name }}, or ask a quick question before you leave.</p>
         </div>
     </div>
-    <p class="visit-prompt-address"><i class="bi bi-geo-alt" aria-hidden="true"></i> <span>360 Wilson Rd<br>Sanford, NC 27332</span></p>
+    <p class="visit-prompt-address"><i class="bi bi-geo-alt" aria-hidden="true"></i> <span>{{ business_address }}<br>{{ business_city }}, {{ business_state }} {{ business_zip }}</span></p>
     <div class="visit-prompt-actions">
-        <a class="btn btn-primary" id="visit-prompt-directions" href="https://www.google.com/maps/dir/?api=1&amp;destination=360%20Wilson%20Rd%2C%20Sanford%20NC%2027332" target="_blank" rel="noopener noreferrer"><i class="bi bi-sign-turn-right me-1" aria-hidden="true"></i>Get directions</a>
+        {% set phone_digits = business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') %}
+        {% set maps_dest = (business_address ~ ', ' ~ business_city ~ ' ' ~ business_state ~ ' ' ~ business_zip) | urlencode %}
+        <a class="btn btn-primary" id="visit-prompt-directions" href="https://www.google.com/maps/dir/?api=1&amp;destination={{ maps_dest }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-sign-turn-right me-1" aria-hidden="true"></i>Get directions</a>
+        <a class="btn btn-outline-primary" href="tel:{{ phone_digits }}"><i class="bi bi-telephone-fill me-1" aria-hidden="true"></i>Call</a>
+        <a class="btn btn-outline-primary" href="sms:{{ phone_digits }}?&amp;body={{ ('Hello, I am interested in ' ~ vehicle.title ~ '.') | urlencode }}"><i class="bi bi-chat-dots-fill me-1" aria-hidden="true"></i>Text</a>
+        <button type="button" class="btn btn-outline-secondary" id="visit-prompt-chat"><i class="bi bi-headset me-1" aria-hidden="true"></i>Chat</button>
         <button type="button" class="btn btn-link" data-visit-dismiss>Not now</button>
     </div>
 </aside>
 {% endif %}
+{% with exclude_slug=vehicle.slug %}
+{% include "_recently_viewed.html" %}
+{% endwith %}
 {% include "_buyer_guides.html" %}
 {% endblock %}
 

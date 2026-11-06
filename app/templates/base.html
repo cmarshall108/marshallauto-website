@@ -401,6 +401,32 @@
     </div>
     {% endif %}
 
+    <!-- Soft engagement nudge (exit-intent / idle) -->
+    {% if not is_financing_application %}
+    <aside id="engagement-nudge" class="engagement-nudge" hidden aria-labelledby="engagement-nudge-title" aria-live="polite">
+        <button type="button" class="engagement-nudge-close" data-engage-dismiss aria-label="Dismiss help offer" title="Dismiss">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+        <div class="engagement-nudge-body">
+            <h2 id="engagement-nudge-title">Need a hand finding the right car?</h2>
+            <p>We can answer questions, check availability, or point you to similar vehicles — no pressure.</p>
+            <div class="engagement-nudge-actions">
+                {% set phone_digits = business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') %}
+                <button type="button" class="btn btn-primary btn-sm" id="engagement-nudge-chat">
+                    <i class="bi bi-chat-dots-fill me-1" aria-hidden="true"></i>Chat with us
+                </button>
+                <a class="btn btn-outline-primary btn-sm" id="engagement-nudge-call" href="tel:{{ phone_digits }}">
+                    <i class="bi bi-telephone-fill me-1" aria-hidden="true"></i>Call
+                </a>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('main.inventory') }}" data-engage-dismiss>
+                    Browse inventory
+                </a>
+                <button type="button" class="btn btn-link btn-sm" data-engage-dismiss>Not now</button>
+            </div>
+        </div>
+    </aside>
+    {% endif %}
+
     <!-- Mobile sticky CTA -->
     <div class="mobile-cta-bar d-lg-none" role="navigation" aria-label="Quick actions">
         <div class="container-fluid px-0">
@@ -473,6 +499,7 @@
     {% endif %}
     <script src="{{ asset_url('js/chat-widget.js') }}" defer></script>
     <script src="{{ asset_url('js/main.js') }}" defer></script>
+    <script src="{{ asset_url('js/engagement-nudge.js') }}" defer></script>
     {% endif %}
     {% block extra_js %}{% endblock %}
 </body>

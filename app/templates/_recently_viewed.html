@@ -1,0 +1,19 @@
+{# Client-filled from localStorage via VehicleTools. Hidden until vehicles load. #}
+<section id="recently-viewed-rail"
+         class="section-padding recently-viewed-rail d-none"
+         aria-labelledby="recently-viewed-title"
+         data-exclude-slug="{{ exclude_slug or '' }}">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
+            <div>
+                <span class="section-eyebrow">Pick up where you left off</span>
+                <h2 id="recently-viewed-title" class="section-title mb-1">Recently viewed</h2>
+                <p class="section-subtitle mb-0">Vehicles you looked at on this device.</p>
+            </div>
+            <a href="{{ url_for('main.saved_vehicles') }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-heart me-1" aria-hidden="true"></i>Saved vehicles
+            </a>
+        </div>
+        <div id="recently-viewed-grid" class="inventory-grid" role="list"></div>
+    </div>
+</section>

@@ -275,9 +275,38 @@
         } catch (e) { /* ignore malformed payload */ }
     }
 
+    function renderRecentlyViewedRail() {
+        var rail = document.getElementById('recently-viewed-rail');
+        var grid = document.getElementById('recently-viewed-grid');
+        if (!rail || !grid) return Promise.resolve();
+        var exclude = rail.getAttribute('data-exclude-slug') || '';
+        var slugs = getRecentlyViewed(exclude).slice(0, 4);
+        if (!slugs.length) {
+            rail.classList.add('d-none');
+            grid.innerHTML = '';
+            return Promise.resolve();
+        }
+        return fetchSummaries(slugs).then(function (vehicles) {
+            var available = (vehicles || []).filter(function (v) {
+                return v && v.status === 'available';
+            });
+            if (!available.length) {
+                rail.classList.add('d-none');
+                grid.innerHTML = '';
+                return;
+            }
+            grid.innerHTML = available.map(function (v) {
+                return vehicleCardHtml(v);
+            }).join('');
+            rail.classList.remove('d-none');
+            bindCardControls();
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         bindCardControls();
         trackCurrentVehicleView();
+        renderRecentlyViewedRail();
     });
 
     var compareClear = document.getElementById('compare-bar-clear');
@@ -298,6 +327,7 @@
         toggleCompare: toggleCompare,
         trackRecentlyViewed: trackRecentlyViewed,
         getRecentlyViewed: getRecentlyViewed,
+        renderRecentlyViewedRail: renderRecentlyViewedRail,
         fetchSummaries: fetchSummaries,
         renderListPage: renderListPage,
         renderComparePage: renderComparePage,
