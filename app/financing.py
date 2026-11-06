@@ -25,6 +25,8 @@ from app.spam_filter import check_lead_spam_for_app
 _SSN_PATTERN = re.compile(r'^\d{3}-?\d{2}-?\d{4}$')
 _EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 _PHONE_PATTERN = re.compile(r'^[\d\s()+.\-]+$')
+_US_STATE_PATTERN = re.compile(r'^[A-Za-z]{2}$')
+_US_ZIP_PATTERN = re.compile(r'^\d{5}(?:-?\d{4})?$')
 _STORED_FILENAME_PATTERN = re.compile(r'^[0-9a-f]{32}\.enc$')
 _MONEY_FIELDS = {
     'housing_payment', 'employment_gross', 'employment_net',
@@ -36,10 +38,18 @@ _TEXT_LIMITS = {
     'ssn': 11,
     'dob': 10,
     'residence_address': 160,
+    'residence_street': 100,
+    'residence_city': 64,
+    'residence_state': 2,
+    'residence_zip': 10,
     'residence_years': 3,
     'residence_months': 2,
     'mailing_address': 160,
     'previous_address': 160,
+    'previous_street': 100,
+    'previous_city': 64,
+    'previous_state': 2,
+    'previous_zip': 10,
     'previous_residence_years': 3,
     'previous_residence_months': 2,
     'home_phone': 24,
@@ -182,6 +192,130 @@ def _parse_money(value, label, errors, required=False):
     return amount.quantize(Decimal('0.01'))
 
 
+def _normalize_zip(value):
+    digits = re.sub(r'\D', '', value or '')
+    if len(digits) == 5:
+        return digits
+    if len(digits) == 9:
+        return f'{digits[:5]}-{digits[5:]}'
+    return (value or '').strip()
+
+
+def _compose_us_address(street, city, state, zip_code):
+    street = ' '.join((street or '').split())
+    city = ' '.join((city or '').split())
+    state = (state or '').strip().upper()
+    zip_code = _normalize_zip(zip_code)
+    locality = ' '.join(part for part in (city and f'{city},', state, zip_code) if part).replace(' ,', ',')
+    if street and locality:
+        return f'{street}, {locality}'
+    return street or locality
+
+
+def _validate_us_address_parts(
+    values,
+    prefix,
+    errors,
+    *,
+    street_field,
+    city_field,
+    state_field,
+    zip_field,
+    combined_field,
+    required,
+    label,
+):
+    """Require street/city/state/ZIP when needed and build the combined address line."""
+    street = values.get(street_field) or ''
+    city = values.get(city_field) or ''
+    state = (values.get(state_field) or '').strip().upper()
+    zip_code = values.get(zip_field) or ''
+    values[state_field] = state
+    values[zip_field] = _normalize_zip(zip_code) if zip_code else ''
+
+    any_part = any((street, city, state, values[zip_field]))
+    if not required and not any_part and not values.get(combined_field):
+        values[combined_field] = ''
+        return
+
+    if required or any_part:
+        if not street:
+            errors[f'{prefix}_{street_field}'] = f'Enter the {label} street address.'
+        elif len(street) < 3 or not any(character.isdigit() for character in street):
+            # House numbers are standard on US credit apps; still allow rare rural exceptions
+            # when the applicant also provided city + ZIP.
+            if not (city and values[zip_field]):
+                errors[f'{prefix}_{street_field}'] = (
+                    f'Enter a full {label} street address including the house number.'
+                )
+        if not city:
+            errors[f'{prefix}_{city_field}'] = f'Enter the {label} city.'
+        elif len(city) < 2 or not re.search(r'[A-Za-z]', city):
+            errors[f'{prefix}_{city_field}'] = f'Enter a valid {label} city name.'
+        if not state:
+            errors[f'{prefix}_{state_field}'] = f'Enter the {label} state (2 letters).'
+        elif not _US_STATE_PATTERN.fullmatch(state):
+            errors[f'{prefix}_{state_field}'] = 'Use the 2-letter state code (for example NC).'
+        if not values[zip_field]:
+            errors[f'{prefix}_{zip_field}'] = f'Enter the {label} ZIP code.'
+        elif not _US_ZIP_PATTERN.fullmatch(values[zip_field]):
+            errors[f'{prefix}_{zip_field}'] = 'Enter a 5-digit ZIP code (or ZIP+4).'
+
+    if street and city and state and values[zip_field] and f'{prefix}_{street_field}' not in errors \
+            and f'{prefix}_{city_field}' not in errors \
+            and f'{prefix}_{state_field}' not in errors \
+            and f'{prefix}_{zip_field}' not in errors:
+        values[combined_field] = _compose_us_address(street, city, state, values[zip_field])
+    elif values.get(combined_field) and not any_part:
+        # Legacy single-line submissions: keep the value but require city + ZIP cues.
+        combined = values[combined_field]
+        has_zip = bool(re.search(r'\b\d{5}(?:-?\d{4})?\b', combined))
+        # City-ish token before a state code, e.g. "Sanford, NC 27332"
+        has_city = bool(re.search(r'[A-Za-z].*,\s*[A-Za-z]{2}\b', combined))
+        if required or combined:
+            if not has_city:
+                errors[f'{prefix}_{city_field}'] = (
+                    f'Include the city in the {label} address (street, city, state, ZIP).'
+                )
+            if not has_zip:
+                errors[f'{prefix}_{zip_field}'] = (
+                    f'Include the ZIP code in the {label} address.'
+                )
+
+
+def lookup_us_zip(zip_code):
+    """Return city/state suggestions for a US ZIP via Zippopotam.us (no API key)."""
+    digits = re.sub(r'\D', '', zip_code or '')
+    if len(digits) < 5:
+        return None
+    zip5 = digits[:5]
+    url = f'https://api.zippopotam.us/us/{zip5}'
+    try:
+        request = urllib.request.Request(url, headers={'Accept': 'application/json', 'User-Agent': 'MarshallAuto/1.0'})
+        with urllib.request.urlopen(request, timeout=3) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, ValueError):
+        return None
+    places = payload.get('places') or []
+    if not places:
+        return None
+    primary = places[0]
+    cities = []
+    seen = set()
+    for place in places:
+        name = (place.get('place name') or '').strip()
+        if name and name.lower() not in seen:
+            seen.add(name.lower())
+            cities.append(name)
+    return {
+        'zip': zip5,
+        'state': (payload.get('state abbreviation') or '').strip().upper(),
+        'state_name': (payload.get('state') or '').strip(),
+        'city': (primary.get('place name') or '').strip(),
+        'cities': cities,
+    }
+
+
 def _collect_person(form, prefix, errors, require_previous_address):
     values = {}
     for field, limit in _TEXT_LIMITS.items():
@@ -209,8 +343,19 @@ def _collect_person(form, prefix, errors, require_previous_address):
         f'{prefix}_previous_employment_date', errors,
     )
 
+    _validate_us_address_parts(
+        values, prefix, errors,
+        street_field='residence_street',
+        city_field='residence_city',
+        state_field='residence_state',
+        zip_field='residence_zip',
+        combined_field='residence_address',
+        required=True,
+        label='current residence',
+    )
+
     required_fields = (
-        'name', 'ssn', 'residence_address', 'residence_years',
+        'name', 'ssn', 'residence_years',
         'residence_months', 'dependents', 'email', 'housing_status',
         'employment_status', 'total_gross_income', 'total_net_income',
         'alimony_obligation',
@@ -218,6 +363,8 @@ def _collect_person(form, prefix, errors, require_previous_address):
     for field in required_fields:
         if not values[field]:
             errors[f'{prefix}_{field}'] = 'This field is required.'
+    if not values.get('residence_address') and f'{prefix}_residence_street' not in errors:
+        errors[f'{prefix}_residence_street'] = 'Enter your current residence address.'
 
     if not values['home_phone'] and not values['cell_phone']:
         errors[f'{prefix}_cell_phone'] = 'Enter at least one home or cell phone number.'
@@ -274,14 +421,37 @@ def _collect_person(form, prefix, errors, require_previous_address):
             (values['previous_residence_years'] or 0) * 12
             + (values['previous_residence_months'] or 0)
         )
-        if current_months < 24 and not values['previous_address']:
-            errors[f'{prefix}_previous_address'] = (
+        need_previous = current_months < 24
+        _validate_us_address_parts(
+            values, prefix, errors,
+            street_field='previous_street',
+            city_field='previous_city',
+            state_field='previous_state',
+            zip_field='previous_zip',
+            combined_field='previous_address',
+            required=need_previous,
+            label='previous residence',
+        )
+        if need_previous and not values.get('previous_address') and f'{prefix}_previous_street' not in errors:
+            errors[f'{prefix}_previous_street'] = (
                 'Enter your prior address to complete two years of residence history.'
             )
         if current_months + previous_months < 24:
             errors[f'{prefix}_previous_residence_years'] = (
                 'Provide enough prior residence history to cover two years.'
             )
+    else:
+        # Still compose previous address when the optional parts are provided.
+        _validate_us_address_parts(
+            values, prefix, errors,
+            street_field='previous_street',
+            city_field='previous_city',
+            state_field='previous_state',
+            zip_field='previous_zip',
+            combined_field='previous_address',
+            required=False,
+            label='previous residence',
+        )
 
     active_employment = values['employment_status'] in {'employed', 'self-employed'}
     if active_employment:

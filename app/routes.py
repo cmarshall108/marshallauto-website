@@ -1641,6 +1641,21 @@ def financing():
     )
 
 
+@main.route('/api/zip/<zip_code>')
+def zip_lookup(zip_code):
+    """Suggest US city/state for a ZIP so financing applicants complete the full address."""
+    from app.financing import lookup_us_zip
+    if rate_limit_exceeded(f"zip-lookup:{client_ip()}", limit=30, window_seconds=60):
+        return jsonify({'error': 'Too many lookups. Try again shortly.'}), 429
+    result = lookup_us_zip(zip_code)
+    if not result:
+        return jsonify({'error': 'ZIP not found'}), 404
+    response = jsonify(result)
+    response.headers['Cache-Control'] = 'private, max-age=86400'
+    response.headers['X-Robots-Tag'] = 'noindex'
+    return response
+
+
 @main.post('/financing/apply')
 def financing_apply():
     if not online_application_available():

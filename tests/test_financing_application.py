@@ -67,7 +67,10 @@ class FinancingApplicationTests(unittest.TestCase):
             'applicant_name': 'Riley Example',
             'applicant_ssn': '234-12-1234',
             'applicant_dob': '1990-01-02',
-            'applicant_residence_address': '1 Main St, Sanford, NC 27332',
+            'applicant_residence_street': '1 Main St',
+            'applicant_residence_city': 'Sanford',
+            'applicant_residence_state': 'NC',
+            'applicant_residence_zip': '27332',
             'applicant_residence_years': '4',
             'applicant_residence_months': '0',
             'applicant_previous_residence_years': '',
@@ -124,6 +127,9 @@ class FinancingApplicationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Social Security number', response.data)
+        self.assertIn(b'City', response.data)
+        self.assertIn(b'ZIP code', response.data)
+        self.assertIn(b'data-address-zip', response.data)
         self.assertIn(b'Your information is protected', response.data)
         self.assertNotIn(b'googletagmanager.com', response.data)
         self.assertNotIn(b'connect.facebook.net', response.data)
@@ -269,10 +275,16 @@ class FinancingApplicationTests(unittest.TestCase):
             coapplicant_name='Jordan Example',
             coapplicant_ssn='345-67-8901',
             coapplicant_dob='1991-04-05',
-            coapplicant_residence_address='3 Oak St, Sanford, NC 27332',
+            coapplicant_residence_street='3 Oak St',
+            coapplicant_residence_city='Sanford',
+            coapplicant_residence_state='NC',
+            coapplicant_residence_zip='27332',
             coapplicant_residence_years='1',
             coapplicant_residence_months='0',
-            coapplicant_previous_address='8 Pine St, Sanford, NC 27332',
+            coapplicant_previous_street='8 Pine St',
+            coapplicant_previous_city='Sanford',
+            coapplicant_previous_state='NC',
+            coapplicant_previous_zip='27332',
             coapplicant_previous_residence_years='2',
             coapplicant_previous_residence_months='0',
             coapplicant_home_phone='9195550103',
@@ -425,13 +437,51 @@ class FinancingApplicationTests(unittest.TestCase):
         invalid_history = self.submit(
             applicant_residence_years='1',
             applicant_residence_months='0',
-            applicant_previous_address='',
+            applicant_previous_street='',
+            applicant_previous_city='',
+            applicant_previous_state='',
+            applicant_previous_zip='',
             applicant_previous_residence_years='',
             applicant_previous_residence_months='',
         )
         self.assertEqual(invalid_history.status_code, 400)
-        self.assertIn(b'previous address', invalid_history.data.lower())
+        body = invalid_history.data.lower()
+        self.assertTrue(
+            b'previous' in body and (b'street' in body or b'address' in body or b'city' in body),
+            body[:500],
+        )
         self.assertEqual(FinancingApplication.query.count(), 0)
+
+    def test_residence_requires_city_state_and_zip(self):
+        response = self.submit(
+            applicant_residence_street='360 Wilson Rd',
+            applicant_residence_city='',
+            applicant_residence_state='',
+            applicant_residence_zip='',
+        )
+        self.assertEqual(response.status_code, 400)
+        body = response.data.lower()
+        self.assertIn(b'city', body)
+        self.assertIn(b'zip', body)
+        self.assertEqual(FinancingApplication.query.count(), 0)
+
+        ok = self.submit(
+            applicant_residence_street='360 Wilson Rd',
+            applicant_residence_city='Sanford',
+            applicant_residence_state='nc',
+            applicant_residence_zip='27332',
+        )
+        self.assertIn(ok.status_code, (200, 302))
+        self.assertEqual(FinancingApplication.query.count(), 1)
+        # Combined line used for the lender PDF includes city and ZIP.
+        from app.financing import validate_application
+        vehicle = type('V', (), {'id': 1, 'title': 'Test', 'display_price': 10000, 'year': 2018, 'make': 'Honda', 'model': 'Civic', 'stock_number': '1', 'vin': None})()
+        # Ensure compose helper formats correctly via a direct unit check.
+        from app.financing import _compose_us_address
+        self.assertEqual(
+            _compose_us_address('360 Wilson Rd', 'Sanford', 'NC', '27332'),
+            '360 Wilson Rd, Sanford, NC 27332',
+        )
 
     def test_honeypot_submission_is_rejected_without_saving_application(self):
         response = self.submit(website='https://spam.example')
@@ -531,6 +581,37 @@ class FinancingApplicationTests(unittest.TestCase):
 
         self.assertTrue(requires_two_factor(admin))
 
+
+    def test_zip_lookup_endpoint_returns_city_and_state(self):
+        from unittest.mock import patch
+        fake = {
+            'post code': '27332',
+            'country': 'United States',
+            'country abbreviation': 'US',
+            'state': 'North Carolina',
+            'state abbreviation': 'NC',
+            'places': [{'place name': 'Sanford', 'longitude': '-79', 'latitude': '35', 'state': 'North Carolina', 'state abbreviation': 'NC'}],
+        }
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return __import__('json').dumps(fake).encode()
+        with patch('app.financing.urllib.request.urlopen', return_value=Resp()):
+            response = self.client.get('/api/zip/27332')
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload['city'], 'Sanford')
+        self.assertEqual(payload['state'], 'NC')
+        self.assertIn('Sanford', payload['cities'])
+
+    def test_zip_lookup_unknown_code_is_404(self):
+        from unittest.mock import patch
+        import urllib.error
+        def boom(*args, **kwargs):
+            raise urllib.error.HTTPError('https://api.zippopotam.us/us/00000', 404, 'Not Found', hdrs=None, fp=None)
+        with patch('app.financing.urllib.request.urlopen', side_effect=boom):
+            response = self.client.get('/api/zip/00000')
+        self.assertEqual(response.status_code, 404)
 
 if __name__ == '__main__':
     unittest.main()

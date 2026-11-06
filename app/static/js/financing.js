@@ -143,5 +143,116 @@
         });
         jointCredit?.addEventListener('change', updateJointCredit);
         updateJointCredit();
+
+        const zipCache = new Map();
+        const normalizeZip = (value) => String(value || '').replace(/\D/g, '').slice(0, 5);
+
+        const setHint = (input, message, isSuggestion) => {
+            if (!input) return;
+            const hint = document.getElementById(`${input.id}-hint`);
+            if (!hint) return;
+            if (!message) {
+                if (hint.dataset.addressHint !== undefined || hint.dataset.defaultHint) {
+                    hint.textContent = hint.dataset.defaultHint || '';
+                    hint.classList.toggle('d-none', !hint.dataset.defaultHint);
+                }
+                return;
+            }
+            if (!hint.dataset.defaultHint && hint.textContent.trim()) {
+                hint.dataset.defaultHint = hint.textContent.trim();
+            }
+            hint.dataset.addressHint = '1';
+            hint.classList.remove('d-none');
+            hint.textContent = message;
+            if (isSuggestion) {
+                hint.classList.add('text-primary');
+            } else {
+                hint.classList.remove('text-primary');
+            }
+        };
+
+        const applyZipSuggestion = async (zipInput) => {
+            const group = zipInput.closest('.row') || applicationForm;
+            const cityInput = group.querySelector('[data-address-city]');
+            const stateInput = group.querySelector('[data-address-state]');
+            // Prefer sibling fields in the same person section.
+            const prefix = (zipInput.name || '').split('_')[0];
+            const scopedCity = document.getElementById(`${prefix}-${zipInput.name.includes('previous') ? 'previous_city' : 'residence_city'}`)
+                || cityInput;
+            const scopedState = document.getElementById(`${prefix}-${zipInput.name.includes('previous') ? 'previous_state' : 'residence_state'}`)
+                || stateInput;
+            const zip5 = normalizeZip(zipInput.value);
+            if (zip5.length !== 5) {
+                setHint(zipInput, '');
+                return;
+            }
+            let payload = zipCache.get(zip5);
+            if (!payload) {
+                try {
+                    const response = await fetch(`/api/zip/${zip5}`, {
+                        headers: { Accept: 'application/json' },
+                    });
+                    if (!response.ok) {
+                        setHint(zipInput, 'Could not verify that ZIP code. Double-check city and state.');
+                        return;
+                    }
+                    payload = await response.json();
+                    zipCache.set(zip5, payload);
+                } catch (error) {
+                    setHint(zipInput, 'Could not look up that ZIP right now. Please confirm city and state.');
+                    return;
+                }
+            }
+            if (!payload || !payload.city) {
+                setHint(zipInput, 'ZIP not found. Check the code or enter city and state manually.');
+                return;
+            }
+            const cityEmpty = !(scopedCity?.value || '').trim();
+            const stateEmpty = !(scopedState?.value || '').trim();
+            if (cityEmpty && scopedCity) scopedCity.value = payload.city;
+            if (stateEmpty && scopedState) scopedState.value = payload.state || '';
+            const cityValue = (scopedCity?.value || '').trim().toLowerCase();
+            const stateValue = (scopedState?.value || '').trim().toUpperCase();
+            const cityMatches = payload.cities.some(
+                (name) => name.toLowerCase() === cityValue,
+            );
+            if (stateValue && payload.state && stateValue !== payload.state) {
+                setHint(
+                    zipInput,
+                    `ZIP ${zip5} is usually in ${payload.state}. Suggested city: ${payload.city}.`,
+                    true,
+                );
+            } else if (cityValue && !cityMatches) {
+                const alt = payload.cities.slice(0, 3).join(', ');
+                setHint(
+                    zipInput,
+                    `ZIP ${zip5} is commonly ${alt} (${payload.state}). Update city if needed.`,
+                    true,
+                );
+            } else if (cityEmpty || stateEmpty) {
+                setHint(
+                    zipInput,
+                    `Suggested from ZIP: ${payload.city}, ${payload.state}`,
+                    true,
+                );
+            } else {
+                setHint(zipInput, `Matched ${payload.city}, ${payload.state}`, true);
+            }
+            if (scopedState) scopedState.value = scopedState.value.toUpperCase();
+        };
+
+        applicationForm.querySelectorAll('[data-address-zip]').forEach((zipInput) => {
+            zipInput.addEventListener('blur', () => {
+                applyZipSuggestion(zipInput);
+            });
+            zipInput.addEventListener('change', () => {
+                applyZipSuggestion(zipInput);
+            });
+        });
+        applicationForm.querySelectorAll('[data-address-state]').forEach((stateInput) => {
+            stateInput.addEventListener('blur', () => {
+                stateInput.value = stateInput.value.trim().toUpperCase();
+            });
+        });
     });
 })();

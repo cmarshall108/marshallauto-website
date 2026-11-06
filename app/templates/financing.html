@@ -3,10 +3,10 @@
 {% block meta_title %}{{ meta_title }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
 
-{% macro text_field(prefix, name, label, required=false, type='text', autocomplete='', hint='', maxlength=128) %}
+{% macro text_field(prefix, name, label, required=false, type='text', autocomplete='', hint='', maxlength=128, col_class='col-md-6', extra_attrs='') %}
 {% set field_id = prefix ~ '-' ~ name %}
 {% set field_name = prefix ~ '_' ~ name %}
-<div class="col-md-6">
+<div class="{{ col_class }}">
     <label class="form-label small fw-semibold" for="{{ field_id }}">{{ label }}{% if required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}</label>
     {% if type == 'ssn' %}
     <div class="input-group">
@@ -23,10 +23,10 @@
     {% elif type == 'integer' %}
     <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="{{ 120 if 'years' in name else (11 if 'months' in name else 20) }}" step="1" value="{{ form_values.get(field_name, '0' if 'months' in name else '') }}" inputmode="numeric" {% if required %}required{% endif %} autocomplete="off">
     {% else %}
-    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="{{ type }}" value="{{ form_values.get(field_name, '') }}" maxlength="{{ maxlength }}" {% if required %}required{% endif %} autocomplete="{{ autocomplete or 'off' }}">
+    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="{{ type }}" value="{{ form_values.get(field_name, '') }}" maxlength="{{ maxlength }}" {% if required %}required{% endif %} autocomplete="{{ autocomplete or 'off' }}" {{ extra_attrs|safe }}>
     {% endif %}
     <div class="invalid-feedback d-block">{{ form_errors.get(field_name, '') }}</div>
-    {% if hint %}<div class="form-text" id="{{ field_id }}-hint">{{ hint }}</div>{% endif %}
+    {% if hint %}<div class="form-text" id="{{ field_id }}-hint">{{ hint }}</div>{% else %}<div class="form-text d-none" id="{{ field_id }}-hint" data-address-hint></div>{% endif %}
 </div>
 {% endmacro %}
 
@@ -51,16 +51,28 @@
     {{ text_field(prefix, 'name', 'Full legal name (last, first, middle)', true, autocomplete='name') }}
     {{ text_field(prefix, 'ssn', 'Social Security number', true, type='ssn', hint='Example: 123-45-6789') }}
     {{ text_field(prefix, 'dob', 'Date of birth', true, type='date', autocomplete='bday') }}
-    {{ text_field(prefix, 'residence_address', 'Current residence address (street, city, state, ZIP)', true, maxlength=160, autocomplete='street-address') }}
+    <div class="col-12"><p class="small text-muted mb-0">Current residence — street, city, state, and ZIP are all required for the lender.</p></div>
+    {{ text_field(prefix, 'residence_street', 'Street address', true, maxlength=100, autocomplete='address-line1', col_class='col-12', extra_attrs='data-address-street') }}
+    {{ text_field(prefix, 'residence_city', 'City', true, maxlength=64, autocomplete='address-level2', col_class='col-md-5', extra_attrs='data-address-city') }}
+    {{ text_field(prefix, 'residence_state', 'State', true, maxlength=2, autocomplete='address-level1', col_class='col-md-3', hint='2-letter code (NC)', extra_attrs='data-address-state spellcheck="false" autocapitalize="characters"') }}
+    {{ text_field(prefix, 'residence_zip', 'ZIP code', true, maxlength=10, autocomplete='postal-code', col_class='col-md-4', hint='Enter ZIP to auto-fill city and state', extra_attrs='data-address-zip inputmode="numeric"') }}
     {{ text_field(prefix, 'residence_years', 'Years at current address', true, type='integer') }}
     {{ text_field(prefix, 'residence_months', 'Additional months', true, type='integer') }}
     {% if is_applicant %}
-    {{ text_field(prefix, 'mailing_address', 'Mailing address (if different)', maxlength=160) }}
-    {{ text_field(prefix, 'previous_address', 'Previous address (if current address is under 2 years)', maxlength=160) }}
+    {{ text_field(prefix, 'mailing_address', 'Mailing address (if different)', maxlength=160, hint='Include street, city, state, and ZIP if different from residence') }}
+    <div class="col-12"><p class="small text-muted mb-0">Previous residence — required when you have lived at your current address less than 2 years.</p></div>
+    {{ text_field(prefix, 'previous_street', 'Previous street address', maxlength=100, autocomplete='off', col_class='col-12', extra_attrs='data-address-street') }}
+    {{ text_field(prefix, 'previous_city', 'Previous city', maxlength=64, col_class='col-md-5', extra_attrs='data-address-city') }}
+    {{ text_field(prefix, 'previous_state', 'Previous state', maxlength=2, col_class='col-md-3', extra_attrs='data-address-state spellcheck="false" autocapitalize="characters"') }}
+    {{ text_field(prefix, 'previous_zip', 'Previous ZIP', maxlength=10, col_class='col-md-4', extra_attrs='data-address-zip inputmode="numeric"') }}
     {{ text_field(prefix, 'previous_residence_years', 'Years at previous address', type='integer') }}
     {{ text_field(prefix, 'previous_residence_months', 'Additional months at previous address', type='integer') }}
     {% else %}
-    {{ text_field(prefix, 'previous_address', 'Previous address (if current address is under 2 years)', maxlength=160) }}
+    <div class="col-12"><p class="small text-muted mb-0">Previous residence — required when the co-applicant has lived at the current address less than 2 years.</p></div>
+    {{ text_field(prefix, 'previous_street', 'Previous street address', maxlength=100, col_class='col-12', extra_attrs='data-address-street') }}
+    {{ text_field(prefix, 'previous_city', 'Previous city', maxlength=64, col_class='col-md-5', extra_attrs='data-address-city') }}
+    {{ text_field(prefix, 'previous_state', 'Previous state', maxlength=2, col_class='col-md-3', extra_attrs='data-address-state spellcheck="false" autocapitalize="characters"') }}
+    {{ text_field(prefix, 'previous_zip', 'Previous ZIP', maxlength=10, col_class='col-md-4', extra_attrs='data-address-zip inputmode="numeric"') }}
     {{ text_field(prefix, 'previous_residence_years', 'Years at previous address', type='integer') }}
     {{ text_field(prefix, 'previous_residence_months', 'Additional months at previous address', type='integer') }}
     {% endif %}
