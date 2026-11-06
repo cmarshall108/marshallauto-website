@@ -413,6 +413,73 @@ The default admin credentials are set by `ADMIN_USERNAME` and `ADMIN_PASSWORD` i
 flask seed
 ```
 
+## Encrypted data backups (private GitHub repo)
+
+Application data (SQLite/Postgres dump, `instance/private_uploads`, vehicle/CarFax
+media, and Coming Soon stock images) can be backed up every 24 hours to a
+**separate private GitHub repository**. Only **AES-256-GCM ciphertext** (`.mbak`)
+and a small public JSON sidecar (hashes, counts, timestamp) are committed. The
+encryption key never leaves the application server / secret store.
+
+### One-time setup
+
+1. Create an empty **private** GitHub repository used only for backups (not this app repo).
+2. Generate and store a dedicated key (password manager + server env only):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+3. Set on the server (`.env` or systemd environment):
+
+```bash
+BACKUP_ENCRYPTION_KEY=...          # from step 2
+BACKUP_GIT_URL=git@github.com:your-org/marshallauto-data-backups.git
+# or HTTPS:
+# BACKUP_GIT_URL=https://github.com/your-org/marshallauto-data-backups.git
+# BACKUP_GITHUB_TOKEN=github_pat_...   # contents:write on the backup repo only
+BACKUP_LOCAL_DIR=/var/backups/marshallauto/encrypted
+```
+
+4. Grant the server push access with a read/write **deploy key** (SSH) or the PAT above.
+5. Install/update units so the daily timer is enabled:
+
+```bash
+sudo deploy/install.sh
+# optional immediate run:
+sudo systemctl start marshallauto-backup.service
+journalctl -u marshallauto-backup.service -n 50 --no-pager
+```
+
+`marshallauto-backup.timer` runs once per day (default 03:15 local time, with a
+short random delay). Logs: `/var/log/marshallauto-backup.log`.
+
+### Manual backup / restore
+
+```bash
+# Create + encrypt + push ciphertext
+flask backup-data
+
+# Encrypt only (no git push)
+flask backup-data --no-push --output-dir /tmp/ma-backup
+
+# Verify decrypt of a local artifact (no writes)
+flask restore-backup --file /path/to/marshallauto-....mbak
+
+# Fetch latest from the private backup repo and verify
+flask restore-backup
+
+# Apply restore to live paths (stop the site first in production)
+sudo systemctl stop marshallauto
+flask restore-backup --file /path/to/marshallauto-....mbak --apply
+sudo systemctl start marshallauto
+```
+
+Restore copies previous database/files aside with a `.pre-restore-<timestamp>`
+suffix before replacing them. Keep `BACKUP_ENCRYPTION_KEY`, `SECRET_KEY`, and
+`FINANCING_ENCRYPTION_KEY` in a separate secrets backup; losing the backup
+encryption key makes `.mbak` files unrecoverable.
+
 ## Production Deployment
 
 For production, set strong credentials and use a production WSGI server such as Gunicorn:
@@ -496,6 +563,15 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 |----------|-------------|
 | `SECRET_KEY` | Flask secret key (change in production) |
 | `FINANCING_ENCRYPTION_KEY` | Dedicated Fernet key; required to accept or decrypt financing applications |
+| `BACKUP_ENCRYPTION_KEY` | Dedicated secret for AES-256-GCM data backups; **never** store in the backup repo |
+| `BACKUP_GIT_URL` | Clone URL of a **separate private** GitHub repo that receives ciphertext only |
+| `BACKUP_GITHUB_TOKEN` | Optional HTTPS PAT (`contents:write` on the backup repo only); prefer a deploy key for SSH URLs |
+| `BACKUP_GIT_BRANCH` | Backup repo branch (default `main`) |
+| `BACKUP_ENABLED` | Enable scheduled/CLI backups (`true`/`false`, default true) |
+| `BACKUP_RETENTION_COUNT` | How many encrypted artifacts to keep in the backup repo (default `30`) |
+| `BACKUP_INCLUDE_PUBLIC_UPLOADS` | Include vehicle photos and CarFax PDFs (default true) |
+| `BACKUP_INCLUDE_COMING_SOON_STOCK` | Include generated Coming Soon stock images (default true) |
+| `BACKUP_LOCAL_DIR` | Optional on-server directory for extra copies of `.mbak` files |
 | `FINANCING_MAX_CONTENT_LENGTH` | Maximum online financing form size in bytes (default 96 KiB) |
 | `FINANCING_RATE_LIMIT` | Financing submissions per client IP per window (default 5) |
 | `FINANCING_RATE_WINDOW` | Financing submission rate-limit window in seconds (default 3600) |

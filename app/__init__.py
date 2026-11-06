@@ -161,6 +161,8 @@ def create_app(config_class=None):
         register_commands as register_coming_soon_photo_commands,
     )
     register_coming_soon_photo_commands(app)
+    from app.backup import register_commands as register_backup_commands
+    register_backup_commands(app)
 
     # Public analytics beacon (sendBeacon / no form token)
     csrf.exempt(analytics_collect)

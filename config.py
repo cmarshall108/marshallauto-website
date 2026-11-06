@@ -47,6 +47,28 @@ class Config:
     # Generate with Fernet.generate_key(); back up securely and keep stable while
     # encrypted applications exist. No application data is accepted without it.
     FINANCING_ENCRYPTION_KEY = os.environ.get('FINANCING_ENCRYPTION_KEY')
+    # Dedicated secret for offline data backups (AES-256-GCM). Keep out of the
+    # backup repository; without it encrypted .mbak files cannot be restored.
+    # python -c "import secrets; print(secrets.token_urlsafe(48))"
+    BACKUP_ENCRYPTION_KEY = os.environ.get('BACKUP_ENCRYPTION_KEY')
+    BACKUP_ENABLED = os.environ.get('BACKUP_ENABLED', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    # Private GitHub repo clone URL for ciphertext only (HTTPS or SSH).
+    BACKUP_GIT_URL = (os.environ.get('BACKUP_GIT_URL') or '').strip()
+    BACKUP_GIT_BRANCH = (os.environ.get('BACKUP_GIT_BRANCH') or 'main').strip() or 'main'
+    # Optional fine-grained/classic PAT with contents:write on the backup repo.
+    # Used only to authenticate HTTPS BACKUP_GIT_URL; prefer a deploy key for SSH.
+    BACKUP_GITHUB_TOKEN = (os.environ.get('BACKUP_GITHUB_TOKEN') or '').strip()
+    BACKUP_RETENTION_COUNT = int(os.environ.get('BACKUP_RETENTION_COUNT', '30'))
+    BACKUP_INCLUDE_PUBLIC_UPLOADS = os.environ.get(
+        'BACKUP_INCLUDE_PUBLIC_UPLOADS', 'true',
+    ).lower() in ('1', 'true', 'yes', 'on')
+    BACKUP_INCLUDE_COMING_SOON_STOCK = os.environ.get(
+        'BACKUP_INCLUDE_COMING_SOON_STOCK', 'true',
+    ).lower() in ('1', 'true', 'yes', 'on')
+    # Optional on-server copy of the latest encrypted artifacts (in addition to git).
+    BACKUP_LOCAL_DIR = (os.environ.get('BACKUP_LOCAL_DIR') or '').strip()
     FINANCING_MAX_CONTENT_LENGTH = int(
         os.environ.get('FINANCING_MAX_CONTENT_LENGTH', 96 * 1024),
     )

@@ -1,0 +1,13 @@
+[Unit]
+Description=Encrypt Marshall Auto data and push ciphertext to private GitHub backup repo
+After=network-online.target marshallauto.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/marshallauto-website
+Environment=FLASK_ENV=production
+Environment=FLASK_APP=run.py
+ExecStart=/usr/bin/bash /opt/marshallauto-website/deploy/run_backup.sh
+TimeoutStartSec=2h

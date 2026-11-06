@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily encrypted Marshall Auto data backup to private GitHub repository
+
+[Timer]
+# Once every 24 hours; Persistent catches up after downtime.
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=600
+Unit=marshallauto-backup.service
+
+[Install]
+WantedBy=timers.target
