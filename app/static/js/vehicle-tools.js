@@ -99,6 +99,17 @@
         });
     }
 
+    function titleStatusBadge(status) {
+        var value = String(status || 'clean').toLowerCase();
+        if (value === 'rebuilt') {
+            return '<span class="badge badge-title-status bg-warning text-dark">Rebuilt Title</span>';
+        }
+        if (value === 'salvage') {
+            return '<span class="badge badge-title-status bg-danger">Salvage Title</span>';
+        }
+        return '<span class="badge badge-title-status bg-success">Clean Title</span>';
+    }
+
     function vehicleCardHtml(v, opts) {
         opts = opts || {};
         var badge = v.status && v.status !== 'available'
@@ -107,6 +118,18 @@
         var removeBtn = opts.showRemove
             ? '<button type="button" class="favorite-btn is-active js-tools-remove" data-slug="' + escapeHtml(v.slug) + '" aria-label="Remove from saved"><i class="bi bi-heart-fill"></i></button>'
             : '';
+        var lowMiles = v.is_low_mileage
+            ? (
+                '<span class="badge-low-miles" title="Low mileage — ' + escapeHtml(v.mileage) + '">' +
+                    '<span class="badge-low-miles-label">Low Mileage</span>' +
+                    '<span class="badge-low-miles-value">' + escapeHtml(v.low_mileage_badge) + '</span>' +
+                '</span>'
+            )
+            : '';
+        var metaBadges = '<div class="vehicle-card-meta-badges">' + titleStatusBadge(v.title_status) + '</div>';
+        // Keep badges inside .vehicle-card-badges so absolute bottom positioning matches
+        // server-rendered cards; a bare .badge-low-miles is clipped by overflow:hidden.
+        var overlayBadges = '<div class="vehicle-card-badges">' + lowMiles + metaBadges + '</div>';
         return (
             '<div class="vehicle-card">' +
                 removeBtn +
@@ -114,7 +137,7 @@
                     '<div class="card-img-wrapper">' +
                         '<img src="' + v.image + '" class="card-img-top" alt="' + escapeHtml(v.image_alt || v.title) + '" width="600" height="400" loading="lazy" decoding="async">' +
                         badge +
-                        (v.is_low_mileage ? '<span class="badge-low-miles" title="Low mileage — ' + escapeHtml(v.mileage) + '"><span class="badge-low-miles-label">Low Mileage</span><span class="badge-low-miles-value">' + escapeHtml(v.low_mileage_badge) + '</span></span>' : '') +
+                        overlayBadges +
                     '</div>' +
                     '<div class="card-body p-4">' +
                         '<h5 class="card-title">' + escapeHtml(v.title) + '</h5>' +

@@ -310,13 +310,15 @@
 .public-site .vehicle-card .badge-condition { background: rgba(20, 34, 56, 0.94); }
 .public-site .vehicle-card .vehicle-card-badges {
     top: auto;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    left: 0.75rem;
+    /* Keep low-miles sticker fully inside the photo frame (glow + pop scale). */
+    right: 0.85rem;
+    bottom: 1rem;
+    left: 0.85rem;
     justify-content: space-between;
     align-items: flex-end;
     max-width: none;
     gap: 0.5rem;
+    z-index: 3;
 }
 .public-site .vehicle-card .vehicle-card-meta-badges {
     display: flex;
@@ -443,8 +445,9 @@
     animation: low-mileage-inline-pop 1.8s ease-in-out infinite;
 }
 @keyframes low-mileage-pop {
+    /* Mild pop so the sticker stays inside overflow:hidden photo frames. */
     0%, 100% { transform: rotate(-5deg) scale(1); }
-    50% { transform: rotate(-2deg) scale(1.1); }
+    50% { transform: rotate(-3deg) scale(1.04); }
 }
 @keyframes low-mileage-inline-pop {
     0%, 100% { transform: scale(1); }
