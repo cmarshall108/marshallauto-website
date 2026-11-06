@@ -561,6 +561,57 @@ class Vehicle(db.Model):
             return path
         return img.absolute_url if absolute else img.url
 
+    def image_alt(self, *, view_index=None, context='listing', generated_stock=False):
+        """Descriptive alt text for inventory photos (SEO + accessibility)."""
+        city = current_app.config.get('BUSINESS_CITY') or ''
+        state = current_app.config.get('BUSINESS_STATE') or ''
+        dealer = current_app.config.get('BUSINESS_NAME') or ''
+        location = ', '.join(part for part in (city, state) if part)
+
+        bits = [str(self.year or '').strip(), (self.make or '').strip(), (self.model or '').strip()]
+        if self.trim:
+            bits.append(str(self.trim).strip())
+        label = ' '.join(bit for bit in bits if bit)
+        if self.exterior_color:
+            label = f"{label} {str(self.exterior_color).strip()}".strip()
+
+        if generated_stock or context == 'coming_soon_stock':
+            return (
+                f"{label} AI-generated reference matching the listed color, trim, and equipment, "
+                f"not the actual vehicle"
+            )
+        if context == 'coming_soon':
+            return f"{label} coming soon at {dealer}".strip()
+        if context == 'vin':
+            vin = (self.vin or '').strip()
+            if vin:
+                return f"{label} associated with VIN {vin}"
+            return f"{label} vehicle identification record"
+        if context == 'related':
+            place = f" in {location}" if location else ''
+            return f"{label} for sale{place}".strip()
+
+        try:
+            index = int(view_index) if view_index is not None else None
+        except (TypeError, ValueError):
+            index = None
+
+        if index and index > 1:
+            suffix = f" at {dealer}" if dealer else ''
+            if location:
+                suffix = f"{suffix} in {location}" if suffix else f" in {location}"
+            return f"{label} - photo {index}{suffix}".strip()
+
+        if self.status == 'available' and not self.is_coming_soon:
+            phrase = 'for sale'
+        elif self.status == 'sold':
+            phrase = 'previous listing'
+        else:
+            phrase = 'listing'
+        place = f" in {location}" if location else ''
+        dealer_bit = f" at {dealer}" if dealer else ''
+        return f"{label} {phrase}{place}{dealer_bit}".strip()
+
     def ordered_images(self):
         return sorted(
             list(self.images or []),

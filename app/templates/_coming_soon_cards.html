@@ -6,7 +6,7 @@
             <article class="coming-soon-card" id="vehicle-{{ vehicle.slug }}">
             <div class="position-relative">
                     <img src="{{ asset_url(generated_photo) if generated_photo else vehicle.primary_image_url() }}"
-                         alt="{{ vehicle.title }}{% if generated_photo %} AI-generated reference matching the listed color, trim, and equipment, not the actual vehicle{% else %} coming soon at {{ business_name }}{% endif %}"
+                         alt="{{ vehicle.image_alt(context='coming_soon_stock' if generated_photo else 'coming_soon', generated_stock=generated_photo) }}"
                      loading="lazy" decoding="async" width="600" height="400">
                 <span class="badge text-bg-info coming-soon-badge">Coming Soon</span>
             </div>

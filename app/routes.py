@@ -1299,6 +1299,7 @@ def api_vehicles_summary():
         {
             'slug': v.slug,
             'title': v.title,
+            'image_alt': v.image_alt(context='related'),
             'url': url_for('main.vehicle_detail', slug=v.slug),
             'image': v.primary_image_url(),
             'price': format_price(v.display_price),
@@ -1854,23 +1855,62 @@ def blog_post_detail(slug):
         (post.title, url_for('main.blog_post_detail', slug=post.slug, _external=True))
     ])
     site = current_app.config['SITE_URL'].rstrip('/')
+    page_url = f"{site}/blog/{post.slug}"
+    publisher_logo = f"{site}/static/images/logo-icon.png"
+    author_name = post.author_name or current_app.config['BUSINESS_NAME']
+    plain_body = BeautifulSoup(post.content or '', 'html.parser').get_text(' ', strip=True)
+    word_count = len(plain_body.split()) if plain_body else None
+    cover = (post.cover_image_url or '').strip()
+    if cover and cover.startswith('/'):
+        cover = f"{site}{cover}"
+    elif cover and not cover.startswith(('http://', 'https://')):
+        cover = f"{site}/{cover.lstrip('/')}"
     structured_article = {
         "@context": "https://schema.org",
         "@type": "Article",
+        "@id": f"{page_url}#article",
         "headline": post.title,
         "description": post_description,
-        "author": {"@type": "Organization", "name": post.author_name or current_app.config['BUSINESS_NAME']},
+        "inLanguage": "en-US",
+        "isAccessibleForFree": True,
+        "author": {
+            "@type": "Person" if post.author_name else "Organization",
+            "name": author_name,
+        },
         "publisher": {
             "@type": "Organization",
+            "@id": f"{site}/#dealership",
             "name": current_app.config['BUSINESS_NAME'],
-            "logo": {"@type": "ImageObject", "url": f"{site}/static/images/logo-icon.png"},
+            "logo": {
+                "@type": "ImageObject",
+                "url": publisher_logo,
+                "width": 512,
+                "height": 512,
+            },
         },
         "datePublished": (post.published_at or post.created_at).isoformat() + 'Z',
         "dateModified": (post.updated_at or post.created_at).isoformat() + 'Z',
-        "mainEntityOfPage": f"{site}/blog/{post.slug}",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": page_url,
+            "url": page_url,
+        },
+        "isPartOf": {
+            "@type": "WebSite",
+            "@id": f"{site}/#website",
+            "name": current_app.config['BUSINESS_NAME'],
+            "url": site,
+        },
+        "articleSection": "Car Buying Guides",
+        "about": [
+            {"@type": "Thing", "name": "Used cars"},
+            {"@type": "Thing", "name": f"Car buying in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}"},
+        ],
     }
-    if post.cover_image_url:
-        structured_article['image'] = [post.cover_image_url]
+    if cover:
+        structured_article['image'] = [cover]
+    if word_count:
+        structured_article['wordCount'] = word_count
     structured_article = {k: v for k, v in structured_article.items() if v not in (None, '', [])}
 
     return render_template(
@@ -2070,12 +2110,26 @@ Allow: /sell-your-car
 Allow: /contact
 Allow: /blog
 Allow: /sitemap.xml
+Allow: /indexnow/
 
 Sitemap: {sitemap_url}
 """
     response = make_response(content)
     response.headers['Content-Type'] = 'text/plain'
     response.headers['Cache-Control'] = 'public, max-age=86400'
+    return response
+
+
+@main.route('/indexnow/<key>.txt')
+def indexnow_key_file(key):
+    """Public IndexNow key file required by the protocol keyLocation URL."""
+    expected = (current_app.config.get('INDEXNOW_KEY') or '').strip()
+    if not expected or key != expected:
+        abort(404)
+    response = make_response(expected)
+    response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    response.headers['Cache-Control'] = 'public, max-age=86400'
+    response.headers['X-Robots-Tag'] = 'noindex'
     return response
 
 

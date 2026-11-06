@@ -7,7 +7,8 @@
 {% block twitter_title %}Used Cars for Sale in {{ business_city }}, {{ business_state }} | {{ business_name }}{% endblock %}
 
 {% block extra_head %}
-<link rel="preload" as="image" href="{{ url_for('static', filename='images/gallardo_cover.jpg') }}" fetchpriority="high">
+<link rel="preload" as="image" type="image/webp" href="{{ url_for('static', filename='images/gallardo_cover.webp') }}" fetchpriority="high" imagesizes="100vw">
+<link rel="preload" as="image" type="image/jpeg" href="{{ url_for('static', filename='images/gallardo_cover.jpg') }}" fetchpriority="high" imagesizes="100vw">
 {% endblock %}
 
 {% block content %}
@@ -109,7 +110,7 @@
                         <img src="{{ vehicle.primary_image_url() }}"
                              {% if img and img.srcset %}srcset="{{ img.srcset }}" sizes="(max-width: 575px) 100vw, (max-width: 991px) 50vw, 350px"{% endif %}
                              class="card-img-top"
-                             alt="{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }} {{ vehicle.trim or '' }} for sale in {{ business_city }}, {{ business_state }}"
+                             alt="{{ vehicle.image_alt() }}"
                              width="{{ img.width if img and img.width else 600 }}"
                              height="{{ img.height if img and img.height else 400 }}"
                              loading="lazy"

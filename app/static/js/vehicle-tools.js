@@ -112,7 +112,7 @@
                 removeBtn +
                 '<a href="' + v.url + '" class="text-decoration-none text-dark">' +
                     '<div class="card-img-wrapper">' +
-                        '<img src="' + v.image + '" class="card-img-top" alt="' + escapeHtml(v.title) + '" width="600" height="400" loading="lazy" decoding="async">' +
+                        '<img src="' + v.image + '" class="card-img-top" alt="' + escapeHtml(v.image_alt || v.title) + '" width="600" height="400" loading="lazy" decoding="async">' +
                         badge +
                         (v.is_low_mileage ? '<span class="badge-low-miles" title="Low mileage — ' + escapeHtml(v.mileage) + '"><span class="badge-low-miles-label">Low Mileage</span><span class="badge-low-miles-value">' + escapeHtml(v.low_mileage_badge) + '</span></span>' : '') +
                     '</div>' +
@@ -204,7 +204,7 @@
             }
             var rows = '';
             rows += '<tr><th scope="row">Vehicle</th>' + vehicles.map(function (v) {
-                return '<td><img src="' + v.image + '" alt="' + escapeHtml(v.title) + '" style="width:100%;max-width:220px;border-radius:8px;" loading="lazy">' +
+                return '<td><img src="' + v.image + '" alt="' + escapeHtml(v.image_alt || v.title) + '" style="width:100%;max-width:220px;border-radius:8px;" loading="lazy">' +
                     '<div class="fw-bold mt-2">' + escapeHtml(v.title) + '</div>' +
                     '<a href="' + v.url + '" class="btn btn-sm btn-primary mt-2">View Details</a></td>';
             }).join('') + '</tr>';

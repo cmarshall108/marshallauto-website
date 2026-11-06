@@ -239,6 +239,14 @@ class Config:
     SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0'))
     ALERT_WORKER_INTERVAL_SECONDS = int(os.environ.get('ALERT_WORKER_INTERVAL_SECONDS', '300'))
 
+    # IndexNow (Bing/Yandex and partners). Google ignores it today; leave key empty to disable.
+    # Generate once: python -c "import secrets; print(secrets.token_hex(16))"
+    INDEXNOW_ENABLED = os.environ.get('INDEXNOW_ENABLED', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    INDEXNOW_KEY = (os.environ.get('INDEXNOW_KEY') or '').strip()
+    INDEXNOW_TIMEOUT = float(os.environ.get('INDEXNOW_TIMEOUT', '3'))
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -287,6 +295,10 @@ class TestingConfig(Config):
     # Unrelated feature tests isolate password-only fixtures; 2FA tests enable enforcement.
     ADMIN_TWO_FACTOR_REQUIRED = False
     FINANCING_ADMIN_TWO_FACTOR_REQUIRED = False
+    # Off by default so vehicle/blog admin tests do not call the public IndexNow API.
+    INDEXNOW_ENABLED = False
+    INDEXNOW_KEY = 'test-indexnow-key'
+    INDEXNOW_TIMEOUT = 1.0
 
 
 config_by_name = {

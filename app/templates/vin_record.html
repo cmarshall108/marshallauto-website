@@ -32,7 +32,7 @@
                 <div class="card border-0 shadow-sm overflow-hidden mb-4">
                     <img src="{{ vehicle.primary_image_url() }}"
                          class="card-img-top"
-                         alt="{{ vehicle.title }} associated with VIN {{ vehicle.vin }}"
+                         alt="{{ vehicle.image_alt(context='vin') }}"
                          width="900"
                          height="600"
                          loading="eager"

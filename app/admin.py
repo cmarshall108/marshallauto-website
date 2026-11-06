@@ -51,6 +51,9 @@ from app.facebook_publish import (
     apply_publish_result, build_marketplace_draft, configuration_status,
     maybe_auto_post_vehicle, post_vehicle_to_page,
 )
+from app.indexnow import notify_blog as indexnow_notify_blog
+from app.indexnow import notify_vehicle as indexnow_notify_vehicle
+from app.indexnow import submit_urls as indexnow_submit_urls
 from app.spam_filter import MANUAL_CLEAR_MARKER, rescan_leads
 from app.mvr_forms import (
     blank_form_image, build_overlay_pdf,
@@ -629,6 +632,8 @@ def blog_post_new():
         db.session.flush()
         post.ensure_slug()
         db.session.commit()
+        if post.is_published:
+            indexnow_notify_blog(post, reason='blog-create')
         flash('Blog post added.', 'success')
         return redirect(url_for('admin.blog_posts'))
     return render_template('admin/blog_post_form.html', form=form, title='Add Blog Post')
@@ -652,6 +657,8 @@ def blog_post_edit(id):
         if post.is_published and not was_published:
             post.published_at = utcnow()
         db.session.commit()
+        if post.is_published or was_published:
+            indexnow_notify_blog(post, reason='blog-update')
         flash('Blog post updated.', 'success')
         return redirect(url_for('admin.blog_posts'))
     return render_template('admin/blog_post_form.html', form=form, post=post, title='Edit Blog Post')
@@ -661,8 +668,13 @@ def blog_post_edit(id):
 @login_required
 def blog_post_delete(id):
     post = db.session.get(BlogPost, id) or abort(404)
+    stale_urls = []
+    if post.slug:
+        stale_urls.append(url_for('main.blog_post_detail', slug=post.slug, _external=True))
+    stale_urls.append(url_for('main.blog_list', _external=True))
     db.session.delete(post)
     db.session.commit()
+    indexnow_submit_urls(stale_urls, reason='blog-delete')
     flash('Blog post deleted.', 'success')
     return redirect(url_for('admin.blog_posts'))
 
@@ -1190,6 +1202,7 @@ def vehicle_new():
                 _maybe_publish_vehicle_to_facebook(
                     vehicle, is_new=True, force=bool(form.post_to_facebook.data),
                 )
+            indexnow_notify_vehicle(vehicle, reason='vehicle-create')
             flash('Vehicle added successfully.', 'success')
             if stock_photo_error:
                 flash(stock_photo_error, 'warning')
@@ -1261,6 +1274,7 @@ def vehicle_edit(id):
                 is_new=False,
                 force=bool(form.post_to_facebook.data),
             )
+        indexnow_notify_vehicle(vehicle, reason='vehicle-update')
         flash('Vehicle updated successfully.', 'success')
         if stock_photo_error:
             flash(stock_photo_error, 'warning')
@@ -1993,8 +2007,16 @@ def vehicle_delete(id):
             delete_receipt_image(receipt.filename)
     delete_local_video_file(vehicle.video_url)
     cancel_video_jobs(vehicle)
+    stale_urls = []
+    try:
+        from app.indexnow import collect_vehicle_urls
+        stale_urls = collect_vehicle_urls(vehicle)
+    except Exception:
+        current_app.logger.debug('IndexNow URL collect failed before delete', exc_info=True)
     db.session.delete(vehicle)
     db.session.commit()
+    if stale_urls:
+        indexnow_submit_urls(stale_urls, reason='vehicle-delete')
     flash('Vehicle deleted.', 'success')
     return redirect(url_for('admin.vehicles'))
 

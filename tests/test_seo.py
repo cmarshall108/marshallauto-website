@@ -49,14 +49,12 @@ class SeoTests(unittest.TestCase):
 
     def test_homepage_preloads_hero_image_for_faster_paint(self):
         html = self.page('/')
-        preload = html.select_one(
-            'link[rel="preload"][as="image"][fetchpriority="high"]',
-        )
-        self.assertIsNotNone(preload)
-        self.assertEqual(
-            preload['href'],
-            '/static/images/gallardo_cover.jpg',
-        )
+        preloads = html.select('link[rel="preload"][as="image"][fetchpriority="high"]')
+        hrefs = {link.get('href') for link in preloads}
+        self.assertIn('/static/images/gallardo_cover.webp', hrefs)
+        self.assertIn('/static/images/gallardo_cover.jpg', hrefs)
+        webp = next(link for link in preloads if link.get('href', '').endswith('.webp'))
+        self.assertEqual(webp.get('type'), 'image/webp')
 
     def test_dealership_schema_omits_self_serving_rating_markup(self):
         db.session.add(Review(
@@ -430,3 +428,141 @@ class SeoTests(unittest.TestCase):
         self.assertEqual(hero['src'], preload['href'])
         self.assertNotIn('srcset', hero.attrs)
         self.assertNotIn('imagesrcset', preload.attrs)
+    def test_vehicle_image_alt_is_descriptive_and_local(self):
+        vehicle = Vehicle.query.filter_by(slug='test-car-0').one()
+        vehicle.exterior_color = 'Silver'
+        vehicle.trim = 'LE'
+        db.session.commit()
+        alt = vehicle.image_alt()
+        self.assertEqual(
+            alt,
+            '2020 Toyota Camry LE Silver for sale in Sanford, NC at Marshall Auto, LLC',
+        )
+        self.assertIn('photo 2', vehicle.image_alt(view_index=2))
+        detail = self.page('/inventory/test-car-0')
+        self.assertEqual(detail.select_one('#main-gallery-image')['alt'], alt)
+        # Force this vehicle onto the first inventory page by making it newest.
+        vehicle.created_at = datetime.utcnow()
+        db.session.commit()
+        inventory = self.page('/inventory')
+        matching = [
+            img['alt'] for img in inventory.select('.vehicle-card img')
+            if 'LE Silver' in img.get('alt', '')
+        ]
+        self.assertEqual(matching, [alt])
+
+    def test_blog_article_schema_has_absolute_image_and_page_entity(self):
+        post = BlogPost(
+            title='Inspect before you buy',
+            slug='inspect-before-you-buy',
+            content='<p>One two three four five six seven eight nine ten.</p>',
+            cover_image_url='/static/images/og-default.jpg',
+            is_published=True,
+            published_at=datetime(2026, 2, 1),
+            updated_at=datetime(2026, 2, 2),
+        )
+        db.session.add(post)
+        db.session.commit()
+        html = self.page('/blog/inspect-before-you-buy')
+        article = next(
+            json.loads(script.string)
+            for script in html.select('script[type="application/ld+json"]')
+            if json.loads(script.string).get('@type') == 'Article'
+        )
+        self.assertEqual(article['image'], ['http://localhost/static/images/og-default.jpg'])
+        self.assertEqual(article['mainEntityOfPage']['@type'], 'WebPage')
+        self.assertEqual(article['mainEntityOfPage']['@id'], 'http://localhost/blog/inspect-before-you-buy')
+        self.assertEqual(article['inLanguage'], 'en-US')
+        self.assertGreaterEqual(article['wordCount'], 10)
+        self.assertEqual(article['isPartOf']['@id'], 'http://localhost/#website')
+
+    def test_indexnow_key_file_and_robots_allow(self):
+        self.app.config['INDEXNOW_KEY'] = 'test-indexnow-key'
+        self.app.config['INDEXNOW_ENABLED'] = True
+        response = self.client.get('/indexnow/test-indexnow-key.txt')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), 'test-indexnow-key')
+        self.assertEqual(self.client.get('/indexnow/wrong-key.txt').status_code, 404)
+        robots = self.client.get('/robots.txt').get_data(as_text=True)
+        self.assertIn('Allow: /indexnow/', robots)
+
+
+class IndexNowNotifyTests(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app(TestingConfig)
+        self.app.config['SITE_URL'] = 'https://dealer.example'
+        self.app.config['INDEXNOW_ENABLED'] = True
+        self.app.config['INDEXNOW_KEY'] = 'abc123key'
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        db.create_all()
+        self.client = self.app.test_client()
+        self.vehicle = Vehicle(
+            slug='ping-camry', year=2019, make='Toyota', model='Camry',
+            price=11000, mileage=40000, status='available',
+            vin='1HGCM82633A004352',
+        )
+        db.session.add(self.vehicle)
+        db.session.commit()
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.ctx.pop()
+
+    def test_submit_urls_posts_indexnow_payload(self):
+        from unittest.mock import patch, MagicMock
+        from app.indexnow import submit_urls, indexnow_key_location
+
+        captured = {}
+
+        class FakeResp:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def getcode(self):
+                return 200
+
+        def fake_urlopen(req, timeout=0):
+            captured['url'] = req.full_url
+            captured['body'] = json.loads(req.data.decode('utf-8'))
+            captured['timeout'] = timeout
+            return FakeResp()
+
+        with patch('app.indexnow.urllib.request.urlopen', side_effect=fake_urlopen):
+            result = submit_urls([
+                'https://dealer.example/inventory/ping-camry',
+                '/inventory',
+            ], reason='unit')
+        self.assertTrue(result['ok'])
+        self.assertEqual(captured['url'], 'https://api.indexnow.org/indexnow')
+        self.assertEqual(captured['body']['host'], 'dealer.example')
+        self.assertEqual(captured['body']['key'], 'abc123key')
+        self.assertEqual(captured['body']['keyLocation'], indexnow_key_location())
+        self.assertEqual(
+            captured['body']['urlList'],
+            [
+                'https://dealer.example/inventory/ping-camry',
+                'https://dealer.example/inventory',
+            ],
+        )
+
+    def test_notify_vehicle_includes_detail_vin_and_hubs(self):
+        from unittest.mock import patch
+        from app.indexnow import notify_vehicle
+
+        with patch('app.indexnow.submit_urls') as submit:
+            submit.return_value = {'ok': True}
+            notify_vehicle(self.vehicle, reason='test')
+        urls = submit.call_args.args[0]
+        self.assertIn('https://dealer.example/inventory/ping-camry', urls)
+        self.assertIn('https://dealer.example/vin/1HGCM82633A004352', urls)
+        self.assertIn('https://dealer.example/inventory', urls)
+        self.assertIn('https://dealer.example/', urls)
+
+    def test_disabled_without_key(self):
+        from app.indexnow import submit_urls
+        self.app.config['INDEXNOW_KEY'] = ''
+        self.assertEqual(submit_urls(['https://dealer.example/'], reason='x')['skipped'], True)

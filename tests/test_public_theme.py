@@ -57,11 +57,10 @@ class PublicThemeTests(unittest.TestCase):
             'script[src*="bootstrap.bundle"], script[src*="/static/js/"]',
         ):
             self.assertIn('defer', script.attrs, script.get('src'))
-        hero_preload = html.select_one(
-            'link[rel="preload"][as="image"][href*="gallardo_cover.jpg"]',
-        )
-        self.assertIsNotNone(hero_preload)
-        self.assertEqual(hero_preload.get('fetchpriority'), 'high')
+        hero_preloads = html.select('link[rel="preload"][as="image"][fetchpriority="high"]')
+        hrefs = ' '.join(link.get('href', '') for link in hero_preloads)
+        self.assertIn('gallardo_cover.webp', hrefs)
+        self.assertIn('gallardo_cover.jpg', hrefs)
 
     def test_current_navigation_and_inventory_section_are_distinguished(self):
         for path, label in (('/', 'Home'), ('/inventory', 'Inventory'),
