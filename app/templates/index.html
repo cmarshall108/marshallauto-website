@@ -181,23 +181,48 @@
 {% endif %}
 
 <!-- Reviews -->
-{% if approved_reviews %}
+{% set gr = google_reviews or {} %}
+{% if approved_reviews or gr.url %}
 <section id="customer-reviews" class="section-padding">
     <div class="container">
-        <div class="text-center mb-5">
+        <div class="text-center mb-4">
+            <p class="section-eyebrow mb-2">Google reviews</p>
             <h2 class="section-title">What Our Customers Say</h2>
-            <p class="section-subtitle mx-auto">
-                {% if aggregate %}
+            <p class="section-subtitle mx-auto mb-3">
+                {% if gr.rating and gr.count is not none %}
+                <strong>{{ gr.rating }}</strong> out of 5 on Google · {{ gr.count }} review{{ 's' if gr.count != 1 else '' }}
+                {% elif aggregate %}
                 Rated <strong>{{ aggregate.ratingValue }}</strong> out of 5 stars based on <strong>{{ aggregate.ratingCount }}</strong> reviews.
+                {% else %}
+                Real feedback from people who bought and visited Marshall Auto in {{ business_city }}, {{ business_state }}.
                 {% endif %}
             </p>
+            {% if gr.url %}
+            <div class="d-flex flex-wrap gap-2 justify-content-center mb-2">
+                <a class="btn btn-primary" href="{{ gr.url }}" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-google me-1"></i> See all Google reviews
+                </a>
+                <a class="btn btn-outline-primary" href="{{ gr.url }}" target="_blank" rel="noopener noreferrer">
+                    Write a Google review
+                </a>
+            </div>
+            {% endif %}
         </div>
+        {% if approved_reviews %}
         <div class="row g-4">
             {% for review in approved_reviews %}
             <div class="col-md-4">
-                <div class="card h-100 border-0 shadow-sm p-4">
-                    <div class="mb-2 text-warning">
-                        {% for i in range(review.rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
+                <div class="card h-100 border-0 shadow-sm p-4 review-card">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div class="text-warning" aria-label="{{ review.rating }} out of 5 stars">
+                            {% for i in range(review.rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
+                            {% for i in range(5 - review.rating) %}<i class="bi bi-star text-black-50"></i>{% endfor %}
+                        </div>
+                        {% if review.source == 'Google' %}
+                        <span class="badge review-source-google"><i class="bi bi-google me-1"></i>Google</span>
+                        {% elif review.source %}
+                        <span class="badge text-bg-light border">{{ review.source }}</span>
+                        {% endif %}
                     </div>
                     {% if review.title %}<h5 class="fw-bold">{{ review.title }}</h5>{% endif %}
                     <p class="text-muted flex-grow-1">"{{ review.content }}"</p>
@@ -206,6 +231,7 @@
             </div>
             {% endfor %}
         </div>
+        {% endif %}
     </div>
 </section>
 {% endif %}

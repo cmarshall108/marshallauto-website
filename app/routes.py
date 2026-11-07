@@ -424,14 +424,15 @@ def inject_globals():
         twitter_handle = _setting('twitter_handle', '') or current_app.config.get('TWITTER_HANDLE', '')
 
         social = []
-        for key, conf in [
-            ('facebook_url', 'FACEBOOK_URL'),
-            ('instagram_url', 'INSTAGRAM_URL'),
-            ('youtube_url', 'YOUTUBE_URL'),
+        for key, conf, network in [
+            ('facebook_url', 'FACEBOOK_URL', 'facebook'),
+            ('instagram_url', 'INSTAGRAM_URL', 'instagram'),
+            ('youtube_url', 'YOUTUBE_URL', 'youtube'),
+            ('google_business_url', 'GOOGLE_BUSINESS_URL', 'google'),
         ]:
             val = _setting(key, '') or current_app.config.get(conf, '')
             if val:
-                social.append((key.replace('_url', ''), val))
+                social.append((network, val))
 
         try:
             canonical = _canonical_url() if getattr(request, 'endpoint', None) else current_app.config['SITE_URL']
@@ -544,14 +545,10 @@ def index():
     ]
     structured_faq = structured_data_faq(home_faqs)
 
-    approved_reviews = (
-        Review.query
-        .filter_by(is_approved=True)
-        .filter(Review.vehicle_id.is_(None))
-        .order_by(Review.is_featured.desc(), Review.created_at.desc())
-        .limit(6)
-        .all()
-    )
+    from app.google_reviews import google_reviews_summary
+
+    google_reviews = google_reviews_summary(limit=6)
+    approved_reviews = google_reviews['reviews']
     aggregate = aggregate_rating_data()
 
     structured_item_list = structured_data_item_list(
@@ -569,6 +566,7 @@ def index():
         models=models,
         approved_reviews=approved_reviews,
         aggregate=aggregate,
+        google_reviews=google_reviews,
         structured_local=structured_local,
         structured_website=structured_website,
         structured_faq=structured_faq,
@@ -1213,14 +1211,10 @@ def vehicle_detail(slug):
     payments = payment_examples(vehicle.display_price)
     slots = appointment_slots()
     interest_message = vehicle_interest_message(vehicle)
-    dealership_reviews = (
-        Review.query
-        .filter_by(is_approved=True)
-        .filter(Review.vehicle_id.is_(None))
-        .order_by(Review.is_featured.desc(), Review.created_at.desc())
-        .limit(3)
-        .all()
-    )
+    from app.google_reviews import google_reviews_summary
+
+    google_reviews = google_reviews_summary(limit=3)
+    dealership_reviews = google_reviews['reviews']
     review_aggregate = aggregate_rating_data()
 
     form = ContactForm(vehicle_id=vehicle.id)
@@ -1307,6 +1301,7 @@ def vehicle_detail(slug):
         interest_message=interest_message,
         dealership_reviews=dealership_reviews,
         review_aggregate=review_aggregate,
+        google_reviews=google_reviews,
         structured_vehicle=structured_vehicle,
         structured_local=structured_data_local_business(),
         breadcrumbs=breadcrumbs,

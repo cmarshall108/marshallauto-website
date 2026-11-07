@@ -1037,13 +1037,18 @@ def send_lead_confirmation(lead):
 
 def _business_social_links():
     links = []
-    for key in ['FACEBOOK_URL', 'INSTAGRAM_URL', 'YOUTUBE_URL']:
+    for key in ['FACEBOOK_URL', 'INSTAGRAM_URL', 'YOUTUBE_URL', 'GOOGLE_BUSINESS_URL']:
         value = current_app.config.get(key, '')
         if value:
             links.append(value)
     # Prefer DB overrides when present
     from app.models import SiteSetting
-    for key, conf in [('facebook_url', 'FACEBOOK_URL'), ('instagram_url', 'INSTAGRAM_URL'), ('youtube_url', 'YOUTUBE_URL')]:
+    for key, conf in [
+        ('facebook_url', 'FACEBOOK_URL'),
+        ('instagram_url', 'INSTAGRAM_URL'),
+        ('youtube_url', 'YOUTUBE_URL'),
+        ('google_business_url', 'GOOGLE_BUSINESS_URL'),
+    ]:
         val = SiteSetting.get(key) or current_app.config.get(conf, '')
         if val and val not in links:
             links.append(val)

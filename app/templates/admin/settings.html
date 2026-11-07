@@ -180,6 +180,34 @@
             {{ form.youtube_url(class="form-control") }}
         </div>
         <div class="col-md-6">
+            <label class="form-label">{{ form.google_business_url.label.text }}</label>
+            {{ form.google_business_url(class="form-control", placeholder="https://share.google/… or Maps URL") }}
+            {% if form.google_business_url.description %}
+            <div class="form-text">{{ form.google_business_url.description }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">{{ form.google_place_id.label.text }}</label>
+            {{ form.google_place_id(class="form-control", placeholder="ChIJ…") }}
+            {% if form.google_place_id.description %}
+            <div class="form-text">{{ form.google_place_id.description }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">{{ form.google_rating.label.text }}</label>
+            {{ form.google_rating(class="form-control", placeholder="4.9") }}
+            {% if form.google_rating.description %}
+            <div class="form-text">{{ form.google_rating.description }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">{{ form.google_review_count.label.text }}</label>
+            {{ form.google_review_count(class="form-control", placeholder="47") }}
+            {% if form.google_review_count.description %}
+            <div class="form-text">{{ form.google_review_count.description }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
             <label class="form-label">Business Latitude</label>
             {{ form.business_latitude(class="form-control", placeholder="40.7128") }}
         </div>

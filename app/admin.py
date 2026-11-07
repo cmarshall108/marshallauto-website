@@ -531,10 +531,35 @@ def dashboard():
 @admin_bp.route('/reviews')
 @login_required
 def reviews():
+    from app.google_reviews import google_reviews_summary
+
     page = request.args.get('page', 1, type=int)
     pagination = Review.query.order_by(Review.created_at.desc()).paginate(
         page=page, per_page=25, error_out=False)
-    return render_template('admin/reviews.html', pagination=pagination)
+    return render_template(
+        'admin/reviews.html',
+        pagination=pagination,
+        google_reviews=google_reviews_summary(limit=3),
+    )
+
+
+@admin_bp.route('/reviews/sync-google', methods=['POST'])
+@login_required
+def reviews_sync_google():
+    from app.google_reviews import sync_google_reviews_from_places
+
+    try:
+        result = sync_google_reviews_from_places()
+    except RuntimeError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('admin.reviews'))
+    flash(
+        f"Google reviews synced ({result.get('imported_or_updated', 0)} new/updated). "
+        f"Rating {result.get('rating') or '—'} · "
+        f"{result.get('count') if result.get('count') is not None else '—'} total on Google.",
+        'success',
+    )
+    return redirect(url_for('admin.reviews'))
 
 
 @admin_bp.route('/reviews/new', methods=['GET', 'POST'])
@@ -2774,6 +2799,10 @@ def settings():
         SiteSetting.set('instagram_url', form.instagram_url.data)
         SiteSetting.set('facebook_url', form.facebook_url.data)
         SiteSetting.set('youtube_url', form.youtube_url.data)
+        SiteSetting.set('google_business_url', (form.google_business_url.data or '').strip())
+        SiteSetting.set('google_place_id', (form.google_place_id.data or '').strip())
+        SiteSetting.set('google_rating', (form.google_rating.data or '').strip())
+        SiteSetting.set('google_review_count', (form.google_review_count.data or '').strip())
         SiteSetting.set('business_latitude', form.business_latitude.data)
         SiteSetting.set('business_longitude', form.business_longitude.data)
         db.session.commit()
@@ -2840,6 +2869,16 @@ def settings():
         form.instagram_url.data = SiteSetting.get('instagram_url')
         form.facebook_url.data = SiteSetting.get('facebook_url')
         form.youtube_url.data = SiteSetting.get('youtube_url')
+        form.google_business_url.data = (
+            SiteSetting.get('google_business_url')
+            or current_app.config.get('GOOGLE_BUSINESS_URL', '')
+        )
+        form.google_place_id.data = (
+            SiteSetting.get('google_place_id')
+            or current_app.config.get('GOOGLE_PLACE_ID', '')
+        )
+        form.google_rating.data = SiteSetting.get('google_rating') or ''
+        form.google_review_count.data = SiteSetting.get('google_review_count') or ''
         form.business_latitude.data = SiteSetting.get('business_latitude')
         form.business_longitude.data = SiteSetting.get('business_longitude')
     return render_template(

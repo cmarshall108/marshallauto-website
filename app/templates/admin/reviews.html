@@ -3,9 +3,35 @@
 {% block title %}Reviews{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="fw-bold mb-0">Reviews</h2>
-    <a href="{{ url_for('admin.review_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Review</a>
+    <div class="d-flex flex-wrap gap-2">
+        <form action="{{ url_for('admin.reviews_sync_google') }}" method="POST" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary" {% if not google_reviews.can_sync %}title="Set Place ID + GOOGLE_PLACES_API_KEY to enable"{% endif %}>
+                <i class="bi bi-google me-1"></i> Sync from Google
+            </button>
+        </form>
+        <a href="{{ url_for('admin.review_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Review</a>
+    </div>
+</div>
+
+<div class="alert alert-light border mb-4">
+    <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
+        <div>
+            <strong>Google Business Profile</strong>
+            <div class="small text-muted mb-1">
+                {% if google_reviews.rating %}{{ google_reviews.rating }}/5{% else %}Rating not set{% endif %}
+                {% if google_reviews.count is not none %} · {{ google_reviews.count }} Google review{{ 's' if google_reviews.count != 1 else '' }}{% endif %}
+            </div>
+            <a href="{{ google_reviews.url }}" target="_blank" rel="noopener noreferrer" class="small">{{ google_reviews.url }}</a>
+            <div class="form-text mt-2 mb-0">
+                Paste real Google reviews with Source = <code>Google</code>, or sync via Places API
+                (env <code>GOOGLE_PLACES_API_KEY</code> + Place ID in Settings).
+            </div>
+        </div>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.settings') }}">Edit Google settings</a>
+    </div>
 </div>
 
 <div class="table-card p-4">
@@ -17,6 +43,7 @@
                     <th>Date</th>
                     <th>Author</th>
                     <th>Rating</th>
+                    <th>Source</th>
                     <th>Title</th>
                     <th>Body</th>
                     <th>Status</th>
@@ -29,6 +56,7 @@
                     <td>{{ review.created_at.strftime('%m/%d/%Y') }}</td>
                     <td>{{ review.author_name }}</td>
                     <td>{{ review.rating }} / 5</td>
+                    <td>{{ review.source or '—' }}</td>
                     <td>{{ review.title or '—' }}</td>
                     <td>{{ review.content[:80] }}{% if review.content|length > 80 %}...{% endif %}</td>
                     <td>

@@ -833,3 +833,15 @@
 }
 .public-site .inventory-search-alert .form-label { color: #445164; }
 
+/* Google / customer review cards */
+.public-site .review-card {
+    border-radius: 16px;
+}
+.public-site .review-source-google {
+    background: #fff;
+    color: #3c4043;
+    border: 1px solid #dadce0;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+

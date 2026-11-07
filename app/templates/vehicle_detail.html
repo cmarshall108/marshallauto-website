@@ -367,9 +367,15 @@ bi-check-circle
                     {% set large = true %}
                     {% set hide_retail = true %}
                     {% include "_price_display.html" %}
-                    {% if review_aggregate or dealership_reviews %}
+                    {% set gr = google_reviews or {} %}
+                    {% if gr.rating or gr.url or review_aggregate or dealership_reviews %}
                     <div class="vehicle-trust-reviews mb-3" aria-label="Customer reviews">
-                        {% if review_aggregate %}
+                        {% if gr.rating %}
+                        <p class="small mb-1">
+                            <span class="text-warning" aria-hidden="true">{% for i in range(gr.rating|int) %}<i class="bi bi-star-fill"></i>{% endfor %}</span>
+                            <strong>{{ gr.rating }}</strong>/5 on Google{% if gr.count is not none %} · {{ gr.count }} review{{ 's' if gr.count != 1 else '' }}{% endif %}
+                        </p>
+                        {% elif review_aggregate %}
                         <p class="small mb-1">
                             <span class="text-warning" aria-hidden="true">{% for i in range(review_aggregate.ratingValue|int) %}<i class="bi bi-star-fill"></i>{% endfor %}</span>
                             <strong>{{ review_aggregate.ratingValue }}</strong>/5 from {{ review_aggregate.ratingCount }} review{{ 's' if review_aggregate.ratingCount != 1 else '' }}
@@ -378,10 +384,16 @@ bi-check-circle
                         {% for review in (dealership_reviews or [])[:2] %}
                         <blockquote class="vehicle-trust-quote mb-1">
                             <p class="mb-0 small">“{{ review.content[:160] }}{% if review.content|length > 160 %}…{% endif %}”</p>
-                            <footer class="small text-muted">— {{ review.author_name }}{% if review.rating %} · {{ review.rating }}/5{% endif %}</footer>
+                            <footer class="small text-muted">— {{ review.author_name }}{% if review.rating %} · {{ review.rating }}/5{% endif %}{% if review.source == 'Google' %} · Google{% endif %}</footer>
                         </blockquote>
                         {% endfor %}
-                        <a class="small" href="{{ url_for('main.index') }}#customer-reviews">More reviews</a>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <a class="small" href="{{ url_for('main.index') }}#customer-reviews">More reviews</a>
+                            {% if gr.url %}
+                            <span class="text-muted small">·</span>
+                            <a class="small" href="{{ gr.url }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-google me-1"></i>Google reviews</a>
+                            {% endif %}
+                        </div>
                     </div>
                     {% endif %}
                     {% if savings %}

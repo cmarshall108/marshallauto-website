@@ -124,6 +124,25 @@ def convert_heic(dry_run):
         raise click.ClickException('Some photos could not be converted; see the log for details.')
 
 
+@app.cli.command('sync-google-reviews')
+def sync_google_reviews():
+    """Pull Google Place Details reviews into the site Review table."""
+    from app.google_reviews import ensure_google_profile_defaults, sync_google_reviews_from_places
+
+    ensure_google_profile_defaults()
+    try:
+        result = sync_google_reviews_from_places()
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        f"Synced Google reviews for {result.get('name') or 'place'}: "
+        f"{result.get('imported_or_updated', 0)} new/updated, "
+        f"rating={result.get('rating')}, count={result.get('count')}"
+    )
+    if result.get('url'):
+        click.echo(f"Profile URL: {result['url']}")
+
+
 @app.cli.command('seed')
 def seed_data():
     """Seed sample data for development."""

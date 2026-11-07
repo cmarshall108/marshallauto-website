@@ -480,6 +480,26 @@ class SiteSettingForm(FlaskForm):
     instagram_url = StringField('Instagram URL', validators=[Optional(), Length(max=512)])
     facebook_url = StringField('Facebook URL', validators=[Optional(), Length(max=512)])
     youtube_url = StringField('YouTube URL', validators=[Optional(), Length(max=512)])
+    google_business_url = StringField(
+        'Google Business Profile URL',
+        validators=[Optional(), Length(max=512)],
+        description='Share or Maps link customers use to read/write Google reviews.',
+    )
+    google_place_id = StringField(
+        'Google Place ID',
+        validators=[Optional(), Length(max=128)],
+        description='Optional. Required with GOOGLE_PLACES_API_KEY to sync live reviews.',
+    )
+    google_rating = StringField(
+        'Google rating (1–5)',
+        validators=[Optional(), Length(max=8)],
+        description='Shown on the site (e.g. 4.9). Updated automatically when Places sync runs.',
+    )
+    google_review_count = StringField(
+        'Google review count',
+        validators=[Optional(), Length(max=16)],
+        description='Total Google reviews for the badge (e.g. 47).',
+    )
     business_latitude = StringField('Business Latitude', validators=[Optional(), Length(max=32)])
     business_longitude = StringField('Business Longitude', validators=[Optional(), Length(max=32)])
     submit = SubmitField('Save Settings')
@@ -573,7 +593,11 @@ class ReviewForm(FlaskForm):
     title = StringField('Review Title', validators=[Optional(), Length(max=160)])
     # Form field is "body"; model column is "content"
     body = TextAreaField('Review Body *', validators=[DataRequired(), Length(max=5000)])
-    source = StringField('Source', validators=[Optional(), Length(max=64)])
+    source = StringField(
+        'Source',
+        validators=[Optional(), Length(max=64)],
+        description='Use "Google" for reviews copied from Google Business Profile.',
+    )
     is_approved = BooleanField('Approved', default=True)
     is_featured = BooleanField('Featured on homepage')
     submit = SubmitField('Save Review')

@@ -596,6 +596,9 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `BUSINESS_ADDRESS` | Business street address |
 | `GOOGLE_TAG_ID` | Google Tag Manager container ID (optional; preferred over bare GA4) |
 | `GOOGLE_ANALYTICS_ID` | GA4 measurement ID used only when GTM is not set (optional) |
+| `GOOGLE_BUSINESS_URL` | Public Google Business / share link for reviews (default Marshall Auto share URL; also in Admin → Settings) |
+| `GOOGLE_PLACE_ID` | Google Place ID for Places Details review sync (optional; also in Admin → Settings) |
+| `GOOGLE_PLACES_API_KEY` | Places API key used by `flask sync-google-reviews` and Admin → Reviews → Sync (optional) |
 | `FACEBOOK_PAGE_ID` | Facebook Page ID for Graph API vehicle posts (optional; also in Admin → Settings) |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Long-lived **Page** access token (optional env fallback; preferred in Admin → Settings) |
 | `FACEBOOK_AUTO_POST_VEHICLES` | Env fallback to enable Page posting (`true`/`false`) |
@@ -844,7 +847,8 @@ existing database model. Sitemap responses may be cached for up to one hour.
 5. Validate rendered vehicle structured data and review indexing/crawl reports.
   Check search impressions and clicks for VIN queries and Sanford-area searches.
 6. Keep the Google Business Profile address, phone, hours, inventory website link,
-  photos, and genuine reviews accurate. Add useful, original Sanford-area buying
+  photos, and genuine reviews accurate. Add featured quotes on the website via Admin → Reviews (Source = Google), or set
+  `GOOGLE_PLACE_ID` + `GOOGLE_PLACES_API_KEY` and run `flask sync-google-reviews` (Places returns up to five review texts). Add useful, original Sanford-area buying
   guides and detailed vehicle descriptions rather than duplicating city pages.
 
 These changes make pages discoverable and eligible for indexing; they cannot

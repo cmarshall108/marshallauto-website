@@ -502,6 +502,10 @@ def _ensure_default_settings():
         'instagram_url': '',
         'facebook_url': '',
         'youtube_url': '',
+        'google_business_url': 'https://share.google/jRec671UblSEwqZTa',
+        'google_place_id': '',
+        'google_rating': '',
+        'google_review_count': '',
         'business_latitude': '35.4438494',
         'business_longitude': '-79.1374067',
     }

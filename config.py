@@ -198,6 +198,12 @@ class Config:
     # Integrations
     GOOGLE_TAG_ID = os.environ.get('GOOGLE_TAG_ID') or ''
     GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID') or ''
+    # Google Business Profile / Places (reviews display + optional sync)
+    GOOGLE_BUSINESS_URL = (
+        os.environ.get('GOOGLE_BUSINESS_URL') or 'https://share.google/jRec671UblSEwqZTa'
+    ).strip()
+    GOOGLE_PLACE_ID = (os.environ.get('GOOGLE_PLACE_ID') or '').strip()
+    GOOGLE_PLACES_API_KEY = (os.environ.get('GOOGLE_PLACES_API_KEY') or '').strip()
     FACEBOOK_PIXEL_ID = os.environ.get('FACEBOOK_PIXEL_ID') or ''
     FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID') or ''
     # Facebook Page publishing (Graph API). Token stays in env only — never commit real tokens.
