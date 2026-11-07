@@ -1,5 +1,6 @@
 import io
 import json
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -10,10 +11,76 @@ from app.forms import VehicleForm
 from app.vin_decode import (
     classify_grok_photo_annotations, decode_vin, derive_vehicle_details,
     enrich_vin_decode_data_with_grok, group_vin_decode_data, map_vehicle_fields,
+    lookup_epa_mpg,
 )
 
 
 REFERENCE_VIN = 'KM8K2CAAXMU609019'
+
+
+class EpaLookupConcurrencyTests(unittest.TestCase):
+    def test_candidate_lookups_overlap_and_keep_ranked_tie_order(self):
+        barrier = threading.Barrier(3, timeout=3)
+        later_finished = threading.Event()
+        lock = threading.Lock()
+        active = 0
+        peak = 0
+        calls = []
+
+        def menu(path, params, timeout):
+            nonlocal active, peak
+            if path == 'model':
+                return [(f'Kona {index}', str(index)) for index in range(1, 8)]
+            self.assertEqual(timeout, 4)
+            name = params['model']
+            with lock:
+                calls.append(name)
+                active += 1
+                peak = max(peak, active)
+            try:
+                if int(name.split()[-1]) <= 3:
+                    barrier.wait()
+                if name == 'Kona 1' and not later_finished.wait(timeout=3):
+                    raise AssertionError('Later candidate did not finish first')
+                if name == 'Kona 2':
+                    raise RuntimeError('EPA unavailable for this model')
+                if name == 'Kona 3':
+                    later_finished.set()
+                return [('Automatic', name)]
+            finally:
+                with lock:
+                    active -= 1
+
+        with (
+            patch.dict('app.vin_decode._EPA_CACHE', {}, clear=True),
+            patch('app.vin_decode._epa_menu_items', side_effect=menu),
+            patch('app.vin_decode._epa_vehicle', return_value={
+                'id': 'selected', 'city08': '25', 'highway08': '30', 'comb08': '27',
+            }) as fetch_vehicle,
+        ):
+            result = lookup_epa_mpg(year=2021, make='Hyundai', model='Kona', timeout=4)
+            cached = lookup_epa_mpg(year=2021, make='Hyundai', model='Kona', timeout=4)
+
+        self.assertEqual(peak, 3)
+        self.assertCountEqual(calls, [f'Kona {index}' for index in range(1, 7)])
+        self.assertEqual(result['epa_model'], 'Kona 1')
+        self.assertEqual(result['mpg_combined'], 27)
+        self.assertEqual(cached, result)
+        fetch_vehicle.assert_called_once_with('Kona 1', timeout=4)
+
+    def test_failed_options_return_no_match(self):
+        def menu(path, params, timeout):
+            if path == 'model':
+                return [('Kona 1', '1'), ('Kona 2', '2')]
+            raise RuntimeError('EPA unavailable')
+
+        with (
+            patch.dict('app.vin_decode._EPA_CACHE', {}, clear=True),
+            patch('app.vin_decode._epa_menu_items', side_effect=menu),
+            patch('app.vin_decode._epa_vehicle') as fetch_vehicle,
+        ):
+            self.assertIsNone(lookup_epa_mpg(year=2021, make='Hyundai', model='Kona'))
+        fetch_vehicle.assert_not_called()
 
 
 class VinDecodeDetailTests(unittest.TestCase):

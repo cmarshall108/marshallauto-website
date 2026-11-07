@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -23,9 +24,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from app.vehicle_catalog import COMMON_FEATURES, EXTERIOR_COLORS, INTERIOR_COLORS
+
+logger = logging.getLogger(__name__)
 
 
 def _ssl_context() -> ssl.SSLContext | None:
@@ -1596,34 +1600,41 @@ def lookup_epa_mpg(
     displacement = _parse_displacement_liters(engine, nhtsa_displacement)
     best: tuple[int, dict[str, str], str, str] | None = None
 
-    for model_score, epa_model in ranked_models[:6]:
-        try:
-            options = _epa_menu_items(
-                'options',
+    candidates = ranked_models[:6]
+    with ThreadPoolExecutor(max_workers=min(3, len(candidates))) as executor:
+        futures = [
+            executor.submit(
+                _epa_menu_items, 'options',
                 {'year': str(year), 'make': make, 'model': epa_model},
                 timeout=timeout,
             )
-        except RuntimeError:
-            continue
-        if not options:
-            continue
-        for opt_text, opt_id in options:
-            if not opt_id:
+            for _, epa_model in candidates
+        ]
+        for (model_score, epa_model), future in zip(candidates, futures):
+            try:
+                options = future.result()
+            except RuntimeError as exc:
+                logger.warning('EPA options lookup failed for %s: %s', epa_model, exc)
                 continue
-            opt_score = _score_epa_option(
-                opt_text,
-                engine=engine or '',
-                transmission=transmission or '',
-                drivetrain=drivetrain or '',
-                cylinders=nhtsa_cylinders,
-                displacement=displacement,
-            )
-            total = model_score + opt_score
-            # Prefer fewer options ambiguity: single option gets a small boost
-            if len(options) == 1:
-                total += 5
-            if best is None or total > best[0]:
-                best = (total, {'id': opt_id, 'text': opt_text}, epa_model, opt_text)
+            if not options:
+                continue
+            for opt_text, opt_id in options:
+                if not opt_id:
+                    continue
+                opt_score = _score_epa_option(
+                    opt_text,
+                    engine=engine or '',
+                    transmission=transmission or '',
+                    drivetrain=drivetrain or '',
+                    cylinders=nhtsa_cylinders,
+                    displacement=displacement,
+                )
+                total = model_score + opt_score
+                # Prefer fewer options ambiguity: single option gets a small boost
+                if len(options) == 1:
+                    total += 5
+                if best is None or total > best[0]:
+                    best = (total, {'id': opt_id, 'text': opt_text}, epa_model, opt_text)
 
     if not best or best[0] < 50:
         _epa_cache_set(cache_key, None)
