@@ -5,7 +5,10 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Dashboard</h2>
-    <a href="{{ url_for('admin.vehicle_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Vehicle</a>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('admin.sales_priorities') }}" class="btn btn-outline-primary">Sales Priorities</a>
+        <a href="{{ url_for('admin.vehicle_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Vehicle</a>
+    </div>
 </div>
 
 <div class="row g-4 mb-4">

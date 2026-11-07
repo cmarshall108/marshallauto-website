@@ -38,6 +38,30 @@
 
 <section class="section-padding">
     <div class="container">
+        <details class="border rounded p-3 mb-4 bg-light-brand">
+            <summary class="fw-bold">Find your fit</summary>
+            <p class="small text-muted mt-2">Choose what matters most and see matching vehicles. Leave any choice blank to see more options.</p>
+            <form method="get" action="{{ url_for('main.inventory') }}" class="row g-2 align-items-end">
+                <div class="col-sm-4">
+                    <label class="form-label" for="fit-body">Vehicle type</label>
+                    <select class="form-select" id="fit-body" name="body_style">
+                        <option value="">Any type</option>
+                        {% for style in body_styles %}
+                        <option value="{{ style }}" {% if request.args.get('body_style') == style %}selected{% endif %}>{{ style }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-3">
+                    <label class="form-label" for="fit-budget">Maximum price</label>
+                    <input class="form-control" id="fit-budget" name="max_price" type="number" min="0" step="1" inputmode="numeric" value="{{ request.args.get('max_price', '') }}" placeholder="Any price">
+                </div>
+                <div class="col-sm-3">
+                    <label class="form-label" for="fit-mileage">Maximum mileage</label>
+                    <input class="form-control" id="fit-mileage" name="max_mileage" type="number" min="0" step="1" inputmode="numeric" value="{{ request.args.get('max_mileage', '') }}" placeholder="Any mileage">
+                </div>
+                <div class="col-sm-2"><button class="btn btn-primary w-100" type="submit">See matches</button></div>
+            </form>
+        </details>
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 p-3 mb-4 rounded bg-light-brand">
             <div>
                 <strong>Have a question about a vehicle?</strong>

@@ -1,0 +1,67 @@
+{% extends "admin/base.html" %}
+{% block title %}Sales Priorities{% endblock %}
+{% block content %}
+<h1 class="h2 fw-bold mb-2">Sales Priorities</h1>
+<p class="text-muted">A starting point for staff review, not a measure of customer intent or completed follow-up.</p>
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <section class="table-card p-4 h-100">
+            <h2 class="h4">Unread leads</h2>
+            <p class="small text-muted">Oldest 10 non-spam leads. Read does not mean contacted.</p>
+            {% if unread_leads %}
+            <ul class="list-group list-group-flush">
+                {% for lead in unread_leads %}
+                <li class="list-group-item">
+                    <a href="{{ url_for('admin.leads', lead_id=lead.id) }}">{{ lead.name }}</a>
+                    <span class="text-muted small"> · {{ lead.created_at.strftime('%b %d, %Y %H:%M') }} UTC</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<p class="mb-0">No unread leads.</p>{% endif %}
+            <a href="{{ url_for('admin.leads') }}" class="btn btn-outline-primary btn-sm mt-3">All leads</a>
+        </section>
+    </div>
+    <div class="col-lg-6">
+        <section class="table-card p-4 h-100">
+            <h2 class="h4">Older public inventory</h2>
+            <p class="small text-muted">Oldest 10 available listings added at least 60 days ago; age is measured from the inventory record's creation date.</p>
+            {% if aging %}
+            <ul class="list-group list-group-flush">
+                {% for vehicle in aging %}
+                <li class="list-group-item">
+                    <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}">{{ vehicle.title }}</a>
+                    <span class="text-muted small"> · {{ (now - vehicle.created_at).days }} days since added</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<p class="mb-0">No public listings have reached 60 days.</p>{% endif %}
+            <a href="{{ url_for('admin.analytics') }}" class="btn btn-outline-primary btn-sm mt-3">Inventory analytics</a>
+        </section>
+    </div>
+</div>
+<section class="table-card p-4" id="listing-quality">
+    <h2 class="h4">Listing-quality checklist</h2>
+    <p class="small text-muted">Available public listings missing photos or basic details. Review each item before editing; missing details may not be known.</p>
+    {% if quality_rows %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Vehicle</th><th>Needs review</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for vehicle, issues in quality_rows %}
+                <tr>
+                    <td>{{ vehicle.title }}</td>
+                    <td>{{ issues | join(', ') }}</td>
+                    <td><a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}">Edit listing</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <nav aria-label="Listing quality pages" class="d-flex gap-3 align-items-center">
+        {% if quality_page.has_prev %}<a href="{{ url_for('admin.sales_priorities', page=quality_page.prev_num) }}#listing-quality">Previous</a>{% endif %}
+        <span>Page {{ quality_page.page }} of {{ quality_page.pages }}</span>
+        {% if quality_page.has_next %}<a href="{{ url_for('admin.sales_priorities', page=quality_page.next_num) }}#listing-quality">Next</a>{% endif %}
+    </nav>
+    {% else %}<p class="mb-0">No listings need review on this page.</p>{% endif %}
+</section>
+{% endblock %}

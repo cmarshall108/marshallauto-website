@@ -21,6 +21,7 @@
         </div>
         <ul class="nav flex-column">
             <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin.sales_priorities' %}active{% endif %}" href="{{ url_for('admin.sales_priorities') }}"><i class="bi bi-list-check me-2"></i> Sales Priorities</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.vehicle') %}active{% endif %}" href="{{ url_for('admin.vehicles') }}"><i class="bi bi-car-front me-2"></i> Vehicles</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.service_record') %}active{% endif %}" href="{{ url_for('admin.service_records') }}"><i class="bi bi-wrench me-2"></i> Service Records</a></li>
             <li class="nav-item"><a class="nav-link {% if request.endpoint.startswith('admin.carfax_report') %}active{% endif %}" href="{{ url_for('admin.carfax_reports') }}"><i class="bi bi-file-earmark-text me-2"></i> CarFax Reports</a></li>
@@ -55,6 +56,7 @@
             <div class="collapse navbar-collapse" id="adminMobileNav">
                 <ul class="navbar-nav pb-2">
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.sales_priorities') }}"><i class="bi bi-list-check me-2"></i>Sales Priorities</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.vehicles') }}"><i class="bi bi-car-front me-2"></i>Vehicles</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.service_records') }}"><i class="bi bi-wrench me-2"></i>Service Records</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.carfax_reports') }}"><i class="bi bi-file-earmark-text me-2"></i>CarFax Reports</a></li>

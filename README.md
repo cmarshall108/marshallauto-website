@@ -8,6 +8,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Responsive Bootstrap 5 storefront with a graphite, warm-white, and champagne visual theme
   - Home page with featured inventory and search
   - Inventory listing with filters (make, body style, price, mileage, search)
+  - Find-your-fit guide for matching inventory by vehicle type, price, and mileage, plus shareable vehicle links
   - Coming Soon showcase for teaser vehicles, with contact links for availability updates
   - Vehicle detail pages with image gallery, specs, features, service history, and CarFax
   - Carvana-style photo highlight bubbles (features + condition notes) powered by a local OpenCV worker
@@ -39,9 +40,20 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Manage service records per vehicle
   - Upload and link CarFax PDF reports
   - View and manage customer leads (with UTM / click-ID attribution)
+  - Sales Priorities board for oldest unread non-spam leads, available public listings added at least 60 days ago, and a paginated listing-quality checklist
   - First-party Live Chat inbox with automatic signed-in staff availability, cross-page toast alerts, and offline fallback
   - Edit site settings, SEO defaults, and analytics IDs
   - Facebook Page auto-post for new/updated vehicles + Marketplace paste draft (see below)
+
+### Sales Priorities
+
+The staff-only Sales Priorities page shows the 10 oldest unread, non-spam leads
+and the 10 oldest public available listings added at least 60 days ago. Listing
+age starts when the inventory record was created, not necessarily when it was
+published. The checklist paginates public listings missing photos, a
+description, body style, engine, or transmission. These are prompts for human
+review, not proof of a missed follow-up or a recommendation to invent details.
+The page does not send messages or add customer tracking.
 
 ### Local network scanner
 

@@ -19,9 +19,9 @@ from cryptography.fernet import InvalidToken
 from qrcode.image.svg import SvgPathImage
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf.csrf import generate_csrf
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import lazyload, selectinload
 
 from app import db
 from app.forms import (
@@ -507,6 +507,64 @@ def profile_setup():
 @admin_required
 def dashboard():
     return render_template('admin/dashboard.html', **_dashboard_context())
+
+
+@admin_bp.get('/sales-priorities')
+@admin_required
+def sales_priorities():
+    now = utcnow()
+    unread_leads = (
+        Lead.query.options(lazyload('*'))
+        .filter_by(is_spam=False, is_read=False)
+        .order_by(Lead.created_at.asc(), Lead.id.asc())
+        .limit(10).all()
+    )
+    public_inventory = Vehicle.query.options(lazyload('*')).filter_by(
+        status='available', is_coming_soon=False,
+    )
+    aging = (
+        public_inventory.filter(Vehicle.created_at <= now - timedelta(days=60))
+        .order_by(Vehicle.created_at.asc(), Vehicle.id.asc())
+        .limit(10).all()
+    )
+    def missing(field):
+        return func.trim(func.coalesce(field, ''), ' \t\n\r') == ''
+
+    quality_page = (
+        public_inventory.filter(or_(
+            ~Vehicle.images.any(),
+            missing(Vehicle.description),
+            missing(Vehicle.body_style),
+            missing(Vehicle.engine),
+            missing(Vehicle.transmission),
+        ))
+        .order_by(Vehicle.created_at.asc(), Vehicle.id.asc())
+        .paginate(page=max(request.args.get('page', 1, type=int) or 1, 1),
+                  per_page=25, error_out=False)
+    )
+    if quality_page.page > 1 and quality_page.page > quality_page.pages:
+        abort(404)
+    quality_rows = []
+    image_ids = {
+        row[0] for row in db.session.query(VehicleImage.vehicle_id).filter(
+            VehicleImage.vehicle_id.in_([vehicle.id for vehicle in quality_page.items])
+        ).distinct()
+    }
+    for vehicle in quality_page.items:
+        issues = []
+        if vehicle.id not in image_ids:
+            issues.append('No photos')
+        for field, label in (
+            ('description', 'Description'), ('body_style', 'Body style'),
+            ('engine', 'Engine'), ('transmission', 'Transmission'),
+        ):
+            if not (getattr(vehicle, field) or '').strip(' \t\n\r'):
+                issues.append(label)
+        quality_rows.append((vehicle, issues))
+    return render_template(
+        'admin/sales_priorities.html', unread_leads=unread_leads,
+        aging=aging, quality_page=quality_page, quality_rows=quality_rows, now=now,
+    )
 
 
 def _dashboard_context():

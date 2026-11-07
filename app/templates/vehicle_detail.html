@@ -432,6 +432,17 @@ bi-check-circle
                             <i class="bi bi-columns-gap"></i> Compare
                         </label>
                     </div>
+                    <details class="mb-3">
+                        <summary class="fw-semibold">Share this car</summary>
+                        <div class="mt-2" id="vehicle-share" data-title="{{ vehicle.title }}">
+                            <label for="vehicle-share-url" class="form-label small">Listing link</label>
+                            <div class="d-flex gap-2">
+                                <input id="vehicle-share-url" class="form-control" type="url" readonly value="{{ site_url.rstrip('/') }}{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}">
+                                <button class="btn btn-outline-primary" type="button" id="vehicle-share-button" hidden>Share</button>
+                            </div>
+                            <p class="small text-muted mt-1 mb-0" id="vehicle-share-status" role="status">Select and copy the link to share it.</p>
+                        </div>
+                    </details>
 
                                         {% set phone_digits = business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') %}
                     <div class="vehicle-primary-ctas d-grid gap-2 mb-3">
@@ -927,6 +938,7 @@ bi-check-circle
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ asset_url('js/vehicle-share.js') }}" defer></script>
 {% if vehicle.is_available %}
 <script src="{{ asset_url('js/vehicle-visit.js') }}" defer></script>
 {% endif %}
