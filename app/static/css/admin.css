@@ -118,6 +118,23 @@
     --bs-table-hover-color: #142238;
 }
 .admin-theme .table-responsive { overscroll-behavior-x: contain; }
+.admin-theme .admin-vehicles-table .vehicle-nowrap { white-space: nowrap; }
+.admin-theme .admin-vehicles-table td[data-label="Vehicle"] { min-width: 13rem; }
+.admin-theme .admin-vehicles-table td[data-label="Actions"] { min-width: 16rem; }
+.admin-theme .vehicle-actions { display: grid; gap: 0.5rem; justify-items: start; }
+.admin-theme .vehicle-actions-primary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.admin-theme .vehicle-actions-primary form { margin: 0; }
+.admin-theme .vehicle-actions-primary .btn { white-space: nowrap; }
+.admin-theme .vehicle-documents { max-width: 100%; }
+.admin-theme .vehicle-documents summary {
+    color: var(--primary);
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0.2rem 0;
+}
+.admin-theme .vehicle-documents summary::marker { color: #78889a; }
+.admin-theme .vehicle-document-links { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; padding: 0.5rem 0 0.2rem; }
+.admin-theme .vehicle-document-links a { white-space: nowrap; }
 .admin-theme :is(.form-control, .form-select) {
     background-color: var(--surface);
     color: var(--bs-body-color);
@@ -224,7 +241,7 @@
 .admin-theme .analytics-mini-stat { background: #edf1f5; border-color: var(--line); }
 .admin-theme.login-page { background: radial-gradient(ellipse at top, #23354a, #142238 70%); padding: 2rem 1rem; }
 .admin-theme .login-card { border-top: 4px solid var(--accent); }
-.admin-theme :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #966322; outline-offset: 3px; }
+.admin-theme :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid #966322; outline-offset: 3px; }
 .admin-theme :is(.admin-sidebar, .admin-mobile-nav) :focus-visible { outline-color: #e3cba5; }
 
 @media (max-width: 991.98px) {
@@ -257,6 +274,8 @@
         text-align: right;
         overflow-wrap: anywhere;
     }
+    .admin-theme .admin-vehicles-table td[data-label="Vehicle"],
+    .admin-theme .admin-vehicles-table td[data-label="Actions"] { min-width: 0; }
     .admin-theme .admin-vehicles-table td[colspan] {
         display: block;
         text-align: center;
@@ -282,9 +301,8 @@
         display: block;
         margin-bottom: 0.5rem;
     }
-    .admin-theme .admin-vehicles-table td[data-label="Actions"] .btn {
-        margin-right: 0.25rem;
-    }
+    .admin-theme .vehicle-documents summary { min-height: 44px; display: list-item; padding-block: 0.65rem; }
+    .admin-theme .vehicle-document-links a { display: inline-flex; align-items: center; min-height: 44px; }
     .admin-theme .admin-vehicles-table .vehicle-thumb {
         width: 5rem;
         height: 3.5rem;

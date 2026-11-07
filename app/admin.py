@@ -18,6 +18,7 @@ import qrcode
 from cryptography.fernet import InvalidToken
 from qrcode.image.svg import SvgPathImage
 from flask_login import current_user, login_required, login_user, logout_user
+from flask_wtf.csrf import generate_csrf
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -92,7 +93,7 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
 _ONBOARDING_EXEMPT_ENDPOINTS = frozenset({
     'admin.login', 'admin.logout', 'admin.profile_setup',
     'admin.two_factor_setup', 'admin.two_factor_qr', 'admin.two_factor_verify',
-    'admin.two_factor_recovery',
+    'admin.two_factor_recovery', 'admin.mobile_session', 'admin.mobile_logout',
 })
 
 
@@ -101,11 +102,13 @@ def _enforce_staff_onboarding():
     """Require authentication across admin routes and enforce salesman onboarding."""
     public_auth_endpoints = {
         'admin.login', 'admin.two_factor_setup',
-        'admin.two_factor_qr', 'admin.two_factor_verify',
+        'admin.two_factor_qr', 'admin.two_factor_verify', 'admin.mobile_session',
     }
     if request.endpoint not in public_auth_endpoints and (
         not current_user.is_authenticated or not current_user.is_active
     ):
+        if request.endpoint == 'admin.dashboard_data' or request.path.startswith('/admin/mobile/'):
+            return jsonify(error='Authentication required.'), 401
         return redirect(url_for('admin.login', next=request.path))
     if request.endpoint in _ONBOARDING_EXEMPT_ENDPOINTS:
         return None
@@ -114,6 +117,8 @@ def _enforce_staff_onboarding():
         and current_user.is_active
         and current_user.needs_onboarding
     ):
+        if request.endpoint == 'admin.dashboard_data' or request.path.startswith('/admin/mobile/'):
+            return jsonify(error='Complete staff profile setup before continuing.'), 403
         return redirect(url_for('admin.profile_setup', next=request.full_path if request.method == 'GET' else None))
     return None
 
@@ -198,9 +203,21 @@ def _post_login_destination(user, next_page=None):
     return url_for('admin.dashboard')
 
 
+@admin_bp.get('/mobile/session')
+def mobile_session():
+    return jsonify(
+        csrf_token=generate_csrf(),
+        authenticated=current_user.is_authenticated,
+        needs_onboarding=bool(current_user.is_authenticated and current_user.needs_onboarding),
+    )
+
+
+@admin_bp.post('/mobile/login')
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
+        if request.is_json:
+            return jsonify(state='onboarding' if current_user.needs_onboarding else 'authenticated')
         return redirect(url_for('admin.dashboard'))
     session.pop('admin_2fa_pending', None)
 
@@ -211,6 +228,8 @@ def login():
             current_app.config.get('LOGIN_RATE_LIMIT', 10),
             current_app.config.get('LOGIN_RATE_WINDOW', 300),
         ):
+            if request.is_json:
+                return jsonify(error='Too many login attempts. Please try again later.'), 429
             flash('Too many login attempts. Please try again later.', 'danger')
             return render_template('admin/login.html', form=form), 429
 
@@ -221,6 +240,8 @@ def login():
         # attacker spreads attempts across many IPs (the per-IP limit above won't catch that).
         if user and user.is_locked:
             current_app.logger.warning('Admin login blocked (account locked): %s from %s', username, client_ip())
+            if request.is_json:
+                return jsonify(error='This account is temporarily locked. Try again later.'), 429
             flash('This account is temporarily locked due to repeated failed logins. Please try again later.', 'danger')
             return render_template('admin/login.html', form=form), 429
 
@@ -232,6 +253,8 @@ def login():
                     user.auth_version = secrets.token_hex(16)
                     db.session.commit()
                 start_challenge(user, next_page)
+                if request.is_json:
+                    return jsonify(state='verify' if user.totp_enabled else 'enroll')
                 if user.totp_enabled:
                     return redirect(url_for('admin.two_factor_verify'))
                 return redirect(url_for('admin.two_factor_setup'))
@@ -240,17 +263,25 @@ def login():
             db.session.commit()
             current_app.logger.info('Admin login succeeded: %s from %s', username, client_ip())
             login_user(user, remember=bool(form.remember.data))
+            if request.is_json:
+                return jsonify(state='onboarding' if user.needs_onboarding else 'authenticated')
             return redirect(_post_login_destination(user, next_page))
 
         if user:
             record_failure(user)
         current_app.logger.warning('Failed admin login attempt: %s from %s', username, client_ip())
+        if request.is_json:
+            return jsonify(error='Invalid username or password.'), 401
         flash('Invalid username or password.', 'danger')
+    if request.is_json:
+        return jsonify(error='Enter a valid username and password.'), 400
     return render_template('admin/login.html', form=form)
 
 
 def _two_factor_expired():
     session.pop('admin_2fa_pending', None)
+    if request.is_json:
+        return jsonify(error='Verification expired or the account is unavailable. Sign in again.'), 401
     flash('Sign in with your password again. Verification expired or the account is unavailable.', 'warning')
     return redirect(url_for('admin.login'))
 
@@ -258,6 +289,8 @@ def _two_factor_expired():
 def _two_factor_storage_error():
     db.session.rollback()
     current_app.logger.error('Admin 2FA secret could not be decrypted; server-owner recovery required.')
+    if request.is_json:
+        return jsonify(error='Two-factor configuration is unavailable. Contact the server owner.'), 503
     flash('Two-factor configuration is unavailable. Contact the server owner; login is blocked.', 'danger')
     return render_template('admin/two_factor.html', form=None, mode='unavailable'), 503
 
@@ -273,12 +306,15 @@ def _finish_two_factor_login(user):
     return _post_login_destination(user, next_page)
 
 
+@admin_bp.post('/mobile/verify')
 @admin_bp.route('/login/verify', methods=['GET', 'POST'])
 def two_factor_verify():
     user = pending_user()
     if not user or not requires_two_factor(user):
         return _two_factor_expired()
     if not user.totp_enabled:
+        if request.is_json:
+            return jsonify(state='enroll')
         return redirect(url_for('admin.two_factor_setup'))
     form = TwoFactorForm()
     if form.validate_on_submit():
@@ -289,13 +325,33 @@ def two_factor_verify():
         if accepted:
             db.session.refresh(user)
             destination = _finish_two_factor_login(user)
+            if request.is_json:
+                return jsonify(state='onboarding' if user.needs_onboarding else 'authenticated')
             return redirect(destination)
         db.session.rollback()
         record_failure(user)
+        if request.is_json:
+            if user.is_locked:
+                return _two_factor_expired()
+            return jsonify(error='Invalid or already-used code.'), 401
         flash('Invalid or already-used code. Try a new authenticator code or an unused recovery code.', 'danger')
         if user.is_locked:
             return _two_factor_expired()
+    if request.is_json:
+        return jsonify(error='Enter an authenticator or recovery code.'), 400
     return render_template('admin/two_factor.html', form=form, mode='verify')
+
+
+@admin_bp.post('/mobile/logout')
+def mobile_logout():
+    if current_user.is_authenticated:
+        from app.models import ChatPresence
+        ChatPresence.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+        logout_user()
+    session.clear()
+    session['_remember'] = 'clear'
+    return jsonify(state='signed_out')
 
 
 @admin_bp.route('/login/setup', methods=['GET', 'POST'])
@@ -450,6 +506,10 @@ def profile_setup():
 @admin_bp.route('/dashboard')
 @admin_required
 def dashboard():
+    return render_template('admin/dashboard.html', **_dashboard_context())
+
+
+def _dashboard_context():
     stats = {
         'total_vehicles': Vehicle.query.count(),
         'available_vehicles': Vehicle.query.filter_by(
@@ -516,13 +576,35 @@ def dashboard():
     from app.financials import build_financial_summary
     financials = build_financial_summary()
 
-    return render_template(
-        'admin/dashboard.html',
-        stats=stats,
-        recent_leads=recent_leads,
-        top_searches=top_searches,
-        most_viewed_vehicles=most_viewed_vehicles,
-        financials=financials,
+    return {
+        'stats': stats,
+        'recent_leads': recent_leads,
+        'top_searches': top_searches,
+        'most_viewed_vehicles': most_viewed_vehicles,
+        'financials': financials,
+    }
+
+
+@admin_bp.get('/dashboard/data')
+@admin_required
+def dashboard_data():
+    data = _dashboard_context()
+    return jsonify(
+        stats=data['stats'],
+        recent_leads=[{
+            'created_at': lead.created_at.isoformat(),
+            'name': lead.name,
+            'email': lead.email,
+            'phone': lead.phone,
+            'vehicle': lead.vehicle.title if lead.vehicle else None,
+            'is_read': lead.is_read,
+        } for lead in data['recent_leads']],
+        top_searches=[{'label': label, 'count': count} for label, count in data['top_searches']],
+        most_viewed_vehicles=[{
+            'title': row['vehicle'].title,
+            'views': row['views'],
+        } for row in data['most_viewed_vehicles']],
+        financials=data['financials'],
     )
 
 
@@ -809,6 +891,11 @@ def financing_application_delete(application_id):
 @admin_bp.route('/vehicles')
 @login_required
 def vehicles():
+    pagination, status = _vehicle_page()
+    return render_template('admin/vehicles.html', pagination=pagination, status=status)
+
+
+def _vehicle_page():
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
     query = Vehicle.query.options(selectinload(Vehicle.images))
@@ -818,7 +905,23 @@ def vehicles():
         query = query.filter_by(status=status)
     pagination = query.order_by(Vehicle.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False)
-    return render_template('admin/vehicles.html', pagination=pagination, status=status)
+    return pagination, status
+
+
+@admin_bp.get('/mobile/vehicles')
+@admin_required
+def mobile_vehicles():
+    pagination, _ = _vehicle_page()
+    return jsonify(
+        items=[{
+            'id': vehicle.id, 'title': vehicle.title, 'vin': vehicle.vin,
+            'stock_number': vehicle.stock_number, 'price': str(vehicle.display_price),
+            'mileage': vehicle.mileage, 'status': vehicle.status,
+            'is_coming_soon': vehicle.is_coming_soon,
+            'created_at': vehicle.created_at.isoformat(),
+        } for vehicle in pagination.items],
+        page=pagination.page, pages=pagination.pages, has_next=pagination.has_next,
+    )
 
 
 @admin_bp.get('/vehicles/<int:id>/qr-print')
@@ -2676,14 +2779,7 @@ def financials():
 @admin_bp.route('/leads')
 @login_required
 def leads():
-    page = request.args.get('page', 1, type=int)
-    view = 'spam' if request.args.get('view') == 'spam' else 'inbox'
-    query = Lead.query.filter(Lead.is_spam.is_(view == 'spam'))
-    lead_id = request.args.get('lead_id', type=int)
-    if lead_id is not None:
-        query = query.filter(Lead.id == lead_id)
-    pagination = query.order_by(Lead.created_at.desc()).paginate(
-        page=page, per_page=25, error_out=False)
+    pagination, view = _lead_page()
     return render_template(
         'admin/leads.html',
         pagination=pagination,
@@ -2693,21 +2789,55 @@ def leads():
     )
 
 
+def _lead_page():
+    page = request.args.get('page', 1, type=int)
+    view = 'spam' if request.args.get('view') == 'spam' else 'inbox'
+    query = Lead.query.filter(Lead.is_spam.is_(view == 'spam'))
+    lead_id = request.args.get('lead_id', type=int)
+    if lead_id is not None:
+        query = query.filter(Lead.id == lead_id)
+    pagination = query.order_by(Lead.created_at.desc()).paginate(
+        page=page, per_page=25, error_out=False)
+    return pagination, view
+
+
+@admin_bp.get('/mobile/leads')
+@admin_required
+def mobile_leads():
+    pagination, _ = _lead_page()
+    return jsonify(
+        items=[{
+            'id': lead.id, 'created_at': lead.created_at.isoformat(),
+            'name': lead.name, 'email': lead.email, 'phone': lead.phone,
+            'message': lead.message, 'vehicle': lead.vehicle.title if lead.vehicle else None,
+            'is_read': lead.is_read, 'is_spam': lead.is_spam,
+            'spam_score': lead.spam_score, 'spam_reasons': lead.spam_reasons,
+        } for lead in pagination.items],
+        page=pagination.page, pages=pagination.pages, has_next=pagination.has_next,
+        inbox_count=Lead.query.filter(Lead.is_spam.is_(False)).count(),
+        spam_count=Lead.query.filter(Lead.is_spam.is_(True)).count(),
+    )
+
+
 def _leads_redirect():
     view = request.form.get('view') or request.args.get('view')
     return redirect(url_for('admin.leads', view='spam' if view == 'spam' else None))
 
 
+@admin_bp.post('/mobile/leads/<int:id>/read')
 @admin_bp.route('/leads/<int:id>/read', methods=['POST'])
 @login_required
 def lead_mark_read(id):
     lead = db.session.get(Lead, id) or abort(404)
     lead.is_read = True
     db.session.commit()
+    if request.is_json:
+        return jsonify(state='updated')
     flash('Lead marked as read.', 'success')
     return _leads_redirect()
 
 
+@admin_bp.post('/mobile/leads/<int:id>/spam')
 @admin_bp.route('/leads/<int:id>/spam', methods=['POST'])
 @login_required
 def lead_toggle_spam(id):
@@ -2718,6 +2848,8 @@ def lead_toggle_spam(id):
         lead.spam_reasons = MANUAL_CLEAR_MARKER
         lead.spam_score = 0
     db.session.commit()
+    if request.is_json:
+        return jsonify(state='updated')
     flash('Lead moved to spam.' if lead.is_spam else 'Lead restored to the inbox.', 'success')
     return _leads_redirect()
 
@@ -2743,12 +2875,15 @@ def leads_rescan_spam():
     return redirect(url_for('admin.leads', view='spam'))
 
 
+@admin_bp.post('/mobile/leads/<int:id>/delete')
 @admin_bp.route('/leads/<int:id>/delete', methods=['POST'])
 @login_required
 def lead_delete(id):
     lead = db.session.get(Lead, id) or abort(404)
     db.session.delete(lead)
     db.session.commit()
+    if request.is_json:
+        return jsonify(state='updated')
     flash('Lead deleted.', 'success')
     return _leads_redirect()
 

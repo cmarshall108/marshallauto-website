@@ -74,6 +74,7 @@ class SalesmanAccountTests(unittest.TestCase):
             'admin.two_factor_setup',
             'admin.two_factor_qr',
             'admin.two_factor_verify',
+            'admin.mobile_session',
         }
         with self.app.test_request_context():
             for rule in self.app.url_map.iter_rules():
@@ -87,12 +88,16 @@ class SalesmanAccountTests(unittest.TestCase):
                 )
                 method = 'GET' if 'GET' in rule.methods else 'POST'
                 response = anonymous.open(path, method=method)
+                wants_json = rule.endpoint == 'admin.dashboard_data' or path.startswith('/admin/mobile/')
                 self.assertEqual(
                     response.status_code,
-                    302,
+                    401 if wants_json else 302,
                     f'{method} {path} exposed {rule.endpoint} anonymously',
                 )
-                self.assertIn('/admin/login', response.headers['Location'])
+                if wants_json:
+                    self.assertEqual(response.json['error'], 'Authentication required.')
+                else:
+                    self.assertIn('/admin/login', response.headers['Location'])
 
     def create_salesman_via_admin(self, username='sales1', password='temp-password-ok'):
         self.login_admin()

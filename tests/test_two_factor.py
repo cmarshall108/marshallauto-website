@@ -118,6 +118,7 @@ class TwoFactorTests(unittest.TestCase):
         self.assertIn('I Saved My Codes', response.text)
         self.assertIn('/admin/vehicles?status=sold', response.text)
         self.assertEqual(self.client.get('/admin/').status_code, 200)
+
         self.assertEqual(self.client.get('/admin/login/setup/qr').status_code, 403)
         with self.app.app_context():
             user = db.session.get(User, self.user_id)
@@ -126,6 +127,15 @@ class TwoFactorTests(unittest.TestCase):
             self.assertNotIn(secret, user.totp_secret_encrypted)
             self.assertEqual(AdminRecoveryCode.query.count(), 10)
             self.assertIsNotNone(user.last_login_at)
+
+    def test_dashboard_data_requires_completed_two_factor(self):
+        self.assertEqual(self.client.get('/admin/dashboard/data').status_code, 401)
+        self.password_login()
+        self.assertEqual(self.client.get('/admin/dashboard/data').status_code, 401)
+        self.client.get('/admin/login/setup')
+        response = self.client.post('/admin/login/setup', data={'code': pyotp.TOTP(self.secret()).now()})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get('/admin/dashboard/data').status_code, 200)
 
     def test_totp_login_replay_protection_clock_window_and_next_redirect(self):
         secret, _, _ = self.enroll()

@@ -126,6 +126,8 @@ their dedicated print layout. Both themes include visible keyboard focus and
 reduced-motion rules.
 The palette uses navy (`#142238`), cool gray (`#f4f6f8`), and gold
 (`#f2bc58`), with darker navy accents for readable text on light surfaces.
+In Admin → Vehicles, the common row actions remain visible; expand **Documents**
+to access the hold deposit, bill of sale, MVR forms, and window QR code.
 
 The theme covers navigation, vehicle cards, forms, galleries, consent/compare
 bars, and the footer. Status badges retain distinct warning/success/error
@@ -287,6 +289,26 @@ Administrators can create **salesman** logins under **Admin → Salesmen**:
 5. After onboarding, the panel prefills their **dealer tag / salesperson name** on test drives, vehicle sale details, and the bill of sale. Saved **dealer tags** appear as quick-select chips on those forms.
 
 Only administrators can open Settings or manage salesman accounts and dealer tags. Financials is available to all signed-in staff. Deactivating a salesman blocks further logins and invalidates their sessions. Resetting a temporary password from the edit screen also clears 2FA so they re-enroll on the next login.
+
+The read-only `GET /admin/dashboard/data` endpoint provides the dashboard's statistics,
+recent leads, search and vehicle activity, and financial summary as JSON. It uses
+the same authenticated staff session, two-factor policy, and onboarding requirements
+as the dashboard; it returns 401 when authentication is required and 403 when profile
+setup is incomplete. Responses are private and not cached. This endpoint is a
+foundation for a native client, not an app or a separate authentication API.
+
+The initial iPhone client is maintained in the `iphone-app` submodule. Its
+native login uses the existing staff session and CSRF protection via
+`/admin/mobile/session`, `/admin/mobile/login`, `/admin/mobile/verify`, and
+`/admin/mobile/logout`. Authenticator enrollment and staff profile setup remain
+on the website. Clone the website with `git clone --recurse-submodules`, or run
+`git submodule update --init --recursive` after cloning. See the app README for
+its build instructions and current distribution limitations.
+
+The native client also uses authenticated `/admin/mobile/vehicles` and
+`/admin/mobile/leads` JSON lists. Its lead actions use the same read, spam/restore,
+and delete operations and CSRF protection as the website; vehicle editing and
+other administrative workflows remain website-only.
 
 ## Admin two-factor authentication
 

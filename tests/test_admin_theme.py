@@ -5,7 +5,7 @@ from unittest.mock import patch
 from bs4 import BeautifulSoup
 
 from app import create_app, db
-from app.models import User, Vehicle
+from app.models import Lead, User, Vehicle
 from config import TestingConfig
 
 
@@ -47,6 +47,30 @@ class AdminThemeTests(unittest.TestCase):
             self.assertIsNotNone(html.select_one(f'[name="{name}"]'))
         self.assertIn('login-page', html.body['class'])
 
+    def test_dashboard_data_requires_staff_and_matches_dashboard(self):
+        response = self.client.get('/admin/dashboard/data')
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json, {'error': 'Authentication required.'})
+
+        with patch('app.admin.rate_limit_exceeded', return_value=False):
+            self.client.post('/admin/login', data={
+                'username': 'theme-agent', 'password': 'theme-test-password',
+            })
+        db.session.add(Lead(name='Test Lead', email='lead@example.com'))
+        db.session.commit()
+        response = self.client.get('/admin/dashboard/data')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['Cache-Control'], 'private, no-store')
+        self.assertEqual(response.json['stats']['pending_leads'], 1)
+        self.assertEqual(response.json['recent_leads'][0]['name'], 'Test Lead')
+        self.assertIn('financials', response.json)
+        self.assertIn('Test Lead', self.client.get('/admin/dashboard').text)
+
+        user = User.query.filter_by(username='theme-agent').one()
+        user.profile_complete = False
+        db.session.commit()
+        self.assertEqual(self.client.get('/admin/dashboard/data').status_code, 403)
+
     def test_staff_pages_share_theme_and_keep_chat_and_navigation_controls(self):
         with patch('app.admin.rate_limit_exceeded', return_value=False):
             response = self.client.post('/admin/login', data={
@@ -79,6 +103,24 @@ class AdminThemeTests(unittest.TestCase):
             {cell.get('data-label') for cell in inventory.select('.admin-vehicles-table tbody tr td')},
             {'Photo', 'Vehicle', 'Price', 'Mileage', 'Status', 'Stock #', 'Added', 'Actions'},
         )
+        row = inventory.select_one('.admin-vehicles-table tbody tr')
+        actions = row.select_one('.vehicle-actions-primary')
+        documents = row.select_one('details.vehicle-documents')
+        self.assertIsNotNone(documents)
+        self.assertFalse(documents.has_attr('open'))
+        self.assertEqual(documents.summary.get('aria-label'), 'Documents for 2022 Honda Civic')
+        self.assertEqual(
+            {link.get_text(strip=True) for link in documents.select('a')},
+            {'Hold Deposit', 'Bill of Sale', 'MVR-180', 'MVR-181', 'Window QR'},
+        )
+        for label in ('View 2022 Honda Civic', 'Edit 2022 Honda Civic', 'Delete 2022 Honda Civic'):
+            self.assertIsNotNone(actions.select_one(f'[aria-label="{label}"]'))
+        self.assertIsNotNone(actions.select_one('form[method="POST"] input[name="csrf_token"]'))
+
+        vehicle.status = 'sold'
+        db.session.commit()
+        sold = self.page('/admin/vehicles')
+        self.assertIn('Sale Details', sold.select_one('.vehicle-actions-primary').get_text())
 
     def test_theme_is_scoped_and_matches_public_palette_and_accessibility(self):
         folder = Path(self.app.static_folder) / 'css'
