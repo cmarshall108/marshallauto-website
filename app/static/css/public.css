@@ -814,3 +814,22 @@
     }
 }
 
+/* Vehicle decision CTAs + trust quotes + inventory notify */
+.public-site .vehicle-primary-ctas .btn-lg { min-height: 48px; }
+.public-site .vehicle-trust-reviews {
+    border: 1px solid var(--line, #d7deea);
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 0.75rem 0.9rem;
+}
+.public-site .vehicle-trust-quote {
+    border-left: 3px solid var(--secondary, #c4a574);
+    padding-left: 0.65rem;
+    margin: 0.35rem 0;
+}
+.public-site .inventory-search-alert {
+    background: linear-gradient(180deg, #fff, #f7f9fc);
+    border: 1px solid var(--line, #d7deea) !important;
+}
+.public-site .inventory-search-alert .form-label { color: #445164; }
+

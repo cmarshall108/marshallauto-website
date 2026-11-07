@@ -110,7 +110,7 @@
             toggle.querySelector('i').className = 'bi bi-chat-dots-fill';
             toggle.focus();
         }
-        toggle.addEventListener('click', function () {
+        function openPanel(prefillMessage) {
             if (panel.classList.contains('d-none')) {
                 panel.classList.remove('d-none');
                 toggle.setAttribute('aria-expanded', 'true');
@@ -118,8 +118,28 @@
                 toggle.classList.remove('chat-has-unread');
                 toggle.querySelector('i').className = 'bi bi-x-lg';
                 poll(true);
-                (conversation && !conversation.closed ? reply : form.querySelector('[name="name"]')).focus();
+            }
+            var messageField = form.querySelector('[name="message"]');
+            if (prefillMessage && messageField && !conversation) {
+                if (!messageField.value.trim()) {
+                    messageField.value = prefillMessage;
+                }
+            }
+            var focusTarget = conversation && !conversation.closed
+                ? reply
+                : (messageField && messageField.value ? messageField : form.querySelector('[name="name"]'));
+            if (focusTarget) focusTarget.focus();
+        }
+        toggle.addEventListener('click', function () {
+            if (panel.classList.contains('d-none')) {
+                openPanel();
             } else { closePanel(); }
+        });
+        document.addEventListener('click', function (event) {
+            var trigger = event.target.closest('.js-open-chat');
+            if (!trigger) return;
+            event.preventDefault();
+            openPanel(trigger.getAttribute('data-chat-message') || '');
         });
         document.getElementById('chat-widget-close').addEventListener('click', closePanel);
         panel.addEventListener('keydown', function (event) { if (event.key === 'Escape') closePanel(); });

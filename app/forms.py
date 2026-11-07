@@ -508,6 +508,39 @@ class InventoryAlertForm(ShopperRequestForm):
     submit = SubmitField('Create Alert')
 
 
+class InventorySearchAlertForm(ShopperRequestForm):
+    """Notify me when inventory matches the shopper's current filters."""
+    phone = StringField('Phone', validators=[Optional(), Length(max=32)])
+    make = StringField('Make', validators=[Optional(), Length(max=64)])
+    body_style = StringField('Body style', validators=[Optional(), Length(max=64)])
+    title_status = SelectField(
+        'Title status',
+        choices=[
+            ('', 'Any title'),
+            ('clean', 'Clean title'),
+            ('rebuilt', 'Rebuilt title'),
+            ('salvage', 'Salvage title'),
+        ],
+        validators=[Optional()],
+    )
+    min_price = DecimalField(
+        'Minimum price',
+        places=2,
+        validators=[Optional(), NumberRange(min=1, max=1000000)],
+    )
+    max_price = DecimalField(
+        'Maximum price',
+        places=2,
+        validators=[Optional(), NumberRange(min=1, max=1000000)],
+    )
+    max_mileage = IntegerField(
+        'Maximum mileage',
+        validators=[Optional(), NumberRange(min=1, max=1000000)],
+    )
+    search_query = StringField('Keywords', validators=[Optional(), Length(max=128)])
+    submit = SubmitField('Email me new matches')
+
+
 class ContactForm(FlaskForm):
     name = StringField('Full Name *', validators=[DataRequired(), Length(max=128)])
     email = StringField('Email *', validators=[DataRequired(), Email(), Length(max=128)])

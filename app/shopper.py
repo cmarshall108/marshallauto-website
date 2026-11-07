@@ -6,6 +6,7 @@ collect a deposit, or reserve a vehicle until staff confirms the request.
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app, url_for
+from sqlalchemy import or_
 
 from app import db
 from app.models import InventoryAlert, Lead, TestDrive, Vehicle, VehicleHoldRequest, utcnow
@@ -39,7 +40,7 @@ def _lead(name, email, phone, message, vehicle, source):
         email=email.strip(),
         phone=(phone or '').strip() or None,
         message=message,
-        vehicle_id=vehicle.id,
+        vehicle_id=vehicle.id if vehicle is not None else None,
         source=source,
     )
     db.session.add(lead)
@@ -108,34 +109,97 @@ def create_hold_request(vehicle, *, name, email, phone, deposit_amount, acknowle
     return lead, hold
 
 
-def create_inventory_alert(vehicle, *, name, email, phone, alert_type, max_price=None):
-    if alert_type not in ('vehicle', 'make', 'body_style'):
+def create_inventory_alert(
+    vehicle,
+    *,
+    name,
+    email,
+    phone,
+    alert_type,
+    max_price=None,
+    min_price=None,
+    max_mileage=None,
+    make=None,
+    body_style=None,
+    title_status=None,
+    search_query=None,
+):
+    if alert_type not in ('vehicle', 'make', 'body_style', 'search'):
         raise ShopperRequestError('Choose a valid alert.')
     phone = format_phone_number(phone)
     if alert_type == 'vehicle' and not vehicle:
         raise ShopperRequestError('Choose a vehicle for this alert.')
-    if alert_type != 'vehicle' and max_price is not None and max_price <= 0:
-        raise ShopperRequestError('Enter a maximum price above zero, or leave it blank.')
-    target = vehicle.title if alert_type == 'vehicle' else (
-        vehicle.make if alert_type == 'make' else vehicle.body_style
-    )
-    if not target:
-        raise ShopperRequestError('This listing does not have enough information for that alert.')
+    for label, amount in (('minimum price', min_price), ('maximum price', max_price)):
+        if amount is not None and amount <= 0:
+            raise ShopperRequestError(f'Enter a {label} above zero, or leave it blank.')
+    if max_mileage is not None and max_mileage <= 0:
+        raise ShopperRequestError('Enter a maximum mileage above zero, or leave it blank.')
+    if (
+        min_price is not None
+        and max_price is not None
+        and min_price > max_price
+    ):
+        raise ShopperRequestError('Minimum price cannot be higher than maximum price.')
+
+    make_value = (make or (vehicle.make if vehicle and alert_type == 'make' else None) or '').strip() or None
+    body_value = (
+        body_style or (vehicle.body_style if vehicle and alert_type == 'body_style' else None) or ''
+    ).strip() or None
+    title_value = (title_status or '').strip().lower() or None
+    if title_value and title_value not in ('clean', 'rebuilt', 'salvage'):
+        raise ShopperRequestError('Choose a valid title status filter.')
+    query_value = ' '.join((search_query or '').split())[:128] or None
+
+    if alert_type == 'make' and not make_value:
+        raise ShopperRequestError('Choose a make for this alert.')
+    if alert_type == 'body_style' and not body_value:
+        raise ShopperRequestError('Choose a body style for this alert.')
+    if alert_type == 'search' and not any(
+        (make_value, body_value, min_price, max_price, max_mileage, title_value, query_value)
+    ):
+        raise ShopperRequestError('Add at least one search filter before creating an alert.')
+
+    if alert_type == 'vehicle':
+        target = vehicle.title
+    elif alert_type == 'make':
+        target = make_value
+    elif alert_type == 'body_style':
+        target = body_value
+    else:
+        bits = []
+        if query_value:
+            bits.append(f'"{query_value}"')
+        if make_value:
+            bits.append(make_value)
+        if body_value:
+            bits.append(body_value)
+        if title_value:
+            bits.append(f'{title_value} title')
+        if min_price is not None:
+            bits.append(f'from ${min_price:,.0f}')
+        if max_price is not None:
+            bits.append(f'up to ${max_price:,.0f}')
+        if max_mileage is not None:
+            bits.append(f'under {int(max_mileage):,} mi')
+        target = ', '.join(bits) or 'saved search'
+
     message = f"Inventory alert ({alert_type}) for {target}."
-    if max_price:
-        message += f" Maximum price: ${max_price:,.2f}."
-    lead = _lead(name, email, phone, message, vehicle, 'inventory_alert')
+    lead = _lead(name, email, phone, message, vehicle if alert_type == 'vehicle' else None, 'inventory_alert')
     alert = InventoryAlert(
         lead_id=lead.id,
-        vehicle_id=vehicle.id if alert_type == 'vehicle' else None,
+        vehicle_id=vehicle.id if alert_type == 'vehicle' and vehicle else None,
         customer_name=name.strip(),
         customer_email=email.strip(),
         customer_phone=(phone or '').strip() or None,
         alert_type=alert_type,
-        make=vehicle.make if alert_type == 'make' else None,
-        body_style=vehicle.body_style if alert_type == 'body_style' else None,
+        make=make_value if alert_type in ('make', 'search') else None,
+        body_style=body_value if alert_type in ('body_style', 'search') else None,
+        min_price=min_price if alert_type == 'search' else None,
         max_price=max_price,
-        last_seen_price=vehicle.display_price if alert_type == 'vehicle' else None,
+        max_mileage=max_mileage if alert_type == 'search' else None,
+        title_status=title_value if alert_type == 'search' else None,
+        search_query=query_value if alert_type == 'search' else None,
+        last_seen_price=vehicle.display_price if alert_type == 'vehicle' and vehicle else None,
         status='active',
     )
     db.session.add(alert)
@@ -216,11 +280,37 @@ def _alert_match(alert):
         if alert.last_seen_price is None or vehicle.display_price < alert.last_seen_price:
             return vehicle
         return None
-    query = Vehicle.query.filter_by(status='available')
+
+    query = Vehicle.query.filter_by(status='available', is_coming_soon=False)
     if alert.alert_type == 'make':
+        if not alert.make:
+            return None
         query = query.filter(Vehicle.make.ilike(alert.make))
     elif alert.alert_type == 'body_style':
+        if not alert.body_style:
+            return None
         query = query.filter(Vehicle.body_style.ilike(alert.body_style))
+    elif alert.alert_type == 'search':
+        if alert.make:
+            query = query.filter(Vehicle.make.ilike(alert.make))
+        if alert.body_style:
+            query = query.filter(Vehicle.body_style.ilike(alert.body_style))
+        if alert.title_status:
+            query = query.filter(Vehicle.title_status == alert.title_status)
+        if alert.search_query:
+            term = f"%{alert.search_query}%"
+            query = query.filter(
+                or_(
+                    Vehicle.make.ilike(term),
+                    Vehicle.model.ilike(term),
+                    Vehicle.trim.ilike(term),
+                    Vehicle.slug.ilike(term),
+                )
+            )
+        if alert.min_price is not None:
+            query = query.filter(Vehicle.display_price >= alert.min_price)
+        if alert.max_mileage is not None:
+            query = query.filter(Vehicle.mileage <= alert.max_mileage)
     else:
         return None
     if alert.max_price is not None:
@@ -271,3 +361,19 @@ def _notify(lead):
     from app.utils import notify_new_lead, send_lead_confirmation
     notify_new_lead(lead)
     send_lead_confirmation(lead)
+
+
+def vehicle_interest_message(vehicle, *, business_name=None):
+    """Short prefilled message for chat, SMS, and contact forms."""
+    if not vehicle:
+        return 'Hello, I have a question about a vehicle on your website.'
+    stock = vehicle.stock_number or vehicle.id
+    price = vehicle.display_price
+    price_bit = f', OTD ${price:,.0f}' if price is not None else ''
+    status = ''
+    if getattr(vehicle, 'status', None) == 'available' and not getattr(vehicle, 'is_coming_soon', False):
+        status = ' Is it still available?'
+    return (
+        f'Hello, I am interested in the {vehicle.title} (Stock #{stock}{price_bit}).'
+        f'{status}'
+    ).strip()

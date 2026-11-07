@@ -140,6 +140,53 @@
                     <p class="mb-0 text-muted">Showing {{ pagination.items | length }} of {{ pagination.total }} vehicles</p>
                 </div>
 
+                {% if search_alert_form %}
+                <div id="inventory-search-alert" class="inventory-search-alert card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                                <h2 class="h6 fw-bold mb-1">Notify me about new matches</h2>
+                                <p class="small text-muted mb-0">
+                                    {% if has_filters %}
+                                    We will email you when a vehicle matching your current filters is listed.
+                                    {% else %}
+                                    Set filters (or leave blank for all new arrivals) and we will email you when something new hits the lot.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ url_for('main.request_search_alert') }}" class="row g-2 align-items-end">
+                            {{ search_alert_form.hidden_tag() }}
+                            <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                            <input type="hidden" name="make" value="{{ search_alert_form.make.data or '' }}">
+                            <input type="hidden" name="body_style" value="{{ search_alert_form.body_style.data or '' }}">
+                            <input type="hidden" name="title_status" value="{{ search_alert_form.title_status.data or '' }}">
+                            <input type="hidden" name="min_price" value="{{ search_alert_form.min_price.data or '' }}">
+                            <input type="hidden" name="max_price" value="{{ search_alert_form.max_price.data or '' }}">
+                            <input type="hidden" name="max_mileage" value="{{ search_alert_form.max_mileage.data or '' }}">
+                            <input type="hidden" name="search_query" value="{{ search_alert_form.search_query.data or '' }}">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1" for="search-alert-name">Name</label>
+                                {{ search_alert_form.name(class='form-control form-control-sm', id='search-alert-name', autocomplete='name') }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1" for="search-alert-email">Email</label>
+                                {{ search_alert_form.email(class='form-control form-control-sm', id='search-alert-email', type='email', autocomplete='email') }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1" for="search-alert-phone">Phone (optional)</label>
+                                {{ search_alert_form.phone(class='form-control form-control-sm', id='search-alert-phone', autocomplete='tel') }}
+                            </div>
+                            <div class="col-md-1 d-none">{{ search_alert_form.honeypot(tabindex='-1', autocomplete='off') }}</div>
+                            <div class="col-md-12 col-lg-auto">
+                                {{ search_alert_form.submit(class='btn btn-primary btn-sm w-100') }}
+                            </div>
+                        </form>
+                        <p class="small text-muted mb-0 mt-2">Availability notices only — not a financing offer or vehicle hold.</p>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if pagination.items %}
                 <div class="inventory-grid" itemscope itemtype="https://schema.org/ItemList">
                     <meta itemprop="name" content="Used Vehicles for Sale at {{ business_name }}">

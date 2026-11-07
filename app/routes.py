@@ -12,7 +12,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app import db
-from app.forms import ContactForm, InventoryAlertForm, TestDriveRequestForm
+from app.forms import (
+    ContactForm, InventoryAlertForm, InventorySearchAlertForm, TestDriveRequestForm,
+)
 from app.models import (
     CarfaxReport, FinancingApplication, Lead, Review, SiteSetting, Vehicle,
 )
@@ -338,6 +340,15 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         'has_filters': bool(has_filters),
     }
 
+    search_alert_form = InventorySearchAlertForm(
+        make=make or '',
+        body_style=body_style or '',
+        title_status=title_status or '',
+        min_price=min_price,
+        max_price=max_price,
+        max_mileage=max_mileage,
+        search_query=search or '',
+    )
     return render_template(
         'inventory.html',
         pagination=pagination,
@@ -368,6 +379,8 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         model_inventory_links=model_inventory_links,
         landing_area=area if landing_h1 else None,
         buyer_guides=published_buyer_guides(),
+        search_alert_form=search_alert_form,
+        has_filters=bool(has_filters),
     )
 
 
@@ -1117,7 +1130,12 @@ def request_hold(slug):
 def request_alert(slug):
     vehicle = Vehicle.query.filter_by(slug=slug).first_or_404()
     form = InventoryAlertForm()
-    form.alert_type.choices = ['vehicle', 'make', 'body_style']
+    form.alert_type.choices = [
+        ('vehicle', f'Price drop on this {vehicle.title}'),
+        ('make', f'New {vehicle.make} arrivals') if vehicle.make else None,
+        ('body_style', f'New {vehicle.body_style} arrivals') if vehicle.body_style else None,
+    ]
+    form.alert_type.choices = [choice for choice in form.alert_type.choices if choice]
     if form.validate_on_submit():
         from app.shopper import create_inventory_alert
         _shopper_submission(
@@ -1130,6 +1148,43 @@ def request_alert(slug):
     else:
         flash('Check the alert form and try again.', 'warning')
     return redirect(url_for('main.vehicle_detail', slug=slug) + '#shopper-tools')
+
+
+@main.route('/inventory/alerts/search', methods=['POST'])
+def request_search_alert():
+    """Save a filter-based inventory alert from the inventory page."""
+    form = InventorySearchAlertForm()
+    next_url = request.form.get('next') or url_for('main.inventory')
+    if form.validate_on_submit():
+        from app.shopper import ShopperRequestError, create_inventory_alert
+        try:
+            create_inventory_alert(
+                None,
+                name=form.name.data,
+                email=form.email.data,
+                phone=form.phone.data,
+                alert_type='search',
+                make=form.make.data,
+                body_style=form.body_style.data,
+                title_status=form.title_status.data,
+                min_price=form.min_price.data,
+                max_price=form.max_price.data,
+                max_mileage=form.max_mileage.data,
+                search_query=form.search_query.data,
+            )
+            flash(
+                'Got it — we will email you when a matching vehicle is listed. '
+                'This is an availability notice, not a financing offer.',
+                'success',
+            )
+        except ShopperRequestError as exc:
+            flash(str(exc), 'warning')
+    else:
+        flash('Check the notify-me form and try again.', 'warning')
+    # Stay on a safe internal path
+    if not next_url.startswith('/') or next_url.startswith('//'):
+        next_url = url_for('main.inventory')
+    return redirect(next_url + '#inventory-search-alert')
 
 
 @main.route('/inventory/<slug>')
@@ -1152,13 +1207,25 @@ def vehicle_detail(slug):
         flash('This vehicle is no longer available.', 'info')
 
     from app.pricing import payment_examples
-    from app.shopper import appointment_slots, similar_vehicles
+    from app.shopper import appointment_slots, similar_vehicles, vehicle_interest_message
 
     related = similar_vehicles(vehicle)
     payments = payment_examples(vehicle.display_price)
     slots = appointment_slots()
+    interest_message = vehicle_interest_message(vehicle)
+    dealership_reviews = (
+        Review.query
+        .filter_by(is_approved=True)
+        .filter(Review.vehicle_id.is_(None))
+        .order_by(Review.is_featured.desc(), Review.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    review_aggregate = aggregate_rating_data()
 
     form = ContactForm(vehicle_id=vehicle.id)
+    if not form.message.data:
+        form.message.data = interest_message
     test_drive_form = TestDriveRequestForm()
     test_drive_form.appointment_at.choices = [
         (slot.strftime('%Y-%m-%dT%H:%M'), slot.strftime('%A, %B %-d at %-I:%M %p'))
@@ -1237,6 +1304,9 @@ def vehicle_detail(slug):
         payment_examples=payments,
         test_drive_form=test_drive_form,
         alert_form=alert_form,
+        interest_message=interest_message,
+        dealership_reviews=dealership_reviews,
+        review_aggregate=review_aggregate,
         structured_vehicle=structured_vehicle,
         structured_local=structured_data_local_business(),
         breadcrumbs=breadcrumbs,

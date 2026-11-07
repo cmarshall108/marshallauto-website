@@ -367,6 +367,23 @@ bi-check-circle
                     {% set large = true %}
                     {% set hide_retail = true %}
                     {% include "_price_display.html" %}
+                    {% if review_aggregate or dealership_reviews %}
+                    <div class="vehicle-trust-reviews mb-3" aria-label="Customer reviews">
+                        {% if review_aggregate %}
+                        <p class="small mb-1">
+                            <span class="text-warning" aria-hidden="true">{% for i in range(review_aggregate.ratingValue|int) %}<i class="bi bi-star-fill"></i>{% endfor %}</span>
+                            <strong>{{ review_aggregate.ratingValue }}</strong>/5 from {{ review_aggregate.ratingCount }} review{{ 's' if review_aggregate.ratingCount != 1 else '' }}
+                        </p>
+                        {% endif %}
+                        {% for review in (dealership_reviews or [])[:2] %}
+                        <blockquote class="vehicle-trust-quote mb-1">
+                            <p class="mb-0 small">“{{ review.content[:160] }}{% if review.content|length > 160 %}…{% endif %}”</p>
+                            <footer class="small text-muted">— {{ review.author_name }}{% if review.rating %} · {{ review.rating }}/5{% endif %}</footer>
+                        </blockquote>
+                        {% endfor %}
+                        <a class="small" href="{{ url_for('main.index') }}#customer-reviews">More reviews</a>
+                    </div>
+                    {% endif %}
                     {% if savings %}
                     <div class="savings-banner mb-3">
                         <div class="savings-banner-icon"><i class="bi bi-piggy-bank-fill" aria-hidden="true"></i></div>
@@ -404,12 +421,28 @@ bi-check-circle
                         </label>
                     </div>
 
-                    <div class="d-grid gap-2 mb-3 d-none d-lg-grid">
-                        <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-telephone-fill me-2"></i>{{ 'Call About This Car' if vehicle.status == 'available' else 'Ask About Similar Vehicles' }}
-                        </a>
-                        <button class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#contactModal">
-                            <i class="bi bi-envelope-fill me-2"></i>Request More Info
+                                        {% set phone_digits = business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') %}
+                    <div class="vehicle-primary-ctas d-grid gap-2 mb-3">
+                        <button type="button"
+                                class="btn btn-primary btn-lg js-open-chat"
+                                data-chat-message="{{ interest_message|e }}">
+                            <i class="bi bi-chat-dots-fill me-2"></i>Ask about this car
+                        </button>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <a class="btn btn-outline-primary w-100"
+                                   href="sms:{{ phone_digits }}?&amp;body={{ interest_message|urlencode }}">
+                                    <i class="bi bi-phone me-1"></i>Text us
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a class="btn btn-outline-primary w-100" href="tel:{{ phone_digits }}">
+                                    <i class="bi bi-telephone-fill me-1"></i>Call
+                                </a>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#contactModal">
+                            <i class="bi bi-envelope-fill me-2"></i>Email more info
                         </button>
                     </div>
                     <p class="text-muted small mb-0"><i class="bi bi-file-earmark-text me-1 text-primary"></i> CarFax history reports available on qualifying vehicles</p>
@@ -509,7 +542,7 @@ bi-check-circle
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label" for="vd-message">Message</label>
-                                        <textarea id="vd-message" name="message" class="form-control" rows="3" maxlength="5000">I'm interested in {{ vehicle.title if vehicle.status == 'available' else 'vehicles similar to ' ~ vehicle.title }}.</textarea>
+                                        <textarea id="vd-message" name="message" class="form-control" rows="3" maxlength="5000">{{ interest_message }}</textarea>
                                     </div>
                                     <div class="d-none" aria-hidden="true">
                                         <label for="vd-honeypot">Website</label>
