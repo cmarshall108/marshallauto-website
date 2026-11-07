@@ -55,6 +55,10 @@ class InteractionFeatureTests(unittest.TestCase):
 
     def test_inventory_search_alert_form_and_create(self):
         page = BeautifulSoup(self.client.get('/inventory?make=Toyota&max_price=15000').data, 'html.parser')
+        panel = page.select_one('details#inventory-search-alert')
+        self.assertIsNotNone(panel)
+        self.assertFalse(panel.has_attr('open'))
+        self.assertEqual(panel.select_one(':scope > summary').get_text(strip=True), 'Notify me about new matches')
         form = page.select_one('#inventory-search-alert form')
         self.assertIsNotNone(form)
         self.assertEqual(form.select_one('input[name="make"]')['value'], 'Toyota')
