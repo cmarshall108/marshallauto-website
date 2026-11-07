@@ -34,8 +34,13 @@ def indexnow_key() -> str:
 
 
 def indexnow_key_location() -> str:
+    """Root key file so submissions can cover any path on this host.
+
+    IndexNow only allows URLs under the key file's directory. A key under
+    /indexnow/ would only cover /indexnow/* and would not cover inventory.
+    """
     site = current_app.config['SITE_URL'].rstrip('/')
-    return f"{site}/indexnow/{indexnow_key()}.txt"
+    return f"{site}/{indexnow_key()}.txt"
 
 
 def _normalize_url(url: str) -> str | None:

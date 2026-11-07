@@ -479,11 +479,16 @@ class SeoTests(unittest.TestCase):
     def test_indexnow_key_file_and_robots_allow(self):
         self.app.config['INDEXNOW_KEY'] = 'test-indexnow-key'
         self.app.config['INDEXNOW_ENABLED'] = True
-        response = self.client.get('/indexnow/test-indexnow-key.txt')
+        response = self.client.get('/test-indexnow-key.txt')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), 'test-indexnow-key')
+        legacy = self.client.get('/indexnow/test-indexnow-key.txt')
+        self.assertEqual(legacy.status_code, 200)
+        self.assertEqual(legacy.get_data(as_text=True), 'test-indexnow-key')
+        self.assertEqual(self.client.get('/wrong-key.txt').status_code, 404)
         self.assertEqual(self.client.get('/indexnow/wrong-key.txt').status_code, 404)
         robots = self.client.get('/robots.txt').get_data(as_text=True)
+        self.assertIn('Allow: /*.txt', robots)
         self.assertIn('Allow: /indexnow/', robots)
 
 

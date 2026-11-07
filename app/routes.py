@@ -2190,6 +2190,7 @@ Allow: /sell-your-car
 Allow: /contact
 Allow: /blog
 Allow: /sitemap.xml
+Allow: /*.txt
 Allow: /indexnow/
 
 Sitemap: {sitemap_url}
@@ -2200,9 +2201,8 @@ Sitemap: {sitemap_url}
     return response
 
 
-@main.route('/indexnow/<key>.txt')
-def indexnow_key_file(key):
-    """Public IndexNow key file required by the protocol keyLocation URL."""
+def _indexnow_key_response(key: str):
+    """Serve the IndexNow ownership key body, or 404 when it does not match."""
     expected = (current_app.config.get('INDEXNOW_KEY') or '').strip()
     if not expected or key != expected:
         abort(404)
@@ -2211,6 +2211,18 @@ def indexnow_key_file(key):
     response.headers['Cache-Control'] = 'public, max-age=86400'
     response.headers['X-Robots-Tag'] = 'noindex'
     return response
+
+
+@main.route('/<key>.txt')
+def indexnow_key_file_root(key):
+    """Root IndexNow key file (covers all site URLs per IndexNow ownership rules)."""
+    return _indexnow_key_response(key)
+
+
+@main.route('/indexnow/<key>.txt')
+def indexnow_key_file(key):
+    """Legacy key path kept for older docs/bookmarks; submissions use the root file."""
+    return _indexnow_key_response(key)
 
 
 def page_not_found(e):

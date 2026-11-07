@@ -15,7 +15,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Financing, sell-your-car, about, and contact pages
   - Online Lendmark financing application for an inventory vehicle, with SSN format validation, completed lender PDF, application-level encryption at rest, and staff-only admin downloads
   - SEO: meta tags, Open Graph, JSON-LD (AutoDealer, Car, Article, FAQ, HowTo, ItemList, Breadcrumb), sitemap.xml, robots.txt
-  - IndexNow pings on vehicle and blog publish/update/delete (set `INDEXNOW_KEY`; key file at `/indexnow/<key>.txt`)
+  - IndexNow pings on vehicle and blog publish/update/delete (set `INDEXNOW_KEY`; key file at `/<key>.txt`, with `/indexnow/<key>.txt` kept as a legacy alias)
   - Descriptive vehicle image `alt` text with year/make/model/color and local dealership context
   - LCP-oriented hero assets (WebP + JPEG preload) and compressed showroom images
   - Search-only VIN record pages for valid VINs in current and archived inventory, discoverable through sitemap.xml but omitted from site navigation
@@ -621,7 +621,7 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `HEIC_CONVERSION_TIMEOUT` | HEIC subprocess timeout in seconds (default 45) |
 | `HEIC_CONVERSION_MEMORY_MB` | Linux HEIC subprocess virtual-memory ceiling in MiB (default 512; tune for available RAM) |
 | `SITE_URL` | Public site URL used for sitemaps and structured data |
-| `INDEXNOW_KEY` | Shared secret for IndexNow URL pings (optional; generate with `python -c "import secrets; print(secrets.token_hex(16))"`). Key file is served at `/indexnow/<key>.txt` |
+| `INDEXNOW_KEY` | Shared secret for IndexNow URL pings (optional; generate with `python -c "import secrets; print(secrets.token_hex(16))"`). Key file is served at `/<key>.txt` (root) so inventory and blog URLs are covered; `/indexnow/<key>.txt` remains as a legacy alias |
 | `INDEXNOW_ENABLED` | Enable IndexNow submissions when a key is set (`true`/`false`, default true) |
 | `INDEXNOW_TIMEOUT` | IndexNow HTTP timeout in seconds (default `3`) |
 | `BUSINESS_NAME` | Business name |
