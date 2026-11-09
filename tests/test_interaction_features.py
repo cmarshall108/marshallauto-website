@@ -61,6 +61,8 @@ class InteractionFeatureTests(unittest.TestCase):
         self.assertEqual(panel.select_one(':scope > summary').get_text(strip=True), 'Notify me about new matches')
         form = page.select_one('#inventory-search-alert form')
         self.assertIsNotNone(form)
+        self.assertIsNotNone(form.select_one('#search-alert-name'))
+        self.assertEqual(form.find_parent('details'), panel)
         self.assertEqual(form.select_one('input[name="make"]')['value'], 'Toyota')
         response = self.client.post('/inventory/alerts/search', data={
             'name': 'Pat Shopper',
