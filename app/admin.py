@@ -4,6 +4,7 @@ import os
 import base64
 import binascii
 import secrets
+import calendar
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -34,13 +35,15 @@ from app.forms import (
 from app.models import (
     AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, PageView,
     Review, ServiceRecord, InventoryAlert, RebuildCostEntry, RebuildCostReceipt,
-    SiteSetting, TestDrive, User, Vehicle, VehicleHoldRequest, VehicleImage,
+    SiteSetting, TestDrive, TestDriveReminderDismissal, User, Vehicle, VehicleHoldRequest, VehicleImage,
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
     VehicleSaleReceipt, VehicleSaleReceiptCharge,
 )
 from app.financing import (
     FinancingEncryptionUnavailable, delete_application_record, load_encrypted_pdf,
+    _send_textbelt_message, _textbelt_phone,
 )
+from app.shopper import dealership_now
 from app.coming_soon_stock_photos import (
     appearance_details, ensure_stock_photo_for_vehicle, stock_photo_filename,
 )
@@ -2607,7 +2610,7 @@ def test_drives():
     page = request.args.get('page', 1, type=int)
     status = (request.args.get('status') or '').strip()
     query = TestDrive.query
-    if status in ('requested', 'out', 'returned', 'cancelled'):
+    if status in ('requested', 'confirmed', 'out', 'returned', 'cancelled'):
         query = query.filter_by(status=status)
     pagination = query.order_by(TestDrive.started_at.desc()).paginate(page=page, per_page=25, error_out=False)
     return render_template(
@@ -2617,6 +2620,135 @@ def test_drives():
         active_count=TestDrive.query.filter_by(status='out').count(),
         requested_count=TestDrive.query.filter_by(status='requested').count(),
     )
+
+
+@admin_bp.post('/test-drives/<int:id>/confirm')
+@admin_role_required
+def test_drive_confirm(id):
+    drive = db.session.get(TestDrive, id) or abort(404)
+    if drive.status not in ('requested', 'confirmed') or (
+        drive.status == 'confirmed' and drive.confirmation_sms_status != 'failed'
+    ):
+        flash('This test drive cannot be confirmed or retried.', 'warning')
+        return redirect(url_for('admin.test_drives'))
+    phone = _textbelt_phone(drive.customer_phone)
+    api_key = current_app.config.get('TEXTBELT_API_KEY')
+    if not phone or not api_key or not drive.scheduled_at:
+        flash('Confirmation requires a valid customer phone number, a scheduled time, and TEXTBELT_API_KEY.', 'danger')
+        return redirect(url_for('admin.test_drives'))
+    if drive.scheduled_at <= dealership_now():
+        flash('This appointment time has passed; contact the customer to arrange a new time.', 'warning')
+        return redirect(url_for('admin.test_drives'))
+    if not drive.vehicle or not drive.vehicle.is_available:
+        flash('This vehicle is no longer available. Contact the customer before confirming.', 'warning')
+        return redirect(url_for('admin.test_drives'))
+
+    updated = TestDrive.query.filter(
+        TestDrive.id == id,
+        or_(
+            TestDrive.status == 'requested',
+            (TestDrive.status == 'confirmed') & (TestDrive.confirmation_sms_status == 'failed'),
+        ),
+    ).update({
+        TestDrive.status: 'confirmed',
+        TestDrive.confirmed_at: utcnow(),
+        TestDrive.confirmation_sms_status: 'sending',
+    }, synchronize_session=False)
+    db.session.commit()
+    if not updated:
+        flash('This confirmation is already being processed or is no longer available.', 'warning')
+        return redirect(url_for('admin.test_drives'))
+    message = (
+        f"Marshall Auto: Your test drive for {drive.vehicle.title} is confirmed for "
+        f"{drive.scheduled_at.strftime('%B %d, %Y at %I:%M %p')} Eastern Time."
+    )
+    sent = _send_textbelt_message(phone, message, api_key)
+    drive = db.session.get(TestDrive, id)
+    drive.confirmation_sms_status = 'sent' if sent else 'failed'
+    db.session.commit()
+    if sent:
+        flash('Test drive confirmed and confirmation text sent.', 'success')
+    else:
+        flash('Test drive confirmed, but the text could not be sent. Contact the customer or retry; verify delivery first to avoid duplicate texts.', 'danger')
+    return redirect(url_for('admin.test_drives'))
+
+
+@admin_bp.get('/test-drives/calendar')
+@login_required
+def test_drive_calendar():
+    now = dealership_now()
+    year = request.args.get('year', now.year, type=int)
+    month = request.args.get('month', now.month, type=int)
+    if not 2 <= year <= 9998 or not 1 <= month <= 12:
+        abort(400)
+    start = datetime(year, month, 1)
+    next_month = datetime(year + (month == 12), month % 12 + 1, 1)
+    previous = start - timedelta(days=1)
+    drives = TestDrive.query.filter(
+        TestDrive.confirmed_at.isnot(None),
+        TestDrive.status != 'cancelled',
+        TestDrive.scheduled_at >= start,
+        TestDrive.scheduled_at < next_month,
+    ).order_by(TestDrive.scheduled_at).all()
+    by_day = {}
+    for drive in drives:
+        by_day.setdefault(drive.scheduled_at.day, []).append(drive)
+    return render_template(
+        'admin/test_drive_calendar.html', start=start, previous=previous, next_month=next_month,
+        weeks=calendar.Calendar(firstweekday=6).monthdayscalendar(year, month), by_day=by_day,
+    )
+
+
+def _due_test_drive_reminders(user_id):
+    now = dealership_now()
+    drives = TestDrive.query.filter(
+        TestDrive.confirmed_at.isnot(None),
+        TestDrive.status != 'cancelled',
+        TestDrive.scheduled_at <= now + timedelta(minutes=30),
+    ).order_by(TestDrive.scheduled_at).all()
+    dismissed = {
+        (item.test_drive_id, item.phase)
+        for item in TestDriveReminderDismissal.query.filter_by(user_id=user_id).all()
+    }
+    reminders = []
+    for drive in drives:
+        for phase in ('upcoming', 'due'):
+            if phase == 'due' and drive.scheduled_at > now:
+                continue
+            if (drive.id, phase) not in dismissed:
+                reminders.append((drive, phase))
+    return reminders
+
+
+@admin_bp.get('/api/test-drives/reminders')
+@login_required
+def test_drive_reminders():
+    return jsonify(reminders=[
+        {
+            'id': drive.id, 'phase': phase, 'customer': drive.customer_name,
+            'vehicle': drive.vehicle.title, 'time': drive.scheduled_at.strftime('%b %d, %Y at %I:%M %p ET'),
+        }
+        for drive, phase in _due_test_drive_reminders(current_user.id)
+    ])
+
+
+@admin_bp.post('/test-drives/<int:id>/reminders/<phase>/dismiss')
+@login_required
+def test_drive_reminder_dismiss(id, phase):
+    if phase not in ('upcoming', 'due'):
+        abort(404)
+    if not any(drive.id == id and item_phase == phase for drive, item_phase in _due_test_drive_reminders(current_user.id)):
+        abort(404)
+    db.session.add(TestDriveReminderDismissal(test_drive_id=id, user_id=current_user.id, phase=phase))
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        if not TestDriveReminderDismissal.query.filter_by(
+            test_drive_id=id, user_id=current_user.id, phase=phase,
+        ).first():
+            raise
+    return jsonify(success=True)
 
 
 @admin_bp.route('/test-drives/new', methods=['GET', 'POST'])
@@ -2715,6 +2847,12 @@ def inventory_alerts_send_due():
 def test_drive_edit(id):
     test_drive = db.session.get(TestDrive, id) or abort(404)
     form = TestDriveEditForm(obj=test_drive)
+    if test_drive.status in ('requested', 'confirmed'):
+        from wtforms.validators import Optional, NumberRange
+        form.status.choices = [(test_drive.status, test_drive.status.title()), ('out', 'Out'), ('cancelled', 'Cancelled')]
+        if form.status.data in (test_drive.status, 'cancelled'):
+            form.start_mileage.validators = [Optional(), NumberRange(min=0)]
+            form.start_mileage.flags.required = False
     dealer_tags = _dealer_tag_choices()
     if request.method == 'GET' and not form.salesperson.data:
         _prefill_salesperson(form)
@@ -2745,6 +2883,8 @@ def test_drive_edit(id):
             test_drive.returned_at = utcnow()
         elif test_drive.status == 'out':
             test_drive.returned_at = None
+            if not was_out and test_drive.scheduled_at:
+                test_drive.started_at = utcnow()
         db.session.commit()
         flash('Test drive updated.', 'success')
         return redirect(url_for('admin.test_drives'))

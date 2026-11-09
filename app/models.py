@@ -935,8 +935,11 @@ class TestDrive(db.Model):
     end_mileage = db.Column(db.Integer, nullable=True)
     started_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     returned_at = db.Column(db.DateTime, nullable=True)
-    # requested = public appointment request; out/returned/cancelled = lot checkout log
-    status = db.Column(db.String(20), default='out', nullable=False, index=True)  # out, returned, cancelled
+    # Appointment time is dealership-local wall time; checkout times are UTC.
+    scheduled_at = db.Column(db.DateTime, nullable=True)
+    confirmed_at = db.Column(db.DateTime, nullable=True)
+    status = db.Column(db.String(20), default='out', nullable=False, index=True)
+    confirmation_sms_status = db.Column(db.String(20), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
@@ -971,6 +974,20 @@ class TestDrive(db.Model):
 
     def __repr__(self):
         return f'<TestDrive {self.customer_name} / vehicle {self.vehicle_id}>'
+
+
+class TestDriveReminderDismissal(db.Model):
+    __tablename__ = 'test_drive_reminder_dismissals'
+    __table_args__ = (
+        db.UniqueConstraint('test_drive_id', 'user_id', 'phase', name='uq_test_drive_reminder_user_phase'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    test_drive_id = db.Column(db.Integer, db.ForeignKey('test_drives.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    phase = db.Column(db.String(20), nullable=False)
+    test_drive = db.relationship('TestDrive', backref=db.backref('reminder_dismissals', cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('test_drive_reminder_dismissals', cascade='all, delete-orphan'))
 
 
 class SiteSetting(db.Model):

@@ -19,6 +19,7 @@
         <div class="col-md-6">
             <label class="form-label">Starting Mileage *</label>
             {{ form.start_mileage(class="form-control") }}
+            {% for error in form.start_mileage.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         {% else %}
         <div class="col-md-4">
@@ -26,8 +27,9 @@
             <input type="text" class="form-control" value="{{ test_drive.vehicle.title if test_drive.vehicle else '' }}" disabled>
         </div>
         <div class="col-md-4">
-            <label class="form-label">Starting Mileage *</label>
+            <label class="form-label">Starting Mileage{% if test_drive.status not in ('requested', 'confirmed') %} *{% endif %}</label>
             {{ form.start_mileage(class="form-control") }}
+            {% for error in form.start_mileage.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-md-4">
             <label class="form-label">Returning Mileage</label>

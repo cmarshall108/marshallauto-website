@@ -171,7 +171,7 @@
                                     <option value="">Choose an available vehicle</option>
                                     {% for vehicle in financing_vehicles %}
                                     <option value="{{ vehicle.id }}" data-price="{{ vehicle.display_price }}" {% if selected_vehicle_id == vehicle.id %}selected{% endif %}>
-                                        {{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}{% if vehicle.trim %} {{ vehicle.trim }}{% endif %} — {{ vehicle.display_price | format_currency }}{% if vehicle.stock_number %} (Stock {{ vehicle.stock_number }}){% endif %}
+                                        {{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}{% if vehicle.trim %} {{ vehicle.trim }}{% endif %} — {{ vehicle.display_price | format_currency }} · {{ '{:,}'.format(vehicle.mileage) }} miles{% if vehicle.stock_number %} (Stock {{ vehicle.stock_number }}){% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>

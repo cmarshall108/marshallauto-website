@@ -13,7 +13,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Vehicle detail pages with image gallery, specs, features, service history, and CarFax
   - Carvana-style photo highlight bubbles (features + condition notes) powered by a local OpenCV worker
   - Financing, sell-your-car, about, and contact pages
-  - Online Lendmark financing application for an inventory vehicle, with SSN format validation, completed lender PDF, application-level encryption at rest, and staff-only admin downloads
+  - Online Lendmark financing application for an inventory vehicle, with current inventory mileage on the supplemental PDF, SSN format validation, application-level encryption at rest, and staff-only admin downloads
   - SEO: meta tags, Open Graph, JSON-LD (AutoDealer, Car, Article, FAQ, HowTo, ItemList, Breadcrumb), sitemap.xml, robots.txt
   - IndexNow pings on vehicle and blog publish/update/delete (set `INDEXNOW_KEY`; key file at `/<key>.txt`, with `/indexnow/<key>.txt` kept as a legacy alias)
   - Descriptive vehicle image `alt` text with year/make/model/color and local dealership context
@@ -390,6 +390,17 @@ the site texts each active salesperson with a usable profile phone through Textb
 Set `TEXTBELT_API_KEY` and keep every salesperson's phone number current for offline
 alerts. The notification includes the vehicle only, never applicant or credit data.
 
+Admins can confirm public test-drive requests under **Test Drives**. Confirmation
+requires `TEXTBELT_API_KEY` and a valid customer phone number; it sends the customer
+an appointment text and adds the appointment to the admin calendar. If texting
+fails, the appointment stays confirmed and the list shows a retry button. Check
+with the customer before retrying because a network failure can leave delivery
+uncertain. A "text processing" status also requires staff to verify delivery.
+Confirmed appointments use Eastern Time. Staff see persistent in-panel reminders
+30 minutes before and at the appointment time; each staff member dismisses their
+own reminders. Reminders refresh while the panel is open and remain until dismissed
+or the appointment is cancelled. Apply `flask db upgrade` before deploying.
+
 Submissions must pass server-side required-field and format checks, a hidden
 anti-bot field, and the site's local spam scoring before an encrypted PDF is saved.
 Financing spam checks do not call Akismet or send applicant data to an external
@@ -612,7 +623,7 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `FINANCING_MAX_CONTENT_LENGTH` | Maximum online financing form size in bytes (default 96 KiB) |
 | `FINANCING_RATE_LIMIT` | Financing submissions per client IP per window (default 5) |
 | `FINANCING_RATE_WINDOW` | Financing submission rate-limit window in seconds (default 3600) |
-| `TEXTBELT_API_KEY` | Textbelt API key for alerting active salespeople when no administrator is online |
+| `TEXTBELT_API_KEY` | Textbelt API key for test-drive confirmation texts and offline salesperson alerts |
 | `DATABASE_URL` | Database connection string (defaults to SQLite) |
 | `ADMIN_USERNAME` | Admin login username |
 | `ADMIN_PASSWORD` | Admin login password |

@@ -5,7 +5,10 @@
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <h2 class="fw-bold mb-0">Test Drives</h2>
-    <a href="{{ url_for('admin.test_drive_new') }}" class="btn btn-primary"><i class="bi bi-signpost-split me-1"></i> Check Out a Vehicle</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.test_drive_calendar') }}" class="btn btn-outline-primary"><i class="bi bi-calendar3 me-1"></i> Appointment Calendar</a>
+        <a href="{{ url_for('admin.test_drive_new') }}" class="btn btn-primary"><i class="bi bi-signpost-split me-1"></i> Check Out a Vehicle</a>
+    </div>
 </div>
 
 <div class="table-card p-3 p-md-4">
@@ -14,6 +17,7 @@
         <a href="{{ url_for('admin.test_drives', status='requested') }}" class="btn btn-sm {% if status == 'requested' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
             Requested {% if requested_count %}<span class="badge bg-warning text-dark ms-1">{{ requested_count }}</span>{% endif %}
         </a>
+        <a href="{{ url_for('admin.test_drives', status='confirmed') }}" class="btn btn-sm {% if status == 'confirmed' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Confirmed</a>
         <a href="{{ url_for('admin.test_drives', status='out') }}" class="btn btn-sm {% if status == 'out' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
             Out {% if active_count %}<span class="badge bg-danger ms-1">{{ active_count }}</span>{% endif %}
         </a>
@@ -30,7 +34,7 @@
                     <th>License</th>
                     <th>Vehicle</th>
                     <th>Salesperson</th>
-                    <th>Out</th>
+                    <th>Scheduled / Out</th>
                     <th>Back</th>
                     <th class="text-end">Miles</th>
                     <th>Actions</th>
@@ -41,9 +45,13 @@
                 <tr>
                     <td>
                         {% if td.status == 'requested' %}<span class="badge bg-warning text-dark">Requested</span>
+                        {% elif td.status == 'confirmed' %}<span class="badge bg-primary">Confirmed</span>
                         {% elif td.status == 'out' %}<span class="badge bg-danger">Out</span>
                         {% elif td.status == 'returned' %}<span class="badge bg-success">Returned</span>
                         {% else %}<span class="badge bg-secondary">Cancelled</span>{% endif %}
+                        {% if td.confirmation_sms_status == 'failed' %}<div class="small text-danger">Text failed</div>
+                        {% elif td.confirmation_sms_status == 'sending' %}<div class="small text-warning">Text processing; verify delivery</div>
+                        {% elif td.confirmation_sms_status == 'sent' %}<div class="small text-muted">Text sent</div>{% endif %}
                     </td>
                     <td>
                         <div class="fw-semibold">{{ td.customer_name }}</div>
@@ -57,10 +65,19 @@
                     </td>
                     <td><a href="{{ url_for('admin.vehicle_edit', id=td.vehicle_id) }}">{{ td.vehicle.title if td.vehicle else 'Vehicle #' ~ td.vehicle_id }}</a></td>
                     <td>{{ td.salesperson or '—' }}</td>
-                    <td class="small">{{ td.started_at.strftime('%m/%d %I:%M %p') if td.started_at else '—' }}</td>
+                    <td class="small">
+                        {% if td.scheduled_at %}Scheduled: {{ td.scheduled_at.strftime('%m/%d/%Y %I:%M %p') }} ET{% endif %}
+                        {% if td.status in ('out', 'returned') %}<div>Out: {{ td.started_at.strftime('%m/%d/%Y %I:%M %p') }} UTC</div>{% endif %}
+                    </td>
                     <td class="small">{{ td.returned_at.strftime('%m/%d %I:%M %p') if td.returned_at else '—' }}</td>
                     <td class="text-end">{% if td.miles_driven is not none %}{{ td.miles_driven }}{% else %}—{% endif %}</td>
                     <td class="text-nowrap">
+                        {% if current_user.is_admin and (td.status == 'requested' or (td.status == 'confirmed' and td.confirmation_sms_status == 'failed')) %}
+                        <form action="{{ url_for('admin.test_drive_confirm', id=td.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-success">{% if td.status == 'requested' %}Confirm &amp; text{% else %}Retry text{% endif %}</button>
+                        </form>
+                        {% endif %}
                         {% if td.status == 'out' %}
                         <a href="{{ url_for('admin.test_drive_return', id=td.id) }}" class="btn btn-sm btn-success" title="Mark returned"><i class="bi bi-check2-circle"></i></a>
                         {% endif %}

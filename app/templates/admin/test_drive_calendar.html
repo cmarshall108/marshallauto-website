@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}Test Drive Calendar{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h2 class="fw-bold mb-0">Test Drive Calendar</h2>
+    <a href="{{ url_for('admin.test_drives') }}" class="btn btn-outline-secondary">Back to Test Drives</a>
+</div>
+<div class="table-card p-3 p-md-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a class="btn btn-outline-secondary" href="{{ url_for('admin.test_drive_calendar', year=previous.year, month=previous.month) }}">Previous</a>
+        <h3 class="h5 mb-0">{{ start.strftime('%B %Y') }}</h3>
+        <a class="btn btn-outline-secondary" href="{{ url_for('admin.test_drive_calendar', year=next_month.year, month=next_month.month) }}">Next</a>
+    </div>
+    <p class="small text-muted">Confirmed appointments, Eastern Time. Select an appointment to edit its record.</p>
+    <div class="table-responsive">
+        <table class="table table-bordered" style="min-width: 700px; table-layout: fixed">
+            <thead><tr>{% for day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] %}<th scope="col">{{ day }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for week in weeks %}
+                <tr>
+                {% for day in week %}
+                    <td>{% if day %}
+                        <strong>{{ day }}</strong>
+                        {% for drive in by_day.get(day, []) %}
+                        <div class="small mt-2"><a href="{{ url_for('admin.test_drive_edit', id=drive.id) }}">{{ drive.scheduled_at.strftime('%I:%M %p') }}<br>{{ drive.customer_name }}<br>{{ drive.vehicle.title }}</a></div>
+                        {% endfor %}
+                    {% endif %}</td>
+                {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

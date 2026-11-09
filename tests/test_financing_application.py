@@ -139,6 +139,7 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertNotIn(b'id="chat-widget-toggle"', response.data)
         self.assertNotIn(b'chat-widget.js', response.data)
         self.assertIn(b'financing.js', response.data)
+        self.assertIn(b'82,000 miles', response.data)
         self.assertIn(b'name="website"', response.data)
         self.assertNotIn(b'novalidate', response.data)
         for field in (
@@ -211,8 +212,20 @@ class FinancingApplicationTests(unittest.TestCase):
         supplemental = reader.pages[1].extract_text()
         self.assertIn('Toyota Camry SE', supplemental)
         self.assertIn('4T1BF1FK5JU000001', supplemental)
+        self.assertIn('Current mileage: 82,000 miles', supplemental)
         self.assertIn('Monthly income summary (gross / net)', supplemental)
         self.assertIn('$5,000.00 / $4,000.00', supplemental)
+
+        positions = {}
+        def capture_text(text, cm, tm, font_dict, font_size):
+            stripped = text.strip()
+            if stripped in ('Vehicle purchase', '$10,000.00', 'Marshall Auto website'):
+                positions[stripped] = (tm[5], font_size)
+        reader.pages[0].extract_text(visitor_text=capture_text)
+        self.assertEqual(len(positions), 3)
+        for baseline, font_size in positions.values():
+            # The scanned form's top-field rules are at approximately 210 px.
+            self.assertGreater(baseline - font_size * 0.22, 792 - 210 * 0.6)
 
         with patch('app.admin.rate_limit_exceeded', return_value=False):
             login = self.client.post('/admin/login', data={
@@ -269,6 +282,34 @@ class FinancingApplicationTests(unittest.TestCase):
                 self.assertIn(expected_error, response.data)
                 self.assertEqual(FinancingApplication.query.count(), 0)
 
+    def test_supplement_uses_current_inventory_mileage_not_submitted_value(self):
+        self.client.get('/financing', base_url='https://localhost')
+        vehicle = Vehicle.query.filter_by(slug='finance-camry').one()
+        vehicle.mileage = 123456
+        db.session.commit()
+        response = self.submit(mileage='1')
+        self.assertEqual(response.status_code, 302)
+        application = FinancingApplication.query.one()
+        path = os.path.join(self.temp_dir.name, 'financing_applications', application.encrypted_pdf_filename)
+        with open(path, 'rb') as stored_file:
+            pdf_bytes = Fernet(self.encryption_key.encode('ascii')).decrypt(stored_file.read())
+        text = PdfReader(BytesIO(pdf_bytes)).pages[1].extract_text()
+        self.assertIn('Current mileage: 123,456 miles', text)
+
+    def test_supplement_shows_zero_mileage_without_stock_number(self):
+        vehicle = Vehicle.query.filter_by(slug='finance-camry').one()
+        vehicle.mileage = 0
+        vehicle.stock_number = None
+        db.session.commit()
+        self.assertEqual(self.submit().status_code, 302)
+        application = FinancingApplication.query.one()
+        path = os.path.join(self.temp_dir.name, 'financing_applications', application.encrypted_pdf_filename)
+        with open(path, 'rb') as stored_file:
+            pdf_bytes = Fernet(self.encryption_key.encode('ascii')).decrypt(stored_file.read())
+        text = PdfReader(BytesIO(pdf_bytes)).pages[1].extract_text()
+        self.assertIn('Current mileage: 0 miles', text)
+        self.assertNotIn('Stock #:', text)
+
     def test_joint_application_adds_coapplicant_and_residence_history_page(self):
         data = self.application_form(
             joint_credit='yes',
@@ -315,6 +356,7 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertIn('Jordan Example', reader.pages[0].extract_text())
         supplement = reader.pages[1].extract_text()
         self.assertIn('Toyota Camry SE', supplement)
+        self.assertIn('Current mileage: 82,000 miles', supplement)
         self.assertIn('Previous residence: 8 Pine St', supplement)
 
     def test_only_one_application_can_be_submitted_per_vehicle(self):

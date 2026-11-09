@@ -567,6 +567,7 @@ def validate_application(form, vehicle):
             'vin': vehicle.vin or '',
             'stock_number': vehicle.stock_number or '',
             'price': vehicle.display_price,
+            'mileage': vehicle.mileage,
         },
         'requested_amount': requested_amount,
         'applicant': applicant,
@@ -923,6 +924,7 @@ def _build_supplemental_page(application):
     )
     if vehicle['stock_number']:
         pdf.drawString(60, 596, _pdf_safe(f"Stock #: {vehicle['stock_number']}"))
+    pdf.drawString(300, 596, f"Current mileage: {vehicle['mileage']:,} miles")
     pdf.drawString(
         60, 580,
         _pdf_safe(f"Advertised price: {_money_text(vehicle['price'])}"),
@@ -1015,11 +1017,11 @@ def build_lender_pdf(application):
         overlay_buffer = BytesIO()
         overlay = canvas.Canvas(overlay_buffer, pagesize=(612, 792))
         overlay.setTitle('Lendmark Financial Services Application')
-        _draw_text(overlay, 120, 216, 'Vehicle purchase', 245)
+        _draw_text(overlay, 120, 206, 'Vehicle purchase', 245)
         _draw_text(
-            overlay, 502, 216, _money_text(application['requested_amount']), 110,
+            overlay, 502, 206, _money_text(application['requested_amount']), 110,
         )
-        _draw_text(overlay, 682, 216, 'Marshall Auto website', 112)
+        _draw_text(overlay, 682, 206, 'Marshall Auto website', 112)
         if application['joint_credit']:
             _draw_check(overlay, 775, 99)
         else:
@@ -1174,11 +1176,11 @@ def _send_textbelt_message(phone, message, api_key):
             result = json.loads(response.read().decode('utf-8'))
     except (OSError, TimeoutError, urllib.error.URLError, ValueError) as exc:
         current_app.logger.error(
-            'Textbelt financing notification failed (%s).', type(exc).__name__,
+            'Textbelt message failed (%s).', type(exc).__name__,
         )
         return False
     if not isinstance(result, dict) or result.get('success') is not True:
-        current_app.logger.error('Textbelt did not accept a financing notification.')
+        current_app.logger.error('Textbelt did not accept a message.')
         return False
     return True
 

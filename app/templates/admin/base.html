@@ -81,6 +81,11 @@
     </nav>
 
     <div class="admin-content">
+        <section id="test-drive-reminders" class="no-print" aria-label="Test drive reminders"
+                 data-url="{{ url_for('admin.test_drive_reminders') }}" data-csrf="{{ csrf_token() }}">
+            <div id="test-drive-reminder-list" aria-live="polite"></div>
+            <div id="test-drive-reminder-error" class="alert alert-warning" role="status" hidden></div>
+        </section>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
             <div class="mb-4">
@@ -105,6 +110,7 @@
     <script src="{{ asset_url('js/chat-client.js') }}"></script>
     <script src="{{ asset_url('js/chat-sounds.js') }}"></script>
     <script src="{{ asset_url('js/admin-chat-notifications.js') }}"></script>
+    <script src="{{ asset_url('js/admin-test-drive-reminders.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

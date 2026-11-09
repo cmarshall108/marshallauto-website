@@ -3,7 +3,8 @@
 Requests create a lead for the existing inbox. They do not check a vehicle out,
 collect a deposit, or reserve a vehicle until staff confirms the request.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from flask import current_app, url_for
 from sqlalchemy import or_
@@ -14,21 +15,25 @@ from app.utils import format_phone_number
 
 HOLD_HOURS = 72
 APPOINTMENT_HOURS = (9, 10, 11, 12, 13, 14, 15, 16, 17)
+DEALERSHIP_TIMEZONE = ZoneInfo('America/New_York')
 
 
 class ShopperRequestError(ValueError):
     """A public request that cannot be accepted as submitted."""
 
 
+def dealership_now():
+    return datetime.now(DEALERSHIP_TIMEZONE).replace(tzinfo=None)
+
+
 def appointment_slots(days=7):
     """Weekday appointment choices during posted business hours."""
-    start = datetime.now(timezone.utc).astimezone().replace(minute=0, second=0, microsecond=0)
+    start = dealership_now().replace(minute=0, second=0, microsecond=0)
     slots = []
     cursor = start + timedelta(hours=1)
     while len(slots) < days * len(APPOINTMENT_HOURS) and cursor < start + timedelta(days=21):
-        local = cursor.astimezone()
-        if local.weekday() < 5 and local.hour in APPOINTMENT_HOURS and local > start:
-            slots.append(local.replace(tzinfo=None))
+        if cursor.weekday() < 5 and cursor.hour in APPOINTMENT_HOURS and cursor > start:
+            slots.append(cursor)
         cursor += timedelta(hours=1)
     return slots
 
@@ -67,6 +72,7 @@ def create_test_drive_request(vehicle, *, name, email, phone, appointment_at, no
         customer_email=email.strip(),
         notes=message,
         started_at=appointment_at,
+        scheduled_at=appointment_at,
         status='requested',
     )
     db.session.add(drive)
