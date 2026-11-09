@@ -4,7 +4,28 @@
     const form = document.getElementById('vehicle-form');
     const status = document.getElementById('vehicle-upload-status');
     if (!form || !status) return;
+    const photoInput = form.elements.images;
+    const photoSelection = document.getElementById('vehicle-image-selection');
+    const clearPhotoSelection = document.getElementById('vehicle-image-clear');
+    const selectedPhotos = [];
     let uploading = false;
+
+    if (photoInput && photoSelection && clearPhotoSelection) {
+        photoInput.addEventListener('change', () => {
+            selectedPhotos.push(...Array.from(photoInput.files || []));
+            photoInput.value = '';
+            photoSelection.textContent = selectedPhotos.length
+                ? `${selectedPhotos.length} photo(s) selected. Choose more to add them.`
+                : 'No photos selected.';
+            clearPhotoSelection.disabled = selectedPhotos.length === 0;
+        });
+        clearPhotoSelection.addEventListener('click', () => {
+            selectedPhotos.length = 0;
+            photoInput.value = '';
+            photoSelection.textContent = 'No photos selected.';
+            clearPhotoSelection.disabled = true;
+        });
+    }
 
     window.addEventListener('beforeunload', (event) => {
         if (!uploading) return;
@@ -41,7 +62,9 @@
             event.preventDefault();
             return;
         }
-        const photos = Array.from(form.elements.images.files || []);
+        const photos = selectedPhotos.length
+            ? [...selectedPhotos]
+            : Array.from(photoInput?.files || []);
         const removeVideo = form.elements.remove_video?.checked;
         const video = removeVideo ? null : form.elements.video_file.files?.[0];
         if (!photos.length && !video) return;

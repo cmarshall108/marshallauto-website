@@ -8,15 +8,28 @@ const source = fs.readFileSync(path.join(__dirname, '../app/static/js/admin-medi
 
 function setup(options = {}) {
     let submit;
+    let imageChange;
+    let clearSelection;
     const calls = [];
     const navigations = [];
     const status = {
         textContent: '', append(value) { this.textContent += typeof value === 'string' ? value : value.textContent; },
     };
+    const photoSelection = { textContent: '' };
+    const clearPhotoSelection = {
+        disabled: true,
+        addEventListener(name, callback) { if (name === 'click') clearSelection = callback; },
+    };
     const controls = [
         { disabled: false }, { disabled: false },
     ];
-    controls.images = { files: options.photos || [] };
+    let imageFiles = [];
+    controls.images = {
+        get files() { return imageFiles; },
+        set files(files) { imageFiles = files; },
+        set value(value) { if (value === '') imageFiles = []; },
+        addEventListener(name, callback) { if (name === 'change') imageChange = callback; },
+    };
     controls.video_file = { files: options.video ? [options.video] : [] };
     controls.remove_video = { checked: !!options.removeVideo };
     const form = {
@@ -75,13 +88,26 @@ function setup(options = {}) {
     vm.runInNewContext(source, {
         FormData, fetch,
         document: {
-            getElementById: id => id === 'vehicle-form' ? form : status,
+            getElementById: id => ({
+                'vehicle-form': form,
+                'vehicle-upload-status': status,
+                'vehicle-image-selection': photoSelection,
+                'vehicle-image-clear': clearPhotoSelection,
+            })[id],
             createElement: () => ({}),
         },
         window: { addEventListener() {}, location: { assign: url => navigations.push(url) } },
     });
+    const choosePhotos = photos => {
+        controls.images.files = photos;
+        imageChange();
+    };
+    for (const batch of options.photoBatches || (options.photos ? [options.photos] : [])) {
+        choosePhotos(batch);
+    }
     return {
-        calls, navigations, status, controls, maxActive: () => maxActive,
+        calls, navigations, status, controls, photoSelection, clearPhotoSelection,
+        choosePhotos, clearSelection: () => clearSelection(), maxActive: () => maxActive,
         submit: async (prevented = false) => {
             const event = { defaultPrevented: prevented, preventDefault() { this.defaultPrevented = true; } };
             await submit(event);
@@ -106,6 +132,30 @@ test('20 photos and video are uploaded sequentially after saving metadata', asyn
     assert.equal(view.calls[21].body.get('video_file'), video);
     assert.equal(view.calls[22].body.get('post_to_facebook'), '1');
     assert.deepEqual(view.navigations, ['/admin/vehicles']);
+});
+
+test('photos selected in separate rounds stay queued for the vehicle', async () => {
+    const view = setup({
+        photoBatches: [
+            [{ name: 'one.jpg', size: 10 }],
+            [{ name: 'two.jpg', size: 10 }, { name: 'three.jpg', size: 10 }],
+        ],
+    });
+    assert.equal(view.photoSelection.textContent, '3 photo(s) selected. Choose more to add them.');
+    await view.submit();
+    assert.deepEqual(view.calls.slice(1, 4).map(call => call.body.get('images').name), [
+        'one.jpg', 'two.jpg', 'three.jpg',
+    ]);
+    assert.equal(view.navigations.length, 1);
+});
+
+test('clearing the photo selection discards queued photos', async () => {
+    const view = setup({ photos: [{ name: 'one.jpg', size: 10 }] });
+    view.clearSelection();
+    assert.equal(view.photoSelection.textContent, 'No photos selected.');
+    assert.equal(view.clearPhotoSelection.disabled, true);
+    await view.submit();
+    assert.equal(view.calls.length, 0);
 });
 
 test('oversized individual video is rejected before saving, not a large aggregate photo selection', async () => {

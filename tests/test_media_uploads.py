@@ -77,6 +77,14 @@ class MediaUploadTests(unittest.TestCase):
             output.write(b'compressed video')
         return True
 
+    def test_vehicle_form_exposes_multi_photo_selection_queue(self):
+        response = self.client.get(f'/admin/vehicles/{self.vehicle.id}/edit')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'multiple name="images"', response.data)
+        self.assertIn(b'id="vehicle-image-selection"', response.data)
+        self.assertIn(b'id="vehicle-image-clear"', response.data)
+        self.assertIn(b'earlier selections stay queued', response.data)
+
     def test_twenty_photos_and_video_use_small_requests_without_inline_compression(self):
         # Each request fits; the same media in one multipart body would exceed this.
         self.app.config['MAX_CONTENT_LENGTH'] = 4096

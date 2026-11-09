@@ -320,8 +320,12 @@
         <div class="col-12">
             <label class="form-label">Upload Images</label>
             {{ form.images(class="form-control", accept="image/*,.heic,.heif", multiple=True) }}
+            <div class="d-flex align-items-center gap-2 mt-2">
+                <span id="vehicle-image-selection" class="form-text" role="status" aria-live="polite">No photos selected.</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="vehicle-image-clear" disabled>Clear selection</button>
+            </div>
             <div class="form-text">
-                Upload multiple photos. First image will be primary by default.
+                Select multiple photos at once or choose them in several rounds; earlier selections stay queued. First image will be primary by default.
                 For a smooth <strong>360° Spin</strong> on the vehicle page, shoot exterior photos walking around the car
                 (front → passenger → rear → driver) and upload them in that order — 8+ frames looks best (4 minimum).
                 Large batches: keep each submit under {{ (config.MAX_CONTENT_LENGTH // (1024 * 1024)) }}MB total
