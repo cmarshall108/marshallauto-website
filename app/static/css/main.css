@@ -873,7 +873,7 @@ a:hover {
 }
 
 .gallery-lightbox-hotspots {
-    inset: auto;
+    display: none !important;
 }
 
 .gallery-lightbox-stage img {

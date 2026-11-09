@@ -410,6 +410,7 @@ class PublicThemeTests(unittest.TestCase):
         css = (Path(self.app.static_folder) / 'css' / 'main.css').read_text()
         self.assertIn('.gallery-lightbox-stage {', css)
         self.assertIn('touch-action: pinch-zoom;', css)
+        self.assertIn('.gallery-lightbox-hotspots {\n    display: none !important;', css)
         self.assertIn('body.gallery-lightbox-open {', css)
         self.assertIn('overflow: hidden;', css)
         self.assertIn('overscroll-behavior: none;', css)
