@@ -1899,6 +1899,7 @@ p.vehicle-price .price-drop-now {
 
 .vehicle-additional-specifications {
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
 }
 
 .vehicle-additional-specifications,
