@@ -163,6 +163,20 @@ class PublicThemeTests(unittest.TestCase):
         self.assertTrue(summary['is_low_mileage'])
         self.assertEqual(summary['low_mileage_badge'], '42K Miles')
 
+    def test_inventory_results_are_inside_results_column_not_alert(self):
+        for path in ('/inventory', '/inventory?make=Toyota', '/inventory?q=unmatched'):
+            with self.subTest(path=path):
+                html = self.page(path)
+                alert = html.select_one('#inventory-search-alert')
+                self.assertIsNotNone(alert)
+                results = alert.find_parent(class_='col-lg-9')
+                self.assertIsNotNone(results)
+                self.assertIsNone(alert.select_one('.inventory-grid'))
+                if 'unmatched' not in path:
+                    self.assertIsNotNone(results.select_one('.inventory-grid .vehicle-card'))
+                else:
+                    self.assertIn('No vehicles', results.get_text(' ', strip=True))
+
     def test_vehicle_detail_offers_in_person_lendmark_financing(self):
         detail = self.page('/inventory/theme-car')
         sidebar = detail.select_one('.sticky-lg-top')
