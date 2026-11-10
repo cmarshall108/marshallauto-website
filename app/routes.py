@@ -1992,6 +1992,7 @@ def blog_post_detail(slug):
     return render_template(
         'blog_post.html',
         post=post,
+        inventory_picks=_vehicle_list_query().order_by(Vehicle.created_at.desc()).limit(3).all(),
         related_posts=(
             BlogPost.query.filter(BlogPost.is_published.is_(True), BlogPost.id != post.id)
             .order_by(BlogPost.published_at.desc(), BlogPost.id.desc()).limit(3).all()

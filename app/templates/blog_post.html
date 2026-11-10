@@ -51,6 +51,20 @@
                     <p>We are a used-car dealership at {{ business_address }}, {{ business_city }}, {{ business_state }} {{ business_zip }}. <a href="{{ url_for('main.about') }}">Learn about our dealership</a> or <a href="{{ url_for('main.contact') }}">ask us about a specific vehicle</a>.</p>
                     <p class="small text-muted">This guide is general information, not a vehicle inspection, legal advice, or a financing or insurance guarantee. Verify current requirements and the details of the vehicle you are considering.</p>
                 </aside>
+                {% if inventory_picks %}
+                <aside class="mt-4" aria-label="Vehicles in stock now">
+                    <h2 class="h5 fw-bold">Vehicles in stock now in {{ business_city }}, {{ business_state }}</h2>
+                    <ul class="list-unstyled mb-2">
+                        {% for vehicle in inventory_picks %}
+                        <li class="mb-2">
+                            <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="fw-semibold">{{ vehicle.title }}</a>
+                            <span class="text-muted"> &middot; {{ vehicle.mileage | format_mileage }}{% if vehicle.display_price %} &middot; ${{ '{:,.0f}'.format(vehicle.display_price) }}{% endif %}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{{ url_for('main.inventory') }}">See all used cars for sale</a>
+                </aside>
+                {% endif %}
                 {% if related_posts %}
                 <aside class="mt-4" aria-label="Related buying guides">
                     <h2 class="h5 fw-bold">More buying guides</h2>

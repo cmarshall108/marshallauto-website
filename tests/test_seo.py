@@ -377,6 +377,22 @@ class SeoTests(unittest.TestCase):
         )
         self.assertEqual(article['description'], description)
 
+    def test_blog_posts_link_to_available_vehicles(self):
+        post = BlogPost(title='Buying tips', slug='buying-tips', content='<p>Tips.</p>', is_published=True)
+        sold = Vehicle(
+            slug='sold-car', year=2019, make='Ford', model='Focus', price=9000,
+            mileage=60000, condition='used', status='sold',
+        )
+        db.session.add_all([post, sold])
+        db.session.commit()
+
+        html = self.page(f'/blog/{post.slug}')
+        picks = html.select_one('aside[aria-label="Vehicles in stock now"]')
+        links = [a['href'] for a in picks.select('a[href^="/inventory/"]')]
+        self.assertEqual(len(links), 3)
+        self.assertTrue(all(href.startswith('/inventory/test-car-') for href in links))
+        self.assertNotIn('/inventory/sold-car', links)
+
     def test_blog_meta_description_prefers_editor_seo_description(self):
         post = BlogPost(
             title='Local used-car buying tips',
