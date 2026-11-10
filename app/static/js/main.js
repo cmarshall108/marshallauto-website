@@ -427,6 +427,13 @@
                 page_type: cfg.pageType,
             }, utm, extra || {});
             this.event('generate_lead', params);
+            if (window.__adsLeadSendTo) {
+                this.gtagEvent('conversion', {
+                    send_to: window.__adsLeadSendTo,
+                    value: 1.0,
+                    currency: 'USD',
+                });
+            }
             this.fbqTrack('Lead', {
                 content_name: params.lead_source,
                 content_category: cfg.pageType,

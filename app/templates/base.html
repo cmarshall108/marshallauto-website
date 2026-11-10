@@ -149,6 +149,18 @@
     </script>
     {% endif %}
 
+    <!-- Google Ads conversion tag (respects Consent Mode defaults set above) -->
+    {% if not is_financing_application and not staff_visit %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18506239825"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = window.gtag || function(){ dataLayer.push(arguments); };
+      gtag('js', new Date());
+      gtag('config', 'AW-18506239825');
+      window.__adsLeadSendTo = 'AW-18506239825/p772COCd1rUdENGeu_hE';
+    </script>
+    {% endif %}
+
     <!-- Facebook Pixel: only loaded once the visitor grants cookie consent (no Consent Mode support) -->
     {% if facebook_pixel_id and not is_financing_application and not staff_visit %}
     <script>
