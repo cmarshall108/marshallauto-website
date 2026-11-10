@@ -147,6 +147,7 @@
             captureUtmParams();
             this.trackPageContext();
             this.bindCtaClicks();
+            this.bindHomepageShopping();
             this.bindOutboundAndDownloads();
             this.bindInventoryFilters();
             this.trackViewItem();
@@ -184,11 +185,11 @@
             }
         },
 
-        event(name, params) {
+        event(name, params, useBeacon) {
             const payload = Object.assign({ event: name }, params || {});
             this.push(payload);
             this.gtagEvent(name, params);
-            this.sendFirstPartyEvent(name, params || {});
+            this.sendFirstPartyEvent(name, params || {}, useBeacon);
         },
 
         /* ---------- First-party admin analytics ---------- */
@@ -470,6 +471,43 @@
                     this.trackCta('email', href, label);
                 }
             }, true);
+        },
+
+        bindHomepageShopping() {
+            if (this.config.pageType !== 'home') return;
+
+            document.addEventListener('click', (e) => {
+                const link = e.target.closest('a[data-homepage-cta], a[data-homepage-vehicle]');
+                if (!link) return;
+
+                if (link.dataset.homepageVehicle) {
+                    this.event('featured_vehicle_click', {
+                        vehicle_id: Number(link.dataset.homepageVehicle) || null,
+                        label: link.dataset.homepageVehicleLabel || (link.textContent || '').trim().slice(0, 80),
+                        placement: 'featured_inventory',
+                    }, true);
+                    return;
+                }
+
+                this.event('homepage_inventory_click', {
+                    cta_type: link.dataset.homepageCta || '',
+                    label: (link.textContent || '').trim().slice(0, 80),
+                    placement: link.dataset.homepageCta || 'homepage',
+                }, true);
+            }, true);
+
+            const searchForm = document.querySelector('form[data-homepage-search]');
+            if (!searchForm) return;
+            searchForm.addEventListener('submit', () => {
+                const fields = new FormData(searchForm);
+                this.event('homepage_inventory_search', {
+                    label: 'Homepage vehicle search',
+                    make: fields.get('make') || '',
+                    model: fields.get('model') || '',
+                    max_price: fields.get('max_price') || '',
+                    placement: 'homepage_search',
+                }, true);
+            });
         },
 
         bindOutboundAndDownloads() {

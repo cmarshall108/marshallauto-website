@@ -115,6 +115,12 @@ class PublicThemeTests(unittest.TestCase):
     def test_home_search_keeps_get_fields_and_has_accessible_labels(self):
         html = self.page('/')
         form = html.select_one('.search-box form')
+        search_disclosure = html.select_one('.search-box')
+        self.assertEqual(search_disclosure.name, 'details')
+        self.assertNotIn('open', search_disclosure.attrs)
+        self.assertIsNotNone(search_disclosure.select_one('summary'))
+        self.assertIsNone(html.select_one('.hero-section .search-box'))
+        self.assertIsNotNone(html.select_one('#featured-inventory .search-box'))
         self.assertEqual(form['action'], '/inventory')
         self.assertEqual(form['method'].lower(), 'get')
         for name in ('make', 'model', 'max_price'):
@@ -124,6 +130,49 @@ class PublicThemeTests(unittest.TestCase):
         budget = form.select_one('[name="max_price"]')
         self.assertEqual(budget['min'], '0')
         self.assertEqual(budget['inputmode'], 'numeric')
+        self.assertNotIn('None', html.select_one('.hero-section h1').get_text(strip=True))
+
+    def test_homepage_surfaces_current_inventory_before_assurances(self):
+        html = self.page('/')
+        inventory = html.select_one('#featured-inventory')
+        assurances = html.select_one('.hero-assurances')
+
+        self.assertIsNotNone(inventory)
+        self.assertIsNotNone(assurances)
+        self.assertLess(
+            list(html.descendants).index(inventory),
+            list(html.descendants).index(assurances),
+        )
+        self.assertIn('Available Vehicles', inventory.get_text(' ', strip=True))
+        self.assertIsNotNone(inventory.select_one('[data-homepage-vehicle]'))
+        self.assertIsNotNone(inventory.select_one('[data-homepage-cta="view_all_inventory"]'))
+        self.assertEqual(
+            inventory.select_one('img.card-img-top').get('loading'),
+            'eager',
+        )
+        self.assertEqual(
+            inventory.select_one('img.card-img-top').get('fetchpriority'),
+            'high',
+        )
+        self.assertIsNotNone(html.select_one('.homepage-financing-banner'))
+        self.assertIsNone(
+            html.select_one('a.financing-banner:not(.homepage-financing-banner)'),
+        )
+        self.assertGreater(
+            list(html.descendants).index(html.select_one('.homepage-financing-banner')),
+            list(html.descendants).index(inventory),
+        )
+
+    def test_homepage_without_stock_keeps_financing_announcement_prominent(self):
+        db.session.query(Vehicle).delete()
+        db.session.commit()
+
+        html = self.page('/')
+
+        self.assertIsNotNone(
+            html.select_one('a.financing-banner:not(.homepage-financing-banner)'),
+        )
+        self.assertIsNone(html.select_one('.homepage-financing-banner'))
 
     def test_shopping_pages_make_call_actions_easy_to_find(self):
         home = self.page('/')
@@ -266,7 +315,7 @@ class PublicThemeTests(unittest.TestCase):
 
     def test_storefront_hero_and_mobile_actions_emphasize_shopping(self):
         html = self.page('/')
-        self.assertIsNotNone(html.select_one('.hero-actions a[href="/inventory"]'))
+        self.assertIsNotNone(html.select_one('.hero-actions a[href="#featured-inventory"]'))
         self.assertIsNotNone(html.select_one('.hero-actions a[href^="tel:"]'))
         self.assertIsNotNone(html.select_one('.search-box form'))
         self.assertIsNotNone(html.select_one('.cookie-consent-banner'))
@@ -274,6 +323,11 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIsNotNone(banner)
         self.assertEqual(banner['href'], '/financing')
         self.assertIn('We Now Offer Financing', banner.get_text(' ', strip=True))
+        self.assertGreater(
+            list(html.descendants).index(banner),
+            list(html.descendants).index(html.select_one('#featured-inventory')),
+        )
+        self.assertIsNotNone(self.page('/contact').select_one('a.financing-banner'))
 
         css = (Path(self.app.static_folder) / 'css' / 'public.css').read_text()
         self.assertIn('.public-site .financing-banner {', css)

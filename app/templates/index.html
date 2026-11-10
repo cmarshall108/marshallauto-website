@@ -16,86 +16,31 @@
 <section class="hero-section">
     <div class="container">
         <div class="row align-items-center">
-            <div class="col-lg-7 mb-5 mb-lg-0">
+            <div class="col-12 col-lg-9 col-xl-8 mb-lg-0">
                 <p class="hero-eyebrow">{{ business_city }}, {{ business_state }} &middot; Marshall Auto</p>
-                <div class="hero-badges d-flex flex-wrap gap-2 justify-content-lg-start justify-content-center mb-3">
-                    <span class="badge px-3 py-2">Used cars. Real value.</span>
-                    <span class="badge px-3 py-2">Rebuilt Title Specialists</span>
-                </div>
-                <h1>{{ site_setting.get('home_hero_title') }}</h1>
-                <p class="mb-4">{{ site_setting.get('home_hero_subtitle') }}</p>
-                <p class="lead text-white-50 mb-4">We also offer rebuilt title vehicles at huge discounts — fully inspected and ready for the road. The advertised price is the out-the-door price. We do not charge any extra fees.</p>
+                <h1>{{ site_setting.get('home_hero_title') or ('Used Cars for Sale in ' ~ business_city ~ ', ' ~ business_state) }}</h1>
+                <p class="hero-subtitle mb-3">{{ site_setting.get('home_hero_subtitle') or 'Clean-title and rebuilt-title vehicles. No extra dealer fees.' }}</p>
+                <p class="hero-value-note text-white-50 mb-4">Advertised prices are out-the-door prices.</p>
                 <div class="hero-actions d-flex flex-wrap gap-3 justify-content-lg-start justify-content-center">
-                    <a href="{{ url_for('main.inventory') }}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-search me-2"></i>Browse Inventory
+                    <a href="#featured-inventory" class="btn btn-primary btn-lg" data-homepage-cta="browse_inventory">
+                        <i class="bi bi-search me-2"></i>See Available Vehicles
                     </a>
                     <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-outline-light btn-lg">
                         <i class="bi bi-telephone-fill me-2"></i>Call Our Cell
                     </a>
-                    <a href="{{ url_for('main.financing') }}" class="btn btn-outline-light btn-lg">
-                        <i class="bi bi-credit-card me-2"></i>Financing Options
-                    </a>
-                </div>
-            </div>
-            <div class="col-lg-5">
-                <div class="search-box">
-                    <span class="section-eyebrow">Your next chapter</span>
-                    <h5 class="fw-bold mb-3">Find Your Perfect Car</h5>
-                    <p class="search-box-subtitle">Start with what matters to you.</p>
-                    <form action="{{ url_for('main.inventory') }}" method="GET">
-                        <div class="row g-2">
-                            <div class="col-12">
-                                <label for="hero-make" class="form-label">Make</label>
-                                <select id="hero-make" name="make" class="form-select">
-                                    <option value="">All Makes</option>
-                                    {% for make in makes %}
-                                    <option value="{{ make }}">{{ make }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label for="hero-model" class="form-label">Model</label>
-                                <select id="hero-model" name="model" class="form-select">
-                                    <option value="">All Models</option>
-                                    {% for model in models %}
-                                    <option value="{{ model }}">{{ model }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label for="hero-max-price" class="form-label">Budget</label>
-                                <input id="hero-max-price" type="number" name="max_price" class="form-control" placeholder="Maximum price" min="0" inputmode="numeric">
-                            </div>
-                            <div class="col-12">
-                                <button type="submit" class="btn btn-primary w-100">
-                                    <i class="bi bi-search me-1"></i> Search Inventory
-                                </button>
-                            </div>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<div class="hero-assurances">
-    <div class="container">
-        <div><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Advertised price is the out-the-door price</div>
-        <div><i class="bi bi-cash-stack" aria-hidden="true"></i> No extra fees</div>
-        <div><i class="bi bi-file-earmark-text" aria-hidden="true"></i> History reports on qualifying vehicles</div>
-        <div><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Trade-ins welcome</div>
-        <div><i class="bi bi-calendar-check" aria-hidden="true"></i> Test drives on your schedule</div>
-    </div>
-</div>
-
 <!-- Featured Inventory -->
-<section class="section-padding bg-light-brand">
+<section class="section-padding bg-light-brand" id="featured-inventory">
     <div class="container">
-        <div class="text-center mb-5">
-            <span class="section-eyebrow">Explore the collection</span>
-            <h2 class="section-title">Featured Vehicles</h2>
-            <p class="section-subtitle mx-auto">Hand-picked quality used cars, trucks, and SUVs ready for delivery. Ask about our huge discounts on rebuilt title inventory.</p>
+        <div class="text-center mb-4">
+            <span class="section-eyebrow">In stock now</span>
+            <h2 class="section-title">Available Vehicles</h2>
+            <p class="section-subtitle mx-auto">Compare photos, mileage, title status, and upfront prices.</p>
         </div>
         <div class="inventory-grid" itemscope itemtype="https://schema.org/ItemList">
             <meta itemprop="name" content="Featured Vehicles at {{ business_name }}">
@@ -104,7 +49,8 @@
                 <meta itemprop="position" content="{{ loop.index }}">
                 <meta itemprop="url" content="{{ site_url }}{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}">
                 <button type="button" class="favorite-btn js-favorite-btn" data-slug="{{ vehicle.slug }}" aria-label="Save {{ vehicle.title }} to favorites"><i class="bi bi-heart"></i></button>
-                <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="text-decoration-none text-dark">
+                <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="text-decoration-none text-dark"
+                   data-homepage-vehicle="{{ vehicle.id }}" data-homepage-vehicle-label="{{ vehicle.title }}">
                     <div class="card-img-wrapper">
                         {% set img = vehicle.primary_image() %}
                         <img src="{{ vehicle.primary_image_url() }}"
@@ -113,7 +59,8 @@
                              alt="{{ vehicle.image_alt() }}"
                              width="{{ img.width if img and img.width else 600 }}"
                              height="{{ img.height if img and img.height else 400 }}"
-                             loading="lazy"
+                             loading="{{ 'eager' if loop.first else 'lazy' }}"
+                             {% if loop.first %}fetchpriority="high"{% endif %}
                              decoding="async">
                         <span class="badge-condition">{{ vehicle.condition | title }}</span>
                         <div class="vehicle-card-badges">
@@ -159,10 +106,65 @@
             {% endfor %}
         </div>
         <div class="text-center mt-5">
-            <a href="{{ url_for('main.inventory') }}" class="btn btn-primary btn-lg">View All Inventory</a>
+            <a href="{{ url_for('main.inventory') }}" class="btn btn-primary btn-lg" data-homepage-cta="view_all_inventory">View All Inventory</a>
         </div>
+        <details class="search-box homepage-search mt-4">
+            <summary class="homepage-search-summary">
+                <span><i class="bi bi-search me-2" aria-hidden="true"></i>Filter by make, model, or budget</span>
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </summary>
+            <form action="{{ url_for('main.inventory') }}" method="GET" data-homepage-search>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label for="hero-make" class="form-label">Make</label>
+                        <select id="hero-make" name="make" class="form-select">
+                            <option value="">All Makes</option>
+                            {% for make in makes %}
+                            <option value="{{ make }}">{{ make }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="hero-model" class="form-label">Model</label>
+                        <select id="hero-model" name="model" class="form-select">
+                            <option value="">All Models</option>
+                            {% for model in models %}
+                            <option value="{{ model }}">{{ model }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-7">
+                        <label for="hero-max-price" class="form-label">Budget</label>
+                        <input id="hero-max-price" type="number" name="max_price" class="form-control" placeholder="Maximum price" min="0" inputmode="numeric">
+                    </div>
+                    <div class="col-5 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search me-1"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </details>
     </div>
 </section>
+
+{% if featured %}
+<a class="financing-banner homepage-financing-banner" href="{{ url_for('main.financing') }}" aria-label="Apply online for vehicle financing.">
+    <span class="financing-banner-kicker">New</span>
+    <span class="financing-banner-message">We Now Offer Financing</span>
+    <span class="financing-banner-cta">Apply online <i class="bi bi-arrow-right-circle-fill" aria-hidden="true"></i></span>
+</a>
+{% endif %}
+
+<div class="hero-assurances">
+    <div class="container">
+        <div><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Advertised price is the out-the-door price</div>
+        <div><i class="bi bi-cash-stack" aria-hidden="true"></i> No extra fees</div>
+        <div><i class="bi bi-file-earmark-text" aria-hidden="true"></i> History reports on qualifying vehicles</div>
+        <div><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Trade-ins welcome</div>
+        <div><i class="bi bi-calendar-check" aria-hidden="true"></i> Test drives on your schedule</div>
+    </div>
+</div>
 
 {% if coming_soon %}
 <section class="section-padding">

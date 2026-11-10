@@ -224,6 +224,60 @@ class AnalyticsTests(unittest.TestCase):
         self.assertIn('Source-to-inquiry performance', html)
         self.assertIn('Converting sessions', html)
         self.assertIn('(direct) / (none)', html)
+        self.assertIn('Homepage shopping actions', html)
+
+    def test_homepage_shopping_events_are_reported_separately(self):
+        created_at = utcnow() - timedelta(minutes=5)
+        home_page = self._page(*self._ids(), created_at, page_type='home')
+        second_home_page = self._page(*self._ids(), created_at, page_type='home')
+        self._event(home_page, 'homepage_inventory_click', created_at)
+        self._event(home_page, 'featured_vehicle_click', created_at)
+        self._event(home_page, 'featured_vehicle_click', created_at)
+        self._event(home_page, 'homepage_inventory_search', created_at)
+        orphan_visitor, orphan_session = self._ids()
+        db.session.add(AnalyticsEvent(
+            visitor_id=orphan_visitor,
+            session_id=orphan_session,
+            event_name='homepage_inventory_search',
+            page_type='home',
+            created_at=created_at,
+        ))
+        other_page = self._page(*self._ids(), created_at, page_type='vehicle_detail')
+        self._event(other_page, 'featured_vehicle_click', created_at)
+        db.session.commit()
+
+        report = build_analytics_dashboard({'range': '30d'})
+
+        self.assertEqual(report['homepage_engagement'], {
+            'inventory_clicks': 1,
+            'vehicle_clicks': 2,
+            'searches': 2,
+            'unique_shoppers': 2,
+            'visitors': 3,
+            'shopper_rate': 66.7,
+        })
+        event_labels = {item['name']: item['label'] for item in report['events']}
+        self.assertEqual(event_labels['featured_vehicle_click'], 'Featured Vehicle Click')
+
+    def test_homepage_click_event_is_collected_as_interest(self):
+        visitor_id, session_id = self._ids()
+        response = self.client.post(
+            '/api/analytics/collect',
+            data=json.dumps({
+                'type': 'event',
+                'event_name': 'featured_vehicle_click',
+                'visitor_id': visitor_id,
+                'session_id': session_id,
+                'page_type': 'home',
+                'label': '2020 Toyota Camry',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = AnalyticsEvent.query.one()
+        self.assertEqual(event.event_category, 'interest')
+        self.assertEqual(event.label, '2020 Toyota Camry')
 
     def test_custom_analytics_ranges_use_local_midnight_boundaries(self):
         start, end, days, range_key = _parse_date_range({

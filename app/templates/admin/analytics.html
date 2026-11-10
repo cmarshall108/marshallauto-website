@@ -171,6 +171,35 @@
     </div>
 </div>
 
+<div class="table-card p-3 p-md-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+            <h5 class="fw-bold mb-1">Homepage shopping actions</h5>
+            <p class="small text-muted mb-0">Action counts include repeats; unique visitors are deduplicated across actions.</p>
+        </div>
+        <span class="small text-muted">Selected date range; page and device filters do not affect these totals</span>
+    </div>
+    <div class="row g-3">
+        <div class="col-12 col-md-3">
+            <div class="small text-muted">Unique visitors who explored inventory</div>
+            <div class="h3 fw-bold mb-0">{{ homepage_engagement.unique_shoppers }} / {{ homepage_engagement.visitors }}</div>
+            <div class="small text-muted">{{ homepage_engagement.shopper_rate }}% of homepage visitors</div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="small text-muted">Inventory link clicks</div>
+            <div class="h3 fw-bold mb-0">{{ homepage_engagement.inventory_clicks }}</div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="small text-muted">Featured vehicle clicks</div>
+            <div class="h3 fw-bold mb-0">{{ homepage_engagement.vehicle_clicks }}</div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="small text-muted">Homepage searches</div>
+            <div class="h3 fw-bold mb-0">{{ homepage_engagement.searches }}</div>
+        </div>
+    </div>
+</div>
+
 {# ---- Conversion interest strip ---- #}
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-lg">

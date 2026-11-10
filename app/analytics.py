@@ -50,6 +50,9 @@ EVENT_LABELS = {
     'view_search_results': 'Inventory Search Results',
     'search': 'Search',
     'inventory_filter': 'Inventory Filter',
+    'homepage_inventory_click': 'Homepage Inventory Click',
+    'featured_vehicle_click': 'Featured Vehicle Click',
+    'homepage_inventory_search': 'Homepage Inventory Search',
     'click_to_call': 'Click to Call',
     'click_to_sms': 'Click to Text',
     'click_to_email': 'Click to Email',
@@ -68,6 +71,9 @@ EVENT_CATEGORIES = {
     'view_search_results': 'interest',
     'search': 'interest',
     'inventory_filter': 'interest',
+    'homepage_inventory_click': 'interest',
+    'featured_vehicle_click': 'interest',
+    'homepage_inventory_search': 'interest',
     'click_to_call': 'conversion',
     'click_to_sms': 'conversion',
     'click_to_email': 'conversion',
@@ -718,6 +724,45 @@ def build_analytics_dashboard(args):
     download_events = event_q.filter(AnalyticsEvent.event_name == 'file_download').count()
     vehicle_view_events = event_q.filter(AnalyticsEvent.event_name == 'view_item').count()
 
+    homepage_event_counts = {
+        row.event_name: row.count
+        for row in _ev_filter(db.session.query(
+            AnalyticsEvent.event_name,
+            func.count(AnalyticsEvent.id).label('count'),
+        ), start, end)
+        .filter(
+            AnalyticsEvent.page_type == 'home',
+            AnalyticsEvent.event_name.in_(
+                ('homepage_inventory_click', 'featured_vehicle_click', 'homepage_inventory_search'),
+            ),
+        )
+        .group_by(AnalyticsEvent.event_name)
+        .all()
+    }
+    homepage_shopper_ids = _ev_filter(
+        AnalyticsEvent.query, start, end,
+    ).filter(
+        AnalyticsEvent.page_type == 'home',
+        AnalyticsEvent.event_name.in_(
+            ('homepage_inventory_click', 'featured_vehicle_click', 'homepage_inventory_search'),
+        ),
+    ).with_entities(AnalyticsEvent.visitor_id).distinct()
+    unique_homepage_shoppers = homepage_shopper_ids.count()
+    homepage_visitor_ids = _pv_filter(
+        db.session.query(PageView.visitor_id), start, end, page_type='home',
+    ).union(homepage_shopper_ids).subquery()
+    homepage_visitors = db.session.query(func.count()).select_from(
+        homepage_visitor_ids,
+    ).scalar() or 0
+    homepage_engagement = {
+        'inventory_clicks': homepage_event_counts.get('homepage_inventory_click', 0),
+        'vehicle_clicks': homepage_event_counts.get('featured_vehicle_click', 0),
+        'searches': homepage_event_counts.get('homepage_inventory_search', 0),
+        'unique_shoppers': unique_homepage_shoppers,
+        'visitors': homepage_visitors,
+        'shopper_rate': _pct(unique_homepage_shoppers, homepage_visitors),
+    }
+
     def delta(current, previous):
         if previous == 0:
             return None if current == 0 else 100.0
@@ -1235,6 +1280,7 @@ def build_analytics_dashboard(args):
         'fbclid_views': fbclid_views,
         'top_vehicles': top_vehicles_data,
         'events': events_data,
+        'homepage_engagement': homepage_engagement,
         'landings': landings_data,
         'recent_views': recent_views_data,
         'recent_events': recent_events_data,

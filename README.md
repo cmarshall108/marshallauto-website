@@ -834,6 +834,9 @@ Client-side tracking lives in `app/static/js/main.js` (`MarshallAnalytics`). Eve
 | `view_item` / Pixel `ViewContent` | Vehicle detail pages |
 | `view_search_results` / `search` | Inventory with filters or search |
 | `inventory_filter` | Filter form submit |
+| `homepage_inventory_click` | Inventory calls to action on the homepage |
+| `featured_vehicle_click` | Clicks from a homepage featured vehicle to its detail page |
+| `homepage_inventory_search` | Make/model/budget search submitted from the homepage |
 | `generate_lead` / Pixel `Lead` + `Contact` | Contact form success (AJAX or full POST) |
 | `click_to_call` / `click_to_sms` / `click_to_email` | `tel:`, `sms:`, `mailto:` clicks |
 | `file_download` | CarFax / PDF links |
@@ -841,6 +844,12 @@ Client-side tracking lives in `app/static/js/main.js` (`MarshallAnalytics`). Eve
 | `payment_calculated` | Financing calculator results |
 
 UTM parameters (`utm_*`, `gclid`, `fbclid`) are stored in `sessionStorage` and attached to lead form submissions. Leads persist attribution fields in the database for reporting.
+**Admin → Analytics → Homepage shopping actions** reports those three homepage
+actions and the unique visitors who clicked or searched inventory, compared with
+unique homepage visitors for the selected date range. Action totals include
+repeats; unique visitors are deduplicated across homepage actions. These metrics
+are independent of page-type and device filters and complement scroll-depth and
+time-on-page metrics.
 
 ### First-party source-to-inquiry reporting
 
