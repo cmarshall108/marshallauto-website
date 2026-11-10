@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 from flask import current_app, has_request_context, request
+from flask_login import current_user
 from sqlalchemy import case, func
 
 from app import db
@@ -385,6 +386,11 @@ def process_collect_payload(data):
     """
     if not isinstance(data, dict):
         return {'ok': False, 'error': 'invalid_json'}, 400
+
+    # Signed-in staff are not visitors; accept and discard so tabs opened
+    # before login (or stale cached pages) cannot add views.
+    if current_user.is_authenticated:
+        return {'ok': True, 'ignored': 'staff'}, 200
 
     if collection_rate_limited():
         return {'ok': False, 'error': 'rate_limited'}, 429

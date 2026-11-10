@@ -42,6 +42,58 @@ class AnalyticsTests(unittest.TestCase):
             follow_redirects=False,
         )
 
+    def test_signed_in_staff_are_not_counted_as_visitors(self):
+        visitor_id, session_id = self._ids()
+        payload = json.dumps({
+            'type': 'pageview',
+            'visitor_id': visitor_id,
+            'session_id': session_id,
+            'path': '/inventory',
+            'page_type': 'inventory',
+        })
+        event_payload = json.dumps({
+            'type': 'event',
+            'event_name': 'cta_click',
+            'visitor_id': visitor_id,
+            'session_id': session_id,
+        })
+
+        self._login()
+        for body in (payload, event_payload):
+            res = self.client.post(
+                '/api/analytics/collect', data=body, content_type='application/json',
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.get_json()['ok'])
+            self.assertNotIn('page_view_id', res.get_json())
+        self.assertEqual(PageView.query.count(), 0)
+        self.assertEqual(AnalyticsEvent.query.count(), 0)
+
+        self.client.get('/admin/logout')
+        res = self.client.post(
+            '/api/analytics/collect', data=payload, content_type='application/json',
+        )
+        self.assertIn('page_view_id', res.get_json())
+        self.assertEqual(PageView.query.count(), 1)
+
+    def test_tracking_tags_are_not_rendered_for_signed_in_staff(self):
+        self.app.config.update(
+            GOOGLE_ANALYTICS_ID='G-TEST123456',
+            FACEBOOK_PIXEL_ID='1234567890',
+        )
+        tags = ('googletagmanager.com/gtag/js', '__facebookPixelId')
+
+        visitor_html = self.client.get('/about').get_data(as_text=True)
+        for tag in tags:
+            self.assertIn(tag, visitor_html)
+        self.assertNotIn('data-staff', visitor_html)
+
+        self._login()
+        staff_html = self.client.get('/about').get_data(as_text=True)
+        for tag in tags:
+            self.assertNotIn(tag, staff_html)
+        self.assertIn('data-staff="true"', staff_html)
+
     def test_collect_pageview_and_update(self):
         visitor_id, session_id = self._ids()
         res = self.client.post(

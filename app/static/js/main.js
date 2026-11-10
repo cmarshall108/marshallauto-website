@@ -24,6 +24,7 @@
             inventory: safeParse(el.dataset.inventory || 'null'),
             leadValue: parseFloat(el.dataset.leadValue || '1') || 1,
             collectUrl: el.dataset.collectUrl || '/api/analytics/collect',
+            staff: el.dataset.staff === 'true',
         };
     }
 
@@ -138,6 +139,8 @@
 
         init() {
             this.config = getConfig();
+            // Signed-in staff are not visitors: record nothing.
+            if (this.config.staff) return;
             this.visitorId = getVisitorId();
             this.sessionId = getSessionId();
             this.startedAt = Date.now();
