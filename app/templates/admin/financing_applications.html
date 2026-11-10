@@ -27,7 +27,7 @@
                 {% for application in pagination.items %}
                 <tr>
                     <td>#{{ application.id }}</td>
-                    <td>{{ application.submitted_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                    <td>{{ (application.submitted_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') }}</td>
                     <td>
                         {% if application.vehicle %}
                         {{ application.vehicle.year }} {{ application.vehicle.make }} {{ application.vehicle.model }}

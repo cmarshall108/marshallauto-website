@@ -67,9 +67,9 @@
                     <td>{{ td.salesperson or '—' }}</td>
                     <td class="small">
                         {% if td.scheduled_at %}Scheduled: {{ td.scheduled_at.strftime('%m/%d/%Y %I:%M %p') }} ET{% endif %}
-                        {% if td.status in ('out', 'returned') %}<div>Out: {{ td.started_at.strftime('%m/%d/%Y %I:%M %p') }} UTC</div>{% endif %}
+                        {% if td.status in ('out', 'returned') %}<div>Out: {{ (td.started_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') }}</div>{% endif %}
                     </td>
-                    <td class="small">{{ td.returned_at.strftime('%m/%d %I:%M %p') if td.returned_at else '—' }}</td>
+                    <td class="small">{{ (td.returned_at | to_dealership_time).strftime('%m/%d %I:%M %p %Z') if td.returned_at else '—' }}</td>
                     <td class="text-end">{% if td.miles_driven is not none %}{{ td.miles_driven }}{% else %}—{% endif %}</td>
                     <td class="text-nowrap">
                         {% if current_user.is_admin and (td.status == 'requested' or (td.status == 'confirmed' and td.confirmation_sms_status == 'failed')) %}

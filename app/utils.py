@@ -9,9 +9,10 @@ import subprocess
 import sys
 import tempfile
 import warnings
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
+from zoneinfo import ZoneInfo
 
 import phonenumbers
 from flask import current_app, request
@@ -28,8 +29,37 @@ HEIC_EXTENSIONS = {'heic', 'heif'}
 MAX_PRIVATE_IMAGE_BYTES = 15 * 1024 * 1024
 MAX_PRIVATE_IMAGE_PIXELS = 20_000_000
 
+DEALERSHIP_TIMEZONE = ZoneInfo('America/New_York')
+
+
 def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def dealership_now():
+    """Current Sanford wall time as a naive value for local-time DB fields."""
+    return datetime.now(DEALERSHIP_TIMEZONE).replace(tzinfo=None)
+
+
+def dealership_today() -> date:
+    """Current calendar date in Sanford, independent of the server timezone."""
+    return datetime.now(DEALERSHIP_TIMEZONE).date()
+
+
+def to_dealership_time(value):
+    """Convert a UTC timestamp to Sanford time; naive stored timestamps are UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(DEALERSHIP_TIMEZONE)
+
+
+def dealership_local_to_utc(value: datetime) -> datetime:
+    """Convert a Sanford wall time to naive UTC for comparisons with DB timestamps."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=DEALERSHIP_TIMEZONE)
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def format_phone_number(phone, region='US'):
@@ -603,7 +633,7 @@ def is_low_mileage(
         vehicle_year = int(year)
     except (TypeError, ValueError):
         return False
-    is_older_vehicle = datetime.now(timezone.utc).year - vehicle_year > OLDER_VEHICLE_AGE_YEARS
+    is_older_vehicle = dealership_today().year - vehicle_year > OLDER_VEHICLE_AGE_YEARS
     return is_older_vehicle and miles < OLDER_VEHICLE_LOW_MILEAGE_THRESHOLD
 
 
@@ -1393,7 +1423,10 @@ def structured_data_vehicle(vehicle):
         "driveWheelConfiguration": vehicle.drivetrain or '',
         "bodyType": vehicle.body_style or '',
         "url": f"{current_app.config['SITE_URL']}/inventory/{vehicle.slug}",
-        "datePosted": vehicle.created_at.strftime('%Y-%m-%d') if vehicle.created_at else None,
+        "datePosted": (
+            to_dealership_time(vehicle.created_at).strftime('%Y-%m-%d')
+            if vehicle.created_at else None
+        ),
         "areaServed": {
             "@type": "City",
             "name": current_app.config['BUSINESS_CITY'],
@@ -1419,10 +1452,9 @@ def structured_data_vehicle(vehicle):
             "name": f"{vehicle.title} Walkaround Video",
             "description": f"Video walkaround of this {vehicle.title} at {current_app.config['BUSINESS_NAME']}.",
             "thumbnailUrl": images[:1],
-            "uploadDate": (
-                vehicle.created_at.strftime('%Y-%m-%dT%H:%M:%S')
-                if vehicle.created_at else utcnow().strftime('%Y-%m-%dT%H:%M:%S')
-            ),
+            "uploadDate": to_dealership_time(
+                vehicle.created_at or utcnow(),
+            ).isoformat(),
         }
         if video_info['kind'] == 'file':
             url = video_info['embed_url']

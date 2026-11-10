@@ -26,9 +26,9 @@
         <h1 class="fw-bold mb-2">{{ post.title }}</h1>
         <p class="text-muted mb-0">
             {% if post.author_name %}By {{ post.author_name }} &middot; {% endif %}
-            Published <time datetime="{{ (post.published_at or post.created_at).isoformat() }}Z">{{ (post.published_at or post.created_at).strftime('%B %-d, %Y') }}</time>
+            Published <time datetime="{{ ((post.published_at or post.created_at) | to_dealership_time).isoformat() }}">{{ ((post.published_at or post.created_at) | to_dealership_time).strftime('%B %-d, %Y') }}</time>
             {% if post.updated_at and post.updated_at.date() > (post.published_at or post.created_at).date() %}
-            &middot; Updated <time datetime="{{ post.updated_at.isoformat() }}Z">{{ post.updated_at.strftime('%B %-d, %Y') }}</time>
+            &middot; Updated <time datetime="{{ (post.updated_at | to_dealership_time).isoformat() }}">{{ (post.updated_at | to_dealership_time).strftime('%B %-d, %Y') }}</time>
             {% endif %}
         </p>
     </div>

@@ -13,7 +13,7 @@
                 {% for lead in unread_leads %}
                 <li class="list-group-item">
                     <a href="{{ url_for('admin.leads', lead_id=lead.id) }}">{{ lead.name }}</a>
-                    <span class="text-muted small"> · {{ lead.created_at.strftime('%b %d, %Y %H:%M') }} UTC</span>
+                    <span class="text-muted small"> · {{ (lead.created_at | to_dealership_time).strftime('%b %d, %Y %I:%M %p %Z') }}</span>
                 </li>
                 {% endfor %}
             </ul>

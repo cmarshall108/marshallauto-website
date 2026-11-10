@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
@@ -29,7 +28,7 @@ from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
-    aggregate_rating_data, client_ip, format_mileage, format_mileage_badge, format_price,
+    aggregate_rating_data, client_ip, dealership_now, format_mileage, format_mileage_badge, format_price,
     format_phone_number, notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
     slugify,
     send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
@@ -54,10 +53,6 @@ def _blog_post_description(post):
                 text = text[:157].rsplit(' ', 1)[0].rstrip('.,;:') + '...'
             return text
     return ''
-
-
-def _utcnow():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def url_for(endpoint, **values):
@@ -467,7 +462,7 @@ def inject_globals():
             'facebook_app_id': facebook_app_id,
             'twitter_handle': twitter_handle,
             'social_links': social,
-            'now': _utcnow(),
+            'now': dealership_now(),
             'canonical_url': canonical,
             'page_type': 'other',
             'analytics_vehicle': None,
@@ -498,7 +493,7 @@ def inject_globals():
             'facebook_app_id': current_app.config.get('FACEBOOK_APP_ID', ''),
             'twitter_handle': current_app.config.get('TWITTER_HANDLE', ''),
             'social_links': [],
-            'now': _utcnow(),
+            'now': dealership_now(),
             'canonical_url': current_app.config.get('SITE_URL', ''),
             'page_type': 'other',
             'analytics_vehicle': None,

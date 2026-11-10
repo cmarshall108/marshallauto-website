@@ -4,26 +4,18 @@ Requests create a lead for the existing inbox. They do not check a vehicle out,
 collect a deposit, or reserve a vehicle until staff confirms the request.
 """
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from flask import current_app, url_for
 from sqlalchemy import or_
 
 from app import db
 from app.models import InventoryAlert, Lead, TestDrive, Vehicle, VehicleHoldRequest, utcnow
-from app.utils import format_phone_number
+from app.utils import dealership_now, format_phone_number, to_dealership_time
 
 HOLD_HOURS = 72
 APPOINTMENT_HOURS = (9, 10, 11, 12, 13, 14, 15, 16, 17)
-DEALERSHIP_TIMEZONE = ZoneInfo('America/New_York')
-
-
 class ShopperRequestError(ValueError):
     """A public request that cannot be accepted as submitted."""
-
-
-def dealership_now():
-    return datetime.now(DEALERSHIP_TIMEZONE).replace(tzinfo=None)
 
 
 def appointment_slots(days=7):
@@ -90,13 +82,13 @@ def create_hold_request(vehicle, *, name, email, phone, deposit_amount, acknowle
     amount = deposit_amount
     if amount is None or amount <= 0:
         raise ShopperRequestError('Enter the deposit amount you are prepared to pay at the dealership.')
-    expires = utcnow() + timedelta(hours=HOLD_HOURS)
+    expires = to_dealership_time(utcnow() + timedelta(hours=HOLD_HOURS))
     message = (
         f"In-person 72-hour hold for {vehicle.title}. "
         f"Deposit: ${amount:,.2f}, payable only at the dealership in cash or by cashier's check "
         f"with the original receipt from the issuing bank branch. "
         f"Proposed expiration if paid and signed now: "
-        f"{expires.strftime('%B %-d, %Y at %-I:%M %p UTC')}."
+        f"{expires.strftime('%B %-d, %Y at %-I:%M %p %Z')}."
     )
     lead = _lead(name, email, phone, message, vehicle, 'hold_request')
     hold = VehicleHoldRequest(

@@ -53,7 +53,7 @@
             <tbody>
                 {% for review in pagination.items %}
                 <tr>
-                    <td>{{ review.created_at.strftime('%m/%d/%Y') }}</td>
+                    <td>{{ (review.created_at | to_dealership_time).strftime('%m/%d/%Y') }}</td>
                     <td>{{ review.author_name }}</td>
                     <td>{{ review.rating }} / 5</td>
                     <td>{{ review.source or '—' }}</td>

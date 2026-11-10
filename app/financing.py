@@ -21,6 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app import db
 from app.models import ChatPresence, FinancingApplication, User, utcnow
 from app.spam_filter import check_lead_spam_for_app
+from app.utils import dealership_today
 
 _SSN_PATTERN = re.compile(r'^\d{3}-?\d{2}-?\d{4}$')
 _EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
@@ -152,7 +153,7 @@ def _parse_date(value, label, errors, required=False):
     except ValueError:
         errors[label] = 'Enter a valid date.'
         return None
-    if parsed > date.today():
+    if parsed > dealership_today():
         errors[label] = 'The date cannot be in the future.'
         return None
     return parsed
@@ -317,6 +318,7 @@ def lookup_us_zip(zip_code):
 
 
 def _collect_person(form, prefix, errors, require_previous_address):
+    today = dealership_today()
     values = {}
     for field, limit in _TEXT_LIMITS.items():
         if field in {'signature'}:
@@ -465,8 +467,8 @@ def _collect_person(form, prefix, errors, require_previous_address):
 
     if values['employment_date']:
         current_months = (
-            (date.today().year - values['employment_date'].year) * 12
-            + date.today().month - values['employment_date'].month
+            (today.year - values['employment_date'].year) * 12
+            + today.month - values['employment_date'].month
         )
         if current_months < 24 and (
             not values['previous_employer'] or not values['previous_employment_date']
@@ -476,8 +478,8 @@ def _collect_person(form, prefix, errors, require_previous_address):
             )
         if current_months < 24 and values['previous_employment_date']:
             previous_months = (
-                (date.today().year - values['previous_employment_date'].year) * 12
-                + date.today().month - values['previous_employment_date'].month
+                (today.year - values['previous_employment_date'].year) * 12
+                + today.month - values['previous_employment_date'].month
             )
             if previous_months < 24:
                 errors[f'{prefix}_previous_employment_date'] = (
@@ -884,7 +886,7 @@ def _draw_person_on_original(pdf, person, coapplicant=False):
     _draw_text(pdf, 438, rows['signature'], person['signature'], 360)
     _draw_text(
         pdf, 820, rows['signature'],
-        date.today().strftime('%m/%d/%Y'), 145,
+        dealership_today().strftime('%m/%d/%Y'), 145,
     )
 
 

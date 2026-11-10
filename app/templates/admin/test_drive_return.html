@@ -11,7 +11,7 @@
 <div class="card border-0 shadow p-4" style="max-width: 560px;">
     <p class="mb-1"><strong>Customer:</strong> {{ test_drive.customer_name }}</p>
     <p class="mb-1"><strong>Vehicle:</strong> {{ test_drive.vehicle.title if test_drive.vehicle else 'Vehicle #' ~ test_drive.vehicle_id }}</p>
-    <p class="mb-3"><strong>Checked out:</strong> {{ test_drive.started_at.strftime('%m/%d/%Y %I:%M %p') if test_drive.started_at else '—' }}
+    <p class="mb-3"><strong>Checked out:</strong> {{ (test_drive.started_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') if test_drive.started_at else '—' }}
         (starting mileage {{ test_drive.start_mileage or '—' }})</p>
 
     <form method="POST">

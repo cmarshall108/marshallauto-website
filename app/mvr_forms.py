@@ -14,6 +14,8 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
 
+from app.utils import dealership_today
+
 _FONT = 'Helvetica-Bold'
 _MAX_FONT = 11
 _MIN_FONT = 8.5
@@ -287,7 +289,7 @@ def build_mvr_180(vehicle, config, on_date=None, mileage=None):
 
 
 def build_mvr_181(vehicle, config, on_date=None):
-    today = on_date or date.today()
+    today = on_date or dealership_today()
     return _fill_template(
         config['MVR_181_PDF'],
         _damage_text_values(vehicle, config, today),
@@ -777,8 +779,9 @@ def default_overlay_values(form_code, vehicle, config):
             'buyer_zip': buyer.get('zip', ''),
             'buyer_date': certified if buyer.get('name') else '',
         }
-    raw = _damage_text_values(vehicle, config, date.today())
-    checks = _damage_checks(vehicle, date.today())
+    today = dealership_today()
+    raw = _damage_text_values(vehicle, config, today)
+    checks = _damage_checks(vehicle, today)
     selected = {
         'damage_yes': DAMAGE_25_YES in checks,
         'damage_no': DAMAGE_25_NO in checks,

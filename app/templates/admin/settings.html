@@ -230,7 +230,7 @@
     <p class="text-muted small mb-3">
         Signed in as <strong>{{ current_user.username }}</strong>
         {% if current_user.last_login_at %}
-        · last login {{ current_user.last_login_at.strftime('%m/%d/%Y %I:%M %p') }}
+        · last login {{ (current_user.last_login_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') }}
         {% if current_user.last_login_ip %}from {{ current_user.last_login_ip }}{% endif %}
         {% endif %}
     </p>

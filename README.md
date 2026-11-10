@@ -400,6 +400,9 @@ Confirmed appointments use Eastern Time. Staff see persistent in-panel reminders
 30 minutes before and at the appointment time; each staff member dismisses their
 own reminders. Reminders refresh while the panel is open and remain until dismissed
 or the appointment is cancelled. Apply `flask db upgrade` before deploying.
+Business-facing date and time displays use Sanford's `America/New_York` timezone,
+including daylight-saving transitions. Stored event timestamps remain UTC; analytics
+date filters and chart buckets are translated to local Eastern time.
 
 Submissions must pass server-side required-field and format checks, a hidden
 anti-bot field, and the site's local spam scoring before an encrypted PDF is saved.

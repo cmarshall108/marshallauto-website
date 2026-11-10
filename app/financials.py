@@ -15,14 +15,13 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
-from zoneinfo import ZoneInfo
-
 from sqlalchemy.orm import noload, selectinload
 
 from app.models import RebuildCostEntry, Vehicle, VehicleSaleReceipt
 from app.pricing import split_otd_sale_price
+from app.utils import DEALERSHIP_TIMEZONE, dealership_today
 
-DEALER_TZ = ZoneInfo('America/New_York')
+DEALER_TZ = DEALERSHIP_TIMEZONE
 ZERO = Decimal('0.00')
 CENT = Decimal('0.01')
 POINT = Decimal('0.1')
@@ -369,7 +368,7 @@ def _resolve_window(range_key, today, earliest, selected_month=None):
 def build_financial_dashboard(args=None, today=None):
     """Aggregate monthly profit, costs, and cash expenses for the admin report."""
     args = args or {}
-    today = today or datetime.now(DEALER_TZ).date()
+    today = today or dealership_today()
     vehicles = _load_vehicles()
 
     deals = []

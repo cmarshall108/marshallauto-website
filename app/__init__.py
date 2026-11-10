@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -20,6 +19,7 @@ from config import get_config
 from app.utils import (
     format_currency, format_mileage, format_mileage_badge, format_price,
     is_low_mileage,
+    to_dealership_time,
 )
 
 # Reasonably strict CSP covering the third-party origins this site actually loads
@@ -176,11 +176,9 @@ def create_app(config_class=None):
     app.jinja_env.filters['format_currency'] = format_currency
     app.jinja_env.filters['format_mileage'] = format_mileage
     app.jinja_env.filters['format_mileage_badge'] = format_mileage_badge
+    app.jinja_env.filters['to_dealership_time'] = to_dealership_time
     app.jinja_env.filters['is_low_mileage'] = is_low_mileage
     app.jinja_env.globals['is_low_mileage'] = is_low_mileage
-
-    # Live "now" callable so footer year stays current without restart
-    app.jinja_env.globals['now'] = lambda: datetime.now(timezone.utc)
 
     # Cache-busted static asset URLs: static files are cached for a week (immutable)
     # by set_security_headers below, so CSS/JS edits need a version query string or

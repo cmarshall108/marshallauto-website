@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import unittest
 from types import SimpleNamespace
@@ -7,8 +7,9 @@ from unittest import mock
 from flask import Flask
 
 from app.utils import (
-    _ffmpeg_path, format_currency, format_mileage_badge, format_phone_number, is_low_mileage,
-    is_safe_redirect, notify_new_lead,
+    _ffmpeg_path, dealership_local_to_utc, format_currency, format_mileage_badge,
+    format_phone_number, is_low_mileage, is_safe_redirect, notify_new_lead,
+    to_dealership_time,
 )
 
 
@@ -31,6 +32,28 @@ class MileageBadgeTests(unittest.TestCase):
         self.assertFalse(is_low_mileage(99999, year=current_year - 8))
         self.assertTrue(is_low_mileage(74999, year=current_year))
         self.assertFalse(is_low_mileage(75000, year=current_year))
+
+
+class DealershipTimezoneTests(unittest.TestCase):
+    def test_utc_timestamps_convert_with_eastern_standard_and_daylight_time(self):
+        winter = to_dealership_time(datetime(2026, 1, 1, 4, 30))
+        summer = to_dealership_time(datetime(2026, 7, 1, 4, 30))
+
+        self.assertEqual(winter.isoformat(), '2025-12-31T23:30:00-05:00')
+        self.assertEqual(winter.tzname(), 'EST')
+        self.assertEqual(summer.isoformat(), '2026-07-01T00:30:00-04:00')
+        self.assertEqual(summer.tzname(), 'EDT')
+
+    def test_local_midnight_converts_to_correct_utc_boundary_across_dst(self):
+        winter = dealership_local_to_utc(datetime(2026, 1, 1))
+        summer = dealership_local_to_utc(datetime(2026, 7, 1))
+
+        self.assertEqual(winter, datetime(2026, 1, 1, 5))
+        self.assertEqual(summer, datetime(2026, 7, 1, 4))
+
+    def test_aware_utc_timestamps_are_also_converted(self):
+        value = datetime(2026, 7, 1, 4, 30, tzinfo=timezone.utc)
+        self.assertEqual(to_dealership_time(value).strftime('%I:%M %p %Z'), '12:30 AM EDT')
 
 
 class PhoneNumberFormattingTests(unittest.TestCase):

@@ -14,7 +14,10 @@ from sqlalchemy import case, func
 
 from app import db
 from app.models import AnalyticsEvent, PageView, Vehicle, utcnow
-from app.utils import client_ip, rate_limit_exceeded
+from app.utils import (
+    DEALERSHIP_TIMEZONE, client_ip, dealership_local_to_utc,
+    rate_limit_exceeded, to_dealership_time,
+)
 
 # ---- limits / sanitization -------------------------------------------------
 
@@ -478,8 +481,9 @@ def process_collect_payload(data):
 # ---- admin aggregations ----------------------------------------------------
 
 def _parse_date_range(args):
-    """Return (start_dt, end_dt, days, range_key) in naive UTC."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    """Return UTC database bounds for ranges defined in Sanford local time."""
+    local_now = datetime.now(DEALERSHIP_TIMEZONE)
+    now = local_now.astimezone(timezone.utc).replace(tzinfo=None)
     end = now
     range_key = (args.get('range') or '30d').strip().lower()
 
@@ -487,12 +491,20 @@ def _parse_date_range(args):
     custom_end = args.get('end')
     if range_key == 'custom' and custom_start:
         try:
-            start = datetime.strptime(custom_start, '%Y-%m-%d')
+            start_local = datetime.strptime(custom_start, '%Y-%m-%d').replace(
+                tzinfo=DEALERSHIP_TIMEZONE,
+            )
             if custom_end:
-                end = datetime.strptime(custom_end, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
+                end_local = (
+                    datetime.strptime(custom_end, '%Y-%m-%d')
+                    + timedelta(days=1) - timedelta(microseconds=1)
+                ).replace(tzinfo=DEALERSHIP_TIMEZONE)
+                end = dealership_local_to_utc(end_local)
             else:
                 end = now
-            days = max(1, (end.date() - start.date()).days + 1)
+            start = dealership_local_to_utc(start_local)
+            local_end_date = end_local.date() if custom_end else local_now.date()
+            days = max(1, (local_end_date - start_local.date()).days + 1)
             return start, end, days, 'custom'
         except ValueError:
             range_key = '30d'
@@ -510,7 +522,10 @@ def _parse_date_range(args):
     if range_key == '24h':
         start = now - timedelta(hours=24)
     else:
-        start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        start_local = (local_now - timedelta(days=days - 1)).replace(
+            hour=0, minute=0, second=0, microsecond=0,
+        )
+        start = dealership_local_to_utc(start_local)
     return start, end, days, range_key if range_key in mapping else '30d'
 
 
@@ -734,66 +749,87 @@ def build_analytics_dashboard(args):
         'downloads': download_events,
     }
 
-    # ---- time series (daily) ----
-    day_expr = func.date(PageView.created_at)
-    daily_rows = (
+    # Stored timestamps are naive UTC; reporting buckets use Sanford local time.
+    ts_rows = (
         _pv_filter(db.session.query(
-            day_expr.label('day'),
-            func.count(PageView.id).label('views'),
-            func.count(func.distinct(PageView.visitor_id)).label('visitors'),
-            func.count(func.distinct(PageView.session_id)).label('sessions'),
-            func.coalesce(func.avg(PageView.duration_seconds), 0).label('avg_duration'),
+            PageView.created_at,
+            PageView.visitor_id,
+            PageView.session_id,
+            PageView.duration_seconds,
+            PageView.is_engaged,
         ), start, end, page_type=page_type, device=device)
-        .group_by(day_expr)
-        .order_by(day_expr)
         .all()
     )
+    daily_buckets = defaultdict(lambda: {
+        'views': 0, 'visitors': set(), 'sessions': set(),
+        'duration_total': 0, 'duration_count': 0,
+    })
+    hourly_buckets = defaultdict(lambda: {'views': 0, 'visitors': set(), 'sessions': set()})
+    hour_counts = [0] * 24
+    hour_engaged = [0] * 24
+    dow_counts = [0] * 7
+    for row in ts_rows:
+        if not row.created_at:
+            continue
+        local_time = to_dealership_time(row.created_at)
+        day_bucket = daily_buckets[local_time.date()]
+        day_bucket['views'] += 1
+        if row.visitor_id is not None:
+            day_bucket['visitors'].add(row.visitor_id)
+        if row.session_id is not None:
+            day_bucket['sessions'].add(row.session_id)
+        if row.duration_seconds is not None:
+            day_bucket['duration_total'] += row.duration_seconds
+            day_bucket['duration_count'] += 1
+
+        hour_bucket = hourly_buckets[row.created_at.replace(
+            minute=0, second=0, microsecond=0,
+        )]
+        hour_bucket['views'] += 1
+        if row.visitor_id is not None:
+            hour_bucket['visitors'].add(row.visitor_id)
+        if row.session_id is not None:
+            hour_bucket['sessions'].add(row.session_id)
+        hour_counts[local_time.hour] += 1
+        if row.is_engaged:
+            hour_engaged[local_time.hour] += 1
+        dow_counts[local_time.weekday()] += 1
+
     daily_map = {
-        str(r.day): {
-            'views': r.views,
-            'visitors': r.visitors,
-            'sessions': r.sessions,
-            'avg_duration': round(float(r.avg_duration or 0), 1),
+        day.isoformat(): {
+            'views': bucket['views'],
+            'visitors': len(bucket['visitors']),
+            'sessions': len(bucket['sessions']),
+            'avg_duration': round(
+                bucket['duration_total'] / bucket['duration_count'], 1,
+            ) if bucket['duration_count'] else 0,
         }
-        for r in daily_rows
+        for day, bucket in daily_buckets.items()
     }
-    # Fill gaps
     daily_labels = []
     daily_views = []
     daily_visitors = []
     daily_sessions = []
     daily_duration = []
-    cursor = start.date() if hasattr(start, 'date') else start
-    end_date = end.date() if hasattr(end, 'date') else end
+    local_start = to_dealership_time(start)
+    local_end = to_dealership_time(end)
     if range_key == '24h':
-        # Hourly for last 24h
-        hourly_rows = (
-            _pv_filter(db.session.query(
-                PageView.created_at,
-                PageView.visitor_id,
-                PageView.session_id,
-            ), start, end, page_type=page_type, device=device)
-            .all()
-        )
-        buckets = defaultdict(lambda: {'views': 0, 'visitors': set(), 'sessions': set()})
-        for row in hourly_rows:
-            key = row.created_at.replace(minute=0, second=0, microsecond=0)
-            buckets[key]['views'] += 1
-            buckets[key]['visitors'].add(row.visitor_id)
-            buckets[key]['sessions'].add(row.session_id)
-        h = start.replace(minute=0, second=0, microsecond=0)
-        while h <= end:
-            label = h.strftime('%m/%d %H:00')
-            daily_labels.append(label)
-            b = buckets.get(h, {'views': 0, 'visitors': set(), 'sessions': set()})
-            daily_views.append(b['views'] if isinstance(b['views'], int) else 0)
-            daily_visitors.append(len(b['visitors']))
-            daily_sessions.append(len(b['sessions']))
+        hour_utc = start.replace(minute=0, second=0, microsecond=0)
+        end_hour_utc = end.replace(minute=0, second=0, microsecond=0)
+        while hour_utc <= end_hour_utc:
+            local_hour = to_dealership_time(hour_utc)
+            daily_labels.append(local_hour.strftime('%m/%d %I %p %Z'))
+            bucket = hourly_buckets.get(
+                hour_utc, {'views': 0, 'visitors': set(), 'sessions': set()},
+            )
+            daily_views.append(bucket['views'])
+            daily_visitors.append(len(bucket['visitors']))
+            daily_sessions.append(len(bucket['sessions']))
             daily_duration.append(0)
-            h += timedelta(hours=1)
+            hour_utc += timedelta(hours=1)
     else:
-        d = cursor
-        while d <= end_date:
+        d = local_start.date()
+        while d <= local_end.date():
             key = str(d)
             daily_labels.append(d.strftime('%b %d'))
             cell = daily_map.get(key, {'views': 0, 'visitors': 0, 'sessions': 0, 'avg_duration': 0})
@@ -802,26 +838,6 @@ def build_analytics_dashboard(args):
             daily_sessions.append(cell['sessions'])
             daily_duration.append(cell['avg_duration'])
             d += timedelta(days=1)
-
-    # ---- hour of day / day of week (Python-side for DB portability) ----
-    ts_rows = (
-        _pv_filter(db.session.query(
-            PageView.created_at,
-            PageView.duration_seconds,
-            PageView.is_engaged,
-        ), start, end, page_type=page_type, device=device)
-        .all()
-    )
-    hour_counts = [0] * 24
-    hour_engaged = [0] * 24
-    dow_counts = [0] * 7  # Mon=0
-    for row in ts_rows:
-        if not row.created_at:
-            continue
-        hour_counts[row.created_at.hour] += 1
-        if row.is_engaged:
-            hour_engaged[row.created_at.hour] += 1
-        dow_counts[row.created_at.weekday()] += 1
 
     # ---- top pages ----
     top_pages = (

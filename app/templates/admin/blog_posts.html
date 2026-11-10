@@ -24,7 +24,7 @@
             <tbody>
                 {% for post in pagination.items %}
                 <tr>
-                    <td>{{ post.created_at.strftime('%m/%d/%Y') }}</td>
+                    <td>{{ (post.created_at | to_dealership_time).strftime('%m/%d/%Y') }}</td>
                     <td>{{ post.title }}</td>
                     <td>{{ post.author_name or '—' }}</td>
                     <td>

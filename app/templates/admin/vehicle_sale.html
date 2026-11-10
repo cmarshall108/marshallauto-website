@@ -6,7 +6,7 @@
     <div>
         <h2 class="fw-bold mb-1">Sale Details</h2>
         <div>{{ vehicle.title }}{% if vehicle.stock_number %} &middot; Stock #{{ vehicle.stock_number }}{% endif %}</div>
-        {% if vehicle.sold_at %}<small class="text-muted">Sold {{ vehicle.sold_at.strftime('%m/%d/%Y') }}</small>{% endif %}
+        {% if vehicle.sold_at %}<small class="text-muted">Sold {{ (vehicle.sold_at | to_dealership_time).strftime('%m/%d/%Y') }}</small>{% endif %}
     </div>
     <div class="d-flex flex-wrap justify-content-end gap-2">
         <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">Edit Vehicle</a>
@@ -141,7 +141,7 @@
                 </a>
                 <div class="small text-muted">
                     {% if document.printer_label %}{{ document.printer_label }} &middot; {% endif %}
-                    {{ document.created_at.strftime('%m/%d/%Y %I:%M %p') }}
+                    {{ (document.created_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') }}
                 </div>
             </div>
             <form method="POST" action="{{ url_for('admin.vehicle_sale_document_delete', id=vehicle.id, document_id=document.id) }}" onsubmit="return confirm('Permanently delete this scanned document?');">

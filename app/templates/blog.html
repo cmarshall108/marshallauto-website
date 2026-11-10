@@ -30,7 +30,7 @@
                         <div class="card-body p-4">
                             <h2 class="h5 card-title fw-bold">{{ post.title }}</h2>
                             <p class="card-text text-muted small">{{ post.excerpt or (post.content | striptags)[:140] ~ '...' }}</p>
-                            <p class="small text-muted mb-0">{{ (post.published_at or post.created_at).strftime('%B %-d, %Y') }}</p>
+                            <p class="small text-muted mb-0">{{ ((post.published_at or post.created_at) | to_dealership_time).strftime('%B %-d, %Y') }}</p>
                         </div>
                     </div>
                 </a>

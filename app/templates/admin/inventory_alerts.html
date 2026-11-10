@@ -17,7 +17,7 @@
                 <td>{{ alert.customer_name }}<div class="small text-muted">{{ alert.customer_email }}</div></td>
                 <td>{{ alert.alert_type | replace('_', ' ') | title }}{% if alert.make %}: {{ alert.make }}{% elif alert.body_style %}: {{ alert.body_style }}{% elif alert.vehicle %}: {{ alert.vehicle.title }}{% endif %}</td>
                 <td>{{ alert.max_price | format_currency if alert.max_price else 'Any' }}</td>
-                <td>{{ alert.last_notified_at.strftime('%m/%d %I:%M %p') if alert.last_notified_at else 'Not sent' }}</td>
+                <td>{{ (alert.last_notified_at | to_dealership_time).strftime('%m/%d %I:%M %p %Z') if alert.last_notified_at else 'Not sent' }}</td>
                 <td>{{ alert.status | title }}</td>
             </tr>
         {% else %}

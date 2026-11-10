@@ -40,7 +40,7 @@
             <tbody>
                 {% for lead in pagination.items %}
                 <tr class="{% if not lead.is_read %}table-primary{% endif %}">
-                    <td>{{ lead.created_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                    <td>{{ (lead.created_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') }}</td>
                     <td class="fw-semibold">{{ lead.name }}</td>
                     <td>
                         <a href="mailto:{{ lead.email }}">{{ lead.email }}</a><br>

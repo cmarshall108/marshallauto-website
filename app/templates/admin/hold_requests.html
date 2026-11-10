@@ -16,7 +16,7 @@
                     <td>{{ hold.customer_name }}<div class="small text-muted">{{ hold.customer_email }} {{ hold.customer_phone or '' }}</div></td>
                     <td><a href="{{ url_for('admin.vehicle_edit', id=hold.vehicle_id) }}">{{ hold.vehicle.title }}</a></td>
                     <td>{{ hold.deposit_amount | format_currency }}</td>
-                    <td>{{ hold.expires_at.strftime('%m/%d %I:%M %p') if hold.expires_at else 'Not started' }}</td>
+                    <td>{{ (hold.expires_at | to_dealership_time).strftime('%m/%d %I:%M %p %Z') if hold.expires_at else 'Not started' }}</td>
                     <td class="text-nowrap">
                         {% if hold.status == 'requested' %}
                         <form method="POST" action="{{ url_for('admin.hold_request_confirm', id=hold.id) }}" class="d-inline">

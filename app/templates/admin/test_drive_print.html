@@ -39,9 +39,9 @@
         <tr><th>Vehicle</th><td>{{ test_drive.vehicle.title if test_drive.vehicle else 'Vehicle #' ~ test_drive.vehicle_id }}</td></tr>
         <tr><th>VIN</th><td>{{ test_drive.vehicle.vin if test_drive.vehicle else '—' }}</td></tr>
         <tr><th>Salesperson</th><td>{{ test_drive.salesperson or '—' }}</td></tr>
-        <tr><th>Checked Out</th><td>{{ test_drive.started_at.strftime('%m/%d/%Y %I:%M %p') if test_drive.started_at else '—' }}</td></tr>
+        <tr><th>{% if test_drive.status in ('out', 'returned') %}Checked Out{% else %}Scheduled{% endif %}</th><td>{% if test_drive.status in ('out', 'returned') and test_drive.started_at %}{{ (test_drive.started_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') }}{% elif test_drive.scheduled_at %}{{ test_drive.scheduled_at.strftime('%m/%d/%Y %I:%M %p') }} ET{% else %}—{% endif %}</td></tr>
         <tr><th>Starting Mileage</th><td>{{ test_drive.start_mileage if test_drive.start_mileage is not none else '—' }}</td></tr>
-        <tr><th>Returned</th><td>{{ test_drive.returned_at.strftime('%m/%d/%Y %I:%M %p') if test_drive.returned_at else '—' }}</td></tr>
+        <tr><th>Returned</th><td>{{ (test_drive.returned_at | to_dealership_time).strftime('%m/%d/%Y %I:%M %p %Z') if test_drive.returned_at else '—' }}</td></tr>
         <tr><th>Returning Mileage</th><td>{{ test_drive.end_mileage if test_drive.end_mileage is not none else '—' }}</td></tr>
         <tr><th>Miles Driven</th><td>{{ test_drive.miles_driven if test_drive.miles_driven is not none else '—' }}</td></tr>
         <tr><th>Notes</th><td>{{ test_drive.notes or '—' }}</td></tr>

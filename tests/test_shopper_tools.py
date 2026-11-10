@@ -63,6 +63,7 @@ class ShopperToolTests(unittest.TestCase):
         self.assertEqual(hold.status, 'requested')
         self.assertIsNone(hold.expires_at)
         self.assertEqual(lead.source, 'hold_request')
+        self.assertRegex(lead.message, r'\b(?:EST|EDT)\.')
         self.assertEqual(lead.phone, '(919) 555-0101')
         self.assertEqual(hold.customer_phone, '(919) 555-0101')
         confirm_hold(hold)

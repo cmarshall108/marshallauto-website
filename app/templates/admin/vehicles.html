@@ -55,7 +55,7 @@
                         {% if vehicle.is_coming_soon %}<span class="badge text-bg-info">Coming Soon</span>{% endif %}
                     </td>
                     <td data-label="Stock #">{{ vehicle.stock_number or 'N/A' }}</td>
-                    <td data-label="Added" class="vehicle-nowrap">{{ vehicle.created_at.strftime('%m/%d/%Y') }}</td>
+                    <td data-label="Added" class="vehicle-nowrap">{{ (vehicle.created_at | to_dealership_time).strftime('%m/%d/%Y') }}</td>
                     <td data-label="Actions">
                         <div class="vehicle-actions">
                             <div class="vehicle-actions-primary">

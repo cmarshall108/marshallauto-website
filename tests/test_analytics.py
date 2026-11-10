@@ -1,11 +1,12 @@
 import json
 import unittest
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 from config import TestingConfig
 from app import create_app, db
-from app.analytics import build_acquisition_report
+from app.analytics import _parse_date_range, build_acquisition_report, build_analytics_dashboard
 from app.models import AnalyticsEvent, PageView, User, utcnow
 
 
@@ -223,6 +224,50 @@ class AnalyticsTests(unittest.TestCase):
         self.assertIn('Source-to-inquiry performance', html)
         self.assertIn('Converting sessions', html)
         self.assertIn('(direct) / (none)', html)
+
+    def test_custom_analytics_ranges_use_local_midnight_boundaries(self):
+        start, end, days, range_key = _parse_date_range({
+            'range': 'custom', 'start': '2026-03-08', 'end': '2026-03-08',
+        })
+
+        self.assertEqual(start, datetime(2026, 3, 8, 5))
+        self.assertEqual(end, datetime(2026, 3, 9, 3, 59, 59, 999999))
+        self.assertEqual(days, 1)
+        self.assertEqual(range_key, 'custom')
+
+    def test_analytics_daily_buckets_follow_sanford_local_dates(self):
+        self._page(*self._ids(), datetime(2026, 3, 8, 4, 59), path='/before-midnight')
+        self._page(*self._ids(), datetime(2026, 3, 8, 5, 1), path='/after-midnight')
+        self._page(*self._ids(), datetime(2026, 3, 9, 3, 59), path='/before-end')
+        db.session.commit()
+
+        report = build_analytics_dashboard({
+            'range': 'custom', 'start': '2026-03-07', 'end': '2026-03-08',
+        })
+
+        self.assertEqual(report['charts']['daily_labels'], ['Mar 07', 'Mar 08'])
+        self.assertEqual(report['charts']['daily_views'], [1, 2])
+
+    def test_24_hour_chart_uses_eastern_hours_across_spring_dst(self):
+        self._page(*self._ids(), datetime(2026, 3, 8, 6, 30), path='/before-clock-change')
+        self._page(*self._ids(), datetime(2026, 3, 8, 7, 30), path='/after-clock-change')
+        db.session.commit()
+
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                fixed = datetime(2026, 3, 8, 8, 30, tzinfo=timezone.utc)
+                return fixed.astimezone(tz) if tz else fixed.replace(tzinfo=None)
+
+        with mock.patch('app.analytics.datetime', FixedDateTime):
+            report = build_analytics_dashboard({'range': '24h'})
+
+        labels = report['charts']['daily_labels']
+        self.assertIn('03/08 01 AM EST', labels)
+        self.assertIn('03/08 03 AM EDT', labels)
+        self.assertNotIn('03/08 02 AM EST', labels)
+        self.assertEqual(report['charts']['daily_views'][labels.index('03/08 01 AM EST')], 1)
+        self.assertEqual(report['charts']['daily_views'][labels.index('03/08 03 AM EDT')], 1)
 
     def _page(self, visitor_id, session_id, created_at, **fields):
         values = {

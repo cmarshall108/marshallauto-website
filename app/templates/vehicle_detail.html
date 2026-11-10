@@ -350,7 +350,7 @@ bi-check-circle
                     </div>
                     <h1 class="h2 fw-bold mb-1">{{ vehicle.title }} {{ 'for Sale' if vehicle.status == 'available' else ('Sold' if vehicle.status == 'sold' else 'Unavailable') }}</h1>
                     <p class="text-muted mb-2">{{ business_city }}, {{ business_state }}{% if vehicle.vin %} &middot; <span class="text-break">VIN {{ vehicle.vin }}</span>{% endif %}</p>
-                    {% if vehicle.updated_at %}<p class="small text-muted">Listing updated <time datetime="{{ vehicle.updated_at.isoformat() }}Z">{{ vehicle.updated_at.strftime('%B %d, %Y') }}</time></p>{% endif %}
+                    {% if vehicle.updated_at %}<p class="small text-muted">Listing updated <time datetime="{{ (vehicle.updated_at | to_dealership_time).isoformat() }}">{{ (vehicle.updated_at | to_dealership_time).strftime('%B %d, %Y') }}</time></p>{% endif %}
                     {% if vehicle.status != 'available' %}
                     <div class="alert alert-secondary">
                         This vehicle is no longer available.

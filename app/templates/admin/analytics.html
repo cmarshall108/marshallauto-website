@@ -9,7 +9,7 @@
         <p class="text-muted mb-0">
             First-party viewer counts, interest signals, and time-on-page insights
             {% if start and end %}
-            · {{ start.strftime('%b %d, %Y') }} – {{ end.strftime('%b %d, %Y') }}
+            · {{ (start | to_dealership_time).strftime('%b %d, %Y') }} – {{ (end | to_dealership_time).strftime('%b %d, %Y') }}
             {% endif %}
         </p>
     </div>
@@ -288,7 +288,7 @@
     <div class="col-lg-7">
         <div class="table-card p-3 p-md-4 h-100">
             <h5 class="fw-bold mb-1">Time of day interest</h5>
-            <p class="small text-muted mb-3">When visitors are on the site (UTC). Darker bars = more engaged views.</p>
+            <p class="small text-muted mb-3">When visitors are on the site (Eastern Time). Darker bars = more engaged views.</p>
             <div class="analytics-chart-wrap">
                 <canvas id="chartHours" height="110" aria-label="Hourly traffic chart"></canvas>
             </div>
@@ -933,7 +933,7 @@
                     <tbody>
                         {% for pv in recent_views %}
                         <tr>
-                            <td class="text-nowrap small">{{ pv.created_at.strftime('%m/%d %I:%M %p') if pv.created_at else '—' }}</td>
+                            <td class="text-nowrap small">{{ (pv.created_at | to_dealership_time).strftime('%m/%d %I:%M %p %Z') if pv.created_at else '—' }}</td>
                             <td>
                                 <div class="small text-break" style="max-width: 200px;">{{ pv.path }}</div>
                                 <div class="text-muted" style="font-size: 0.75rem;">
@@ -978,7 +978,7 @@
                     <tbody>
                         {% for ev in recent_events %}
                         <tr>
-                            <td class="text-nowrap small">{{ ev.created_at.strftime('%m/%d %I:%M %p') if ev.created_at else '—' }}</td>
+                            <td class="text-nowrap small">{{ (ev.created_at | to_dealership_time).strftime('%m/%d %I:%M %p %Z') if ev.created_at else '—' }}</td>
                             <td>
                                 <span class="badge analytics-cat-{{ ev.category }}">{{ ev.label }}</span>
                             </td>
