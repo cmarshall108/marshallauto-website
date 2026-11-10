@@ -117,6 +117,21 @@ class SeoTests(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
             self.assertEqual(response.headers['X-Robots-Tag'], 'noindex, follow')
 
+    def test_error_pages_are_noindex_without_homepage_canonical(self):
+        response = self.client.get('/no-such-page-for-seo-check')
+        self.assertEqual(response.status_code, 404)
+        html = BeautifulSoup(response.data, 'html.parser')
+        self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'noindex, follow')
+        self.assertIsNone(html.select_one('link[rel="canonical"]'))
+        self.assertIsNone(html.select_one('link[rel="alternate"][hreflang="x-default"]'))
+        self.assertEqual(response.headers['X-Robots-Tag'], 'noindex, follow')
+
+    def test_blog_index_description_is_a_full_search_snippet(self):
+        html = self.page('/blog')
+        description = html.select_one('meta[name="description"]')['content']
+        self.assertGreaterEqual(len(description), 120)
+        self.assertLessEqual(len(description), 160)
+
     def test_filters_and_sorts_are_noindex_on_every_page(self):
         for query in ('make=Toyota', 'make=Toyota&page=2', 'min_price=0', 'sort=price_asc'):
             html = self.page(f'/inventory?{query}')

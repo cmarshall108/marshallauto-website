@@ -1918,8 +1918,9 @@ def blog_list():
         structured_website=structured_data_website(),
         meta_title=f"Car Buying Guides & News | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
-            f"Tips, buying guides, and news from {current_app.config['BUSINESS_NAME']} in "
-            f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}."
+            f"Car buying guides, financing tips, and news from {current_app.config['BUSINESS_NAME']} in "
+            f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. Learn how to "
+            f"shop for a used car and get the most for your trade-in."
         ),
         page_type='blog',
     )
@@ -2230,6 +2231,7 @@ def page_not_found(e):
         'errors/404.html',
         meta_title='Page Not Found | Marshall Auto LLC',
         meta_description='The page you are looking for could not be found.',
+        error_page=True,
     ), 404)
     response.headers['X-Robots-Tag'] = 'noindex, follow'
     return response
@@ -2240,6 +2242,7 @@ def internal_server_error(e):
         'errors/500.html',
         meta_title='Server Error | Marshall Auto LLC',
         meta_description='Something went wrong. Please try again later.',
+        error_page=True,
     ), 500)
     response.headers['X-Robots-Tag'] = 'noindex, follow'
     return response

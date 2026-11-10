@@ -18,11 +18,13 @@
     {{ google_search_console_tag | safe }}
     {% endif %}
 
+    {% if not error_page %}
     {% set _canonical = canonical_override if canonical_override else canonical_url %}
     <link rel="canonical" href="{{ _canonical }}">
     {% block pagination_rels %}{% endblock %}
     <link rel="alternate" hreflang="en-us" href="{{ _canonical }}">
     <link rel="alternate" hreflang="x-default" href="{{ _canonical }}">
+    {% endif %}
 
     <!-- Preconnect / Preload -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
