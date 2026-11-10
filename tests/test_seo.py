@@ -274,7 +274,7 @@ class SeoTests(unittest.TestCase):
         return result
 
     def test_guides_publish_once_and_preserve_admin_changes(self):
-        self.assertIn('Published 3', self.publish_guides().output)
+        self.assertIn('Published 4', self.publish_guides().output)
         guide = BlogPost.query.filter_by(slug=BUYER_GUIDES[0]['slug']).one()
         published_at = guide.published_at
         guide.content = '<p>Edited by admin</p>'
@@ -283,7 +283,7 @@ class SeoTests(unittest.TestCase):
         updated_at = guide.updated_at
         self.assertIn('Published 0', self.publish_guides().output)
         db.session.refresh(guide)
-        self.assertEqual(BlogPost.query.count(), 3)
+        self.assertEqual(BlogPost.query.count(), 4)
         self.assertEqual(guide.content, '<p>Edited by admin</p>')
         self.assertFalse(guide.is_published)
         self.assertEqual(guide.published_at, published_at)
@@ -293,6 +293,14 @@ class SeoTests(unittest.TestCase):
         for path in ('/inventory', '/service-area', '/inventory/test-car-0'):
             html = self.page(path)
             self.assertIsNone(html.select_one(f'a[href="/blog/{guide.slug}"]'))
+
+    def test_new_guides_publish_for_sites_initialized_with_the_original_guides(self):
+        from app.models import SiteSetting
+        db.session.add(SiteSetting(key='buyer_guides_v1_published', value='1'))
+        db.session.commit()
+        self.assertIn('Published 1', self.publish_guides().output)
+        self.assertEqual([post.slug for post in BlogPost.query.all()], [BUYER_GUIDES[-1]['slug']])
+        self.assertIn('Published 0', self.publish_guides().output)
 
     def test_guides_are_indexable_linked_and_have_real_schema_dates(self):
         self.publish_guides()
@@ -324,7 +332,7 @@ class SeoTests(unittest.TestCase):
                          content='<p>Original draft</p>', is_published=False)
         db.session.add(draft)
         db.session.commit()
-        self.assertIn('Published 2', self.publish_guides().output)
+        self.assertIn('Published 3', self.publish_guides().output)
         db.session.refresh(draft)
         self.assertEqual(draft.title, 'Existing draft')
         self.assertFalse(draft.is_published)
@@ -332,7 +340,7 @@ class SeoTests(unittest.TestCase):
         db.session.delete(draft)
         db.session.commit()
         self.assertIn('Published 0', self.publish_guides().output)
-        self.assertEqual(BlogPost.query.count(), 2)
+        self.assertEqual(BlogPost.query.count(), 3)
 
     def test_article_dates_cover_space_and_draft_related_exclusion(self):
         self.publish_guides()

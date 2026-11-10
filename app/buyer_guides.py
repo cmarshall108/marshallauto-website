@@ -184,7 +184,78 @@ to prepare your questions.</p>
 </ul>
 """,
     },
+    {
+        'slug': 'buying-a-used-car-in-winter-checklist',
+        'title': 'Buying a Used Car in Winter: What to Check When Days Are Short',
+        'excerpt': 'Shorter days and cold mornings change how you should shop. Plan a daylight visit, ask for a cold start, and check the battery, tires, heat, lights, and recalls.',
+        'content': """
+<p>Early sunsets and cold mornings are a good reason to adjust how you shop for a
+used car. Poor light can hide paint and body problems, and cold weather exposes
+weak batteries, worn tires, and heating problems that a warm afternoon test drive
+might not. This checklist helps you plan the visit and ask better questions. It
+does not replace an inspection by an independent qualified mechanic.</p>
+<h2>Plan the visit around daylight</h2>
+<p>Look at the vehicle outside in good daylight, because dim or wet conditions
+can hide dents, mismatched paint, scratches, and uneven panel gaps. Seasonal
+closing times can also change when the days get shorter, so
+<a href="/contact">confirm current hours and that the vehicle is still available</a>
+before you travel, and aim to arrive early enough to finish the inspection and the
+test drive before dark. Bring a flashlight to look at wheel wells, the engine
+bay, and the interior footwells.</p>
+<h2>Ask for a cold start</h2>
+<p>Ask the seller not to warm the vehicle up before you arrive. A cold start is
+when many problems show themselves: slow or hard starting, rough idling,
+unusual noises, smoke from the exhaust, or warning lights that stay on after
+the engine starts. Write down anything you notice and ask about it instead of
+assuming it is minor.</p>
+<h2>Battery and charging system</h2>
+<p>Cold weather makes a weak battery much easier to expose. Ask how old the
+battery is and whether it has been tested. A parts store or independent shop can
+load-test it and check the charging system, which is usually quick and
+inexpensive compared with being stranded.</p>
+<h2>Tires and brakes</h2>
+<p>Ask an independent professional to measure tread depth and look for uneven
+wear, which can point to alignment or suspension issues. Tires also age: the
+four-digit DOT date code on the sidewall shows the week and year of manufacture,
+and old rubber can harden and lose grip even when the tread looks fine. If the
+tires will need replacing soon, include that in your budget and your
+negotiation. Pay attention to braking feel, noises, and pulling during the test
+drive.</p>
+<h2>Heat, defrost, wipers, and lights</h2>
+<p>Do not wait until the first frosty morning to find out these do not work.
+During your visit, check that:</p>
+<ul>
+<li>The heater warms up and the front and rear defrosters clear the glass.</li>
+<li>The wipers clear the windshield without streaking, and the washer sprays.</li>
+<li>Headlights, high beams, brake lights, turn signals, and fog lights all work.</li>
+<li>The seat heaters, mirrors, and window and door locks operate as expected.</li>
+</ul>
+<h2>Leaks, rust, and road salt</h2>
+<p>Look under the vehicle for fresh fluid on the ground. If the vehicle spent
+time in a state that salts its roads, ask an independent mechanic to check the
+underbody, brake lines, and suspension for corrosion that is hard to see from
+the outside.</p>
+<h2>Check for open recalls by VIN</h2>
+<p>Save the VIN from the listing and search it on
+<a href="https://www.nhtsa.gov/recalls">NHTSA's recall lookup</a>. The tool shows
+unrepaired safety recalls for that VIN, though it will not show recalls that
+have already been repaired or every manufacturer campaign. Ask the seller how
+any open recall will be handled.</p>
+<h2>Review the whole deal</h2>
+<p>Compare the title status, vehicle history, and written terms before you
+commit. Our <a href="/blog/used-car-inspection-checklist">used-car checklist</a>
+covers the records and paperwork, and our
+<a href="/blog/rebuilt-vs-salvage-titles-north-carolina">title guide</a> explains
+what to ask about branded vehicles. Ready to look?
+<a href="/inventory">Browse our current used cars</a> or
+<a href="/contact">contact us with your questions</a>.</p>
+""",
+    },
 )
+
+# Guides published before per-guide tracking, covered by the original one-time marker.
+_LEGACY_GUIDE_SLUGS = frozenset(guide['slug'] for guide in BUYER_GUIDES[:3])
+_LEGACY_MARKER_KEY = 'buyer_guides_v1_published'
 
 
 def published_buyer_guides() -> list[BlogPost]:
@@ -199,28 +270,31 @@ def published_buyer_guides() -> list[BlogPost]:
 def register_commands(app):
     @app.cli.command('publish-buyer-guides')
     def publish_buyer_guides():
-        """Initialize starter guides once, preserving subsequent admin decisions."""
-        marker_key = 'buyer_guides_v1_published'
-        if SiteSetting.query.filter_by(key=marker_key).first():
-            click.echo('Published 0 buyer guide(s). Already initialized; admin changes were kept.')
-            return
+        """Publish each guide once, preserving subsequent admin decisions."""
+        legacy_initialized = bool(SiteSetting.query.filter_by(key=_LEGACY_MARKER_KEY).first())
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         created = 0
         for guide in BUYER_GUIDES:
-            if BlogPost.query.filter_by(slug=guide['slug']).first():
-                click.echo(f"Kept existing guide: {guide['slug']}")
+            slug = guide['slug']
+            marker_key = f'buyer_guide_published:{slug}'
+            if SiteSetting.query.filter_by(key=marker_key).first():
                 continue
-            db.session.add(BlogPost(
-                **guide,
-                author_name=current_app.config['BUSINESS_NAME'],
-                seo_description=guide['excerpt'],
-                is_published=True,
-                created_at=now,
-                updated_at=now,
-                published_at=now,
-            ))
-            created += 1
-        db.session.add(SiteSetting(key=marker_key, value='1'))
+            if legacy_initialized and slug in _LEGACY_GUIDE_SLUGS:
+                continue
+            if BlogPost.query.filter_by(slug=slug).first():
+                click.echo(f'Kept existing guide: {slug}')
+            else:
+                db.session.add(BlogPost(
+                    **guide,
+                    author_name=current_app.config['BUSINESS_NAME'],
+                    seo_description=guide['excerpt'],
+                    is_published=True,
+                    created_at=now,
+                    updated_at=now,
+                    published_at=now,
+                ))
+                created += 1
+            db.session.add(SiteSetting(key=marker_key, value='1'))
         db.session.commit()
         SiteSetting.invalidate_cache()
         click.echo(f'Published {created} buyer guide(s). Existing posts were not changed.')
