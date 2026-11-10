@@ -47,6 +47,30 @@ class SeoTests(unittest.TestCase):
         self.assertEqual(html.select_one('meta[property="og:title"]')['content'], title)
         self.assertEqual(html.select_one('meta[name="twitter:title"]')['content'], title)
 
+    def test_social_metadata_matches_page_specific_search_metadata(self):
+        paths = (
+            '/about',
+            '/contact',
+            '/financing',
+            '/sell-your-car',
+            '/service-area',
+            '/blog',
+            '/coming-soon',
+            '/inventory',
+            '/inventory/test-car-0',
+            '/saved-vehicles',
+            '/compare',
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                html = self.page(path)
+                title = html.title.get_text(strip=True)
+                description = html.select_one('meta[name="description"]')['content']
+                self.assertEqual(html.select_one('meta[property="og:title"]')['content'], title)
+                self.assertEqual(html.select_one('meta[name="twitter:title"]')['content'], title)
+                self.assertEqual(html.select_one('meta[property="og:description"]')['content'], description)
+                self.assertEqual(html.select_one('meta[name="twitter:description"]')['content'], description)
+
     def test_homepage_preloads_hero_image_for_faster_paint(self):
         html = self.page('/')
         preloads = html.select('link[rel="preload"][as="image"][fetchpriority="high"]')
