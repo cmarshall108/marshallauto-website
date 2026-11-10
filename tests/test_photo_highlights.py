@@ -161,7 +161,7 @@ class ShopperCopyTests(unittest.TestCase):
 
 class GrokNormalizeTests(unittest.TestCase):
     def test_normalize_grok_payload(self):
-        from app.photo_highlights import _normalize_grok_highlights
+        from app.photo_highlights import ANALYSIS_VERSION, _normalize_grok_highlights
 
         payload = {
             'scene': 'exterior_side',
@@ -190,7 +190,7 @@ class GrokNormalizeTests(unittest.TestCase):
         result = _normalize_grok_highlights(payload, max_highlights=5)
         self.assertEqual(result['scene'], 'exterior_side')
         self.assertEqual(result['engine'], 'grok')
-        self.assertEqual(result['analysis_version'], 5)
+        self.assertEqual(result['analysis_version'], ANALYSIS_VERSION)
         labels = {h['label'] for h in result['highlights']}
         self.assertIn('Alloy Wheels', labels)
         self.assertNotIn('Too weak', labels)
@@ -204,7 +204,7 @@ class AnalyzeSmokeTests(unittest.TestCase):
         except Exception:
             self.skipTest('opencv/numpy not installed')
 
-        from app.photo_highlights import analyze_vehicle_image
+        from app.photo_highlights import ANALYSIS_VERSION, analyze_vehicle_image
 
         # Create a simple synthetic "car-ish" image
         img = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -235,7 +235,7 @@ class AnalyzeSmokeTests(unittest.TestCase):
         self.assertIn('scene', result)
         self.assertIn('highlights', result)
         self.assertIsInstance(result['highlights'], list)
-        self.assertEqual(result['analysis_version'], 5)
+        self.assertEqual(result['analysis_version'], ANALYSIS_VERSION)
         self.assertEqual(result.get('engine'), 'opencv')
         for h in result['highlights']:
             self.assertIn('x_pct', h)
@@ -287,6 +287,56 @@ class AnalyzeSmokeTests(unittest.TestCase):
         grok_mock.assert_called_once()
         self.assertEqual(result['engine'], 'grok')
         self.assertEqual(result['highlights'][0]['label'], 'Grok Spot')
+
+    def _tiny_image(self, td):
+        import cv2
+        import numpy as np
+
+        path = os.path.join(td, 'tiny.jpg')
+        cv2.imwrite(path, np.zeros((120, 160, 3), dtype=np.uint8))
+        return path
+
+    def test_grok_failure_raises_instead_of_publishing_opencv_guesses(self):
+        try:
+            import cv2  # noqa: F401
+        except Exception:
+            self.skipTest('opencv/numpy not installed')
+
+        from app.photo_highlights import analyze_vehicle_image
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._tiny_image(td)
+            env = {'PHOTO_HIGHLIGHTS_ENGINE': 'grok', 'XAI_API_KEY': 'test-key-not-real'}
+            with mock.patch.dict(os.environ, env, clear=False):
+                with mock.patch(
+                    'app.photo_highlights.analyze_with_grok',
+                    side_effect=RuntimeError('xAI HTTP 429'),
+                ):
+                    with mock.patch('app.photo_highlights.analyze_with_opencv') as cv_mock:
+                        with self.assertRaises(RuntimeError):
+                            analyze_vehicle_image(path)
+                        cv_mock.assert_not_called()
+
+    def test_missing_api_key_raises_unless_opencv_fallback_enabled(self):
+        try:
+            import cv2  # noqa: F401
+        except Exception:
+            self.skipTest('opencv/numpy not installed')
+
+        from app.photo_highlights import analyze_vehicle_image
+
+        fallback = {'scene': 'x', 'highlights': [], 'analysis_version': 6, 'engine': 'opencv'}
+        with tempfile.TemporaryDirectory() as td:
+            path = self._tiny_image(td)
+            env = {'PHOTO_HIGHLIGHTS_ENGINE': 'grok', 'XAI_API_KEY': '', 'GROK_API_KEY': ''}
+            with mock.patch.dict(os.environ, env, clear=False):
+                with self.assertRaises(RuntimeError):
+                    analyze_vehicle_image(path)
+                with mock.patch.dict(os.environ, {'PHOTO_HIGHLIGHTS_OPENCV_FALLBACK': 'true'}):
+                    with mock.patch(
+                        'app.photo_highlights.analyze_with_opencv', return_value=fallback,
+                    ):
+                        self.assertEqual(analyze_vehicle_image(path)['engine'], 'opencv')
 
 
 class HighlightQueueTests(unittest.TestCase):
@@ -392,6 +442,43 @@ class HighlightQueueTests(unittest.TestCase):
                 db.session.commit()
                 self.assertEqual(enqueue_image_highlight_job(new_image.id).id, job.id)
                 self.assertEqual(PhotoHighlightJob.query.count(), 1)
+
+    def test_outdated_auto_highlights_are_hidden_but_manual_ones_stay(self):
+        from app import db
+        from app.models import VehicleImageHighlight
+        from app.photo_highlights import ANALYSIS_VERSION
+
+        for source, label in (('auto', 'Tire Tread'), ('manual', 'Dealer Note')):
+            db.session.add(VehicleImageHighlight(
+                vehicle_image_id=self.image.id, label=label, source=source,
+                x_pct=50, y_pct=50, is_visible=True,
+            ))
+        self.image.highlight_status = 'ready'
+        self.image.highlight_version = ANALYSIS_VERSION - 1
+        db.session.commit()
+        self.assertEqual([h.label for h in self.image.visible_highlights()], ['Dealer Note'])
+
+        self.image.highlight_version = ANALYSIS_VERSION
+        db.session.commit()
+        self.assertEqual(len(self.image.visible_highlights()), 2)
+
+    def test_enqueue_stale_queues_only_outdated_ready_photos(self):
+        from app import db
+        from app.highlight_jobs import enqueue_stale_highlight_jobs
+        from app.models import PhotoHighlightJob, VehicleImage
+        from app.photo_highlights import ANALYSIS_VERSION
+
+        current = VehicleImage(
+            filename='current.jpg', highlight_status='ready', highlight_version=ANALYSIS_VERSION,
+        )
+        self.vehicle.images.append(current)
+        self.image.highlight_status = 'ready'
+        self.image.highlight_version = ANALYSIS_VERSION - 1
+        db.session.commit()
+
+        self.assertEqual(enqueue_stale_highlight_jobs(), 1)
+        self.assertEqual(PhotoHighlightJob.query.one().vehicle_image_id, self.image.id)
+        self.assertEqual(enqueue_stale_highlight_jobs(), 0)
 
     def test_force_allows_explicit_reanalysis(self):
         from app import db

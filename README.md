@@ -650,13 +650,13 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PHOTO_HIGHLIGHTS_ENABLED` | Enable photo highlight system (`true`/`false`, default true) |
 | `PHOTO_HIGHLIGHTS_AUTO_ENQUEUE` | Auto-queue analysis on image upload (`true`/`false`, default true) |
 | `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `5`) |
-| `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` fallback-only |
+| `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` (local heuristics only) |
 | `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.7`) |
 | `XAI_API_KEY` | xAI API key for Grok vision highlights and optional VIN-spec estimates |
 | `VIN_GROK_MODEL` | Text model for conservative missing-spec estimates (default `grok-4.20-0309-non-reasoning`) |
 | `LICENSE_GROK_MODEL` | xAI vision model for license extraction and visual screening (default `grok-4.5`) |
 | `LICENSE_GROK_TIMEOUT` | License-analysis request timeout in seconds (default `45`) |
-| `PHOTO_HIGHLIGHTS_GROK_REQUIRED` | If `true`, fail the job instead of OpenCV fallback when Grok errors |
+| `PHOTO_HIGHLIGHTS_OPENCV_FALLBACK` | If `true`, publish crude OpenCV guesses when Grok fails or the key is missing. Default `false`: the job retries (5 attempts with backoff) and no bubbles are shown rather than wrong ones |
 | `HIGHLIGHT_WORKER_POLL` | Worker idle poll seconds (default `2`) |
 | `HIGHLIGHT_WORKER_LEASE` | Job lease seconds (default `300`) |
 | `START_HIGHLIGHT_WORKER` | Ubuntu launcher starts the highlight worker (`1`/`0`, default `1`) |
@@ -760,7 +760,9 @@ after a successful deploy; other deployment methods should run it once after
 Listing photos can show clickable hotspot bubbles for features (CarPlay, leather seats, new tires, sunroof, etc.) and condition notes (scratches, dings). Analysis runs in a **background worker** — uploads never wait on the model.
 
 **Primary engine:** [Grok vision](https://docs.x.ai/) via the xAI API (`XAI_API_KEY`).  
-**Fallback:** local OpenCV if the key is missing or the API call fails (unless `PHOTO_HIGHLIGHTS_GROK_REQUIRED=true`).
+**Fallback:** none by default. If the key is missing or the API call fails, the job retries with backoff and the photo shows no bubbles until it succeeds — the OpenCV heuristics mislabel interiors and bodywork, so they are used only when `PHOTO_HIGHLIGHTS_ENGINE=opencv` or `PHOTO_HIGHLIGHTS_OPENCV_FALLBACK=true`.
+
+When `ANALYSIS_VERSION` is bumped, bubbles from older analyses are hidden and the worker re-queues those photos on startup.
 
 Coordinates are stored as percent of the **full source image**. The gallery JS maps them through `object-fit: cover` so bubbles sit on the painted car, not the cropped stage edges.
 

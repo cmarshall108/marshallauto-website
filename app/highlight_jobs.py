@@ -83,7 +83,7 @@ def enqueue_image_highlight_job(image_id: int, force: bool = False, priority: in
         status='queued',
         priority=int(priority or 100),
         attempts=0,
-        max_attempts=3,
+        max_attempts=5,
         scheduled_at=utcnow(),
         created_at=utcnow(),
         updated_at=utcnow(),
@@ -126,6 +126,24 @@ def enqueue_images(image_ids: Sequence[int], force: bool = False) -> int:
         if enqueue_image_highlight_job(int(image_id), force=force):
             n += 1
     return n
+
+
+def enqueue_stale_highlight_jobs() -> int:
+    """Queue re-analysis for every ready photo analyzed with an older version."""
+    from app import db
+    from app.models import VehicleImage
+    from app.photo_highlights import ANALYSIS_VERSION
+
+    stale_ids = [
+        row.id for row in db.session.query(VehicleImage.id).filter(
+            VehicleImage.highlight_status == 'ready',
+            or_(
+                VehicleImage.highlight_version.is_(None),
+                VehicleImage.highlight_version < ANALYSIS_VERSION,
+            ),
+        ).order_by(VehicleImage.id.desc()).all()
+    ]
+    return enqueue_images(stale_ids)
 
 
 def claim_next_job(lease_seconds: int = 300):

@@ -49,8 +49,15 @@ def run_loop(poll_seconds: float = 2.0, lease_seconds: int = 300, once: bool = F
     )
 
     with app.app_context():
-        from app.highlight_jobs import queue_stats, run_worker_once
+        from app.highlight_jobs import enqueue_stale_highlight_jobs, queue_stats, run_worker_once
         from app.video_jobs import run_video_worker_once
+
+        try:
+            queued = enqueue_stale_highlight_jobs()
+            if queued:
+                logger.info('Queued %s photo(s) analyzed with an outdated version', queued)
+        except Exception:
+            logger.exception('Could not queue stale highlight photos')
 
         while not _shutdown:
             try:

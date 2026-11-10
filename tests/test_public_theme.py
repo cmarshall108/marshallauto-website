@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from app import create_app, db
 from app.models import Vehicle, VehicleImage, VehicleImageHighlight
+from app.photo_highlights import ANALYSIS_VERSION
 from config import TestingConfig
 
 
@@ -303,6 +304,7 @@ class PublicThemeTests(unittest.TestCase):
             is_primary=True,
             order_index=2,
             highlight_status='ready',
+            highlight_version=ANALYSIS_VERSION,
         )
         db.session.add(image)
         db.session.flush()

@@ -720,11 +720,22 @@ class VehicleImage(db.Model):
         return ', '.join(entries)
 
     def visible_highlights(self):
-        """Public-facing highlights only (visible + ready analysis or manual)."""
+        """Public-facing highlights only (visible + ready analysis or manual).
+
+        Auto highlights from an older analysis version are withheld until the photo
+        is re-analyzed, so outdated or mislabeled bubbles never show to shoppers.
+        """
+        from app.photo_highlights import ANALYSIS_VERSION
+
         rows = list(self.highlights or [])
+        auto_current = (
+            self.highlight_status == 'ready'
+            and self.highlight_version is not None
+            and int(self.highlight_version) >= ANALYSIS_VERSION
+        )
         return [
             h for h in rows
-            if h.is_visible and (h.source == 'manual' or self.highlight_status == 'ready')
+            if h.is_visible and (h.source == 'manual' or auto_current)
         ]
 
     def highlights_payload(self):

@@ -25,7 +25,7 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_VERSION = 5
+ANALYSIS_VERSION = 6
 
 # Normalized feature keywords → display metadata.
 # Descriptions are shopper-facing: what the feature is, why it matters, and
@@ -2897,23 +2897,34 @@ def analyze_vehicle_image(
     max_highlights = int(max_highlights or os.environ.get('PHOTO_HIGHLIGHTS_MAX', '12') or 12)
     max_highlights = max(1, min(16, max_highlights))
 
-    want_grok = engine_pref in ('grok', 'xai', 'auto', '')
-    force_opencv = engine_pref in ('opencv', 'local', 'cv')
+    if engine_pref in ('opencv', 'local', 'cv'):
+        return analyze_with_opencv(
+            image_path,
+            features_text=features_text,
+            vehicle_context=vehicle_context,
+            max_highlights=max_highlights,
+        )
 
-    if want_grok and not force_opencv and _xai_api_key():
-        try:
-            return analyze_with_grok(
-                image_path,
-                features_text=features_text,
-                vehicle_context=vehicle_context,
-                max_highlights=max_highlights,
-            )
-        except Exception as exc:
-            logger.warning('Grok highlight analysis failed, falling back to OpenCV: %s', exc)
-            if engine_pref in ('grok', 'xai') and os.environ.get(
-                'PHOTO_HIGHLIGHTS_GROK_REQUIRED', ''
-            ).lower() in ('1', 'true', 'yes', 'on'):
-                raise
+    opencv_fallback = os.environ.get(
+        'PHOTO_HIGHLIGHTS_OPENCV_FALLBACK', ''
+    ).strip().lower() in ('1', 'true', 'yes', 'on')
+
+    # The OpenCV heuristics mislabel interiors and bodywork (e.g. "Tire Tread" on a
+    # seat), so a failed vision call raises and lets the job retry instead of
+    # publishing guesses to shoppers.
+    try:
+        if not _xai_api_key():
+            raise RuntimeError('XAI_API_KEY is not set')
+        return analyze_with_grok(
+            image_path,
+            features_text=features_text,
+            vehicle_context=vehicle_context,
+            max_highlights=max_highlights,
+        )
+    except Exception as exc:
+        if not opencv_fallback:
+            raise
+        logger.warning('Grok highlight analysis failed, using OpenCV fallback: %s', exc)
 
     return analyze_with_opencv(
         image_path,
