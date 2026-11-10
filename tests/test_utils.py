@@ -7,7 +7,8 @@ from unittest import mock
 from flask import Flask
 
 from app.utils import (
-    _ffmpeg_path, dealership_local_to_utc, format_currency, format_mileage_badge,
+    _ffmpeg_path, _opening_hours_spec, business_hours, dealership_local_to_utc,
+    format_currency, format_mileage_badge,
     format_phone_number, is_low_mileage, is_safe_redirect, notify_new_lead,
     to_dealership_time,
 )
@@ -54,6 +55,31 @@ class DealershipTimezoneTests(unittest.TestCase):
     def test_aware_utc_timestamps_are_also_converted(self):
         value = datetime(2026, 7, 1, 4, 30, tzinfo=timezone.utc)
         self.assertEqual(to_dealership_time(value).strftime('%I:%M %p %Z'), '12:30 AM EDT')
+
+    def test_business_hours_follow_sanford_daylight_saving_time(self):
+        app = Flask(__name__)
+        app.config.update(
+            BUSINESS_HOURS={
+                'Monday': '10:00 AM - 5:30 PM',
+                'Saturday': '10:00 AM - 5:30 PM',
+                'Sunday': 'Closed',
+            },
+            BUSINESS_HOURS_STANDARD_CLOSE='5:30 PM',
+            BUSINESS_HOURS_DAYLIGHT_CLOSE='6:30 PM',
+        )
+
+        with app.app_context():
+            standard_time = business_hours(datetime(2026, 11, 9, 12))
+            daylight_time = business_hours(datetime(2026, 3, 9, 12))
+            standard_schema = _opening_hours_spec(datetime(2026, 11, 9, 12))
+            daylight_schema = _opening_hours_spec(datetime(2026, 3, 9, 12))
+
+        self.assertEqual(standard_time['Monday'], '10:00 AM - 5:30 PM')
+        self.assertEqual(daylight_time['Monday'], '10:00 AM - 6:30 PM')
+        self.assertEqual(daylight_time['Saturday'], '10:00 AM - 6:30 PM')
+        self.assertEqual(daylight_time['Sunday'], 'Closed')
+        self.assertEqual(standard_schema[0]['closes'], '17:30')
+        self.assertEqual(daylight_schema[0]['closes'], '18:30')
 
 
 class PhoneNumberFormattingTests(unittest.TestCase):

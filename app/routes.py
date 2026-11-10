@@ -28,7 +28,7 @@ from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
-    aggregate_rating_data, client_ip, dealership_now, format_mileage, format_mileage_badge, format_price,
+    aggregate_rating_data, business_hours, client_ip, dealership_now, format_mileage, format_mileage_badge, format_price,
     format_phone_number, notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
     slugify,
     send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
@@ -448,7 +448,7 @@ def inject_globals():
             'business_city': current_app.config.get('BUSINESS_CITY', ''),
             'business_state': current_app.config.get('BUSINESS_STATE', ''),
             'business_zip': current_app.config.get('BUSINESS_ZIP', ''),
-            'business_hours': current_app.config.get('BUSINESS_HOURS', ''),
+            'business_hours': business_hours(),
             'business_latitude': _setting('business_latitude') or current_app.config.get('BUSINESS_LATITUDE', ''),
             'business_longitude': _setting('business_longitude') or current_app.config.get('BUSINESS_LONGITUDE', ''),
             'site_url': current_app.config.get('SITE_URL', ''),
@@ -479,7 +479,7 @@ def inject_globals():
             'business_city': current_app.config.get('BUSINESS_CITY', ''),
             'business_state': current_app.config.get('BUSINESS_STATE', ''),
             'business_zip': current_app.config.get('BUSINESS_ZIP', ''),
-            'business_hours': current_app.config.get('BUSINESS_HOURS', ''),
+            'business_hours': business_hours(),
             'business_latitude': current_app.config.get('BUSINESS_LATITUDE', ''),
             'business_longitude': current_app.config.get('BUSINESS_LONGITUDE', ''),
             'site_url': current_app.config.get('SITE_URL', ''),

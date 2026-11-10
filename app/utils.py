@@ -46,6 +46,29 @@ def dealership_today() -> date:
     return datetime.now(DEALERSHIP_TIMEZONE).date()
 
 
+def business_hours(now=None):
+    """Return configured Sanford hours with the seasonal closing time applied."""
+    hours = current_app.config.get('BUSINESS_HOURS') or {}
+    local_now = now or datetime.now(DEALERSHIP_TIMEZONE)
+    if local_now.tzinfo is None:
+        local_now = local_now.replace(tzinfo=DEALERSHIP_TIMEZONE)
+    else:
+        local_now = local_now.astimezone(DEALERSHIP_TIMEZONE)
+    if not local_now.dst():
+        return dict(hours)
+
+    standard_close = current_app.config.get('BUSINESS_HOURS_STANDARD_CLOSE', '5:30 PM')
+    daylight_close = current_app.config.get('BUSINESS_HOURS_DAYLIGHT_CLOSE', '6:30 PM')
+    adjusted = {}
+    for day, value in hours.items():
+        opening, separator, closing = value.rpartition('-') if isinstance(value, str) else ('', '', '')
+        if separator and closing.strip().casefold() == standard_close.casefold():
+            adjusted[day] = f'{opening.rstrip()} - {daylight_close}'
+        else:
+            adjusted[day] = value
+    return adjusted
+
+
 def to_dealership_time(value):
     """Convert a UTC timestamp to Sanford time; naive stored timestamps are UTC."""
     if value is None:
@@ -1109,8 +1132,8 @@ def _parse_hours_range(hours_str):
     return None
 
 
-def _opening_hours_spec():
-    hours = current_app.config.get('BUSINESS_HOURS') or {}
+def _opening_hours_spec(now=None):
+    hours = business_hours(now)
     specs = []
     for day, value in hours.items():
         parsed = _parse_hours_range(value)

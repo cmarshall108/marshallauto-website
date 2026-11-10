@@ -167,13 +167,15 @@ class Config:
     # Geocoded for 360 Wilson Rd, Sanford, NC 27332
     BUSINESS_LATITUDE = os.environ.get('BUSINESS_LATITUDE') or '35.4438494'
     BUSINESS_LONGITUDE = os.environ.get('BUSINESS_LONGITUDE') or '-79.1374067'
+    BUSINESS_HOURS_STANDARD_CLOSE = '5:30 PM'
+    BUSINESS_HOURS_DAYLIGHT_CLOSE = '6:30 PM'
     BUSINESS_HOURS = {
-        'Monday': '10:00 AM - 6:30 PM',
-        'Tuesday': '10:00 AM - 6:30 PM',
-        'Wednesday': '10:00 AM - 6:30 PM',
-        'Thursday': '10:00 AM - 6:30 PM',
-        'Friday': '10:00 AM - 6:30 PM',
-        'Saturday': '10:00 AM - 6:30 PM',
+        'Monday': '10:00 AM - 5:30 PM',
+        'Tuesday': '10:00 AM - 5:30 PM',
+        'Wednesday': '10:00 AM - 5:30 PM',
+        'Thursday': '10:00 AM - 5:30 PM',
+        'Friday': '10:00 AM - 5:30 PM',
+        'Saturday': '10:00 AM - 5:30 PM',
         'Sunday': 'Closed'
     }
 
