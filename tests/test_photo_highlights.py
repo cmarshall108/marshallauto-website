@@ -144,22 +144,97 @@ class ShopperCopyTests(unittest.TestCase):
         # A payload number must not become a surround-view camera.
         self.assertFalse(match_feature_catalog('3600 pound payload'))
 
-    def test_prompt_asks_for_thorough_visible_features(self):
+    def test_prompt_prioritizes_useful_information(self):
         from app.photo_highlights import _build_grok_prompt
 
         _system, user = _build_grok_prompt(
             'LED Headlights, Tow Package, Apple CarPlay',
-            {'year': 2021, 'make': 'Ford', 'model': 'F-150'},
+            {
+                'year': 2021, 'make': 'Ford', 'model': 'F-150', 'trim': 'XLT',
+                'engine': '2.7L V6 EcoBoost', 'mileage': 64210,
+                'covered_labels': ['Tire Tread', 'Alloy Wheels'],
+            },
             max_highlights=12,
         )
-        self.assertIn('Be thorough', user)
         self.assertIn('up to 12', user)
         self.assertIn('LED Headlights', user)
         self.assertIn('Tow Package', user)
-        self.assertNotIn('Prefer 2-4', user)
+        self.assertIn('trim=XLT', user)
+        self.assertIn('engine=2.7L V6 EcoBoost', user)
+        self.assertIn('mileage=64210', user)
+        self.assertIn('Already marked on this vehicle\'s other photos: Tire Tread, Alloy Wheels', user)
+        self.assertIn('Water drops, reflections', user)
+        self.assertIn('Skip commodity parts', user)
+        self.assertNotIn('Be thorough', user)
 
 
 class GrokNormalizeTests(unittest.TestCase):
+    def _item(self, label, **kw):
+        base = {
+            'label': label, 'category': 'feature', 'severity': 'positive',
+            'x_pct': 40, 'y_pct': 40, 'confidence': 0.9, 'icon': 'circle',
+            'description': 'Specific note about what is visible here and what it means for you.',
+        }
+        base.update(kw)
+        return base
+
+    def _labels(self, items, **kw):
+        from app.photo_highlights import _normalize_grok_highlights
+
+        # Spread positions so spacing never hides an item under test.
+        for i, item in enumerate(items):
+            item['x_pct'] = 5 + i * 13
+        result = _normalize_grok_highlights({'scene': 'exterior_side', 'highlights': items}, 8, **kw)
+        return [h['label'] for h in result['highlights']]
+
+    def test_commodity_parts_are_dropped_but_damage_to_them_is_kept(self):
+        labels = self._labels([
+            self._item('Side Mirror'),
+            self._item('Roof Antenna', severity='info'),
+            self._item('Fuel Filler Door', severity='info'),
+            self._item('Combination Taillight'),
+            self._item('Cracked Side Mirror', category='imperfection', severity='caution', confidence=0.85),
+            self._item('Side Mirror', category='imperfection', severity='caution', confidence=0.85),
+            self._item('MyLink Touchscreen'),
+        ])
+        self.assertEqual(labels.count('Side Mirror'), 1)
+        self.assertIn('Cracked Side Mirror', labels)
+        self.assertIn('MyLink Touchscreen', labels)
+        self.assertNotIn('Roof Antenna', labels)
+        self.assertNotIn('Fuel Filler Door', labels)
+        self.assertNotIn('Combination Taillight', labels)
+
+    def test_labels_already_covered_on_other_photos_are_skipped(self):
+        labels = self._labels(
+            [self._item('Tire Tread'), self._item('Alloy Wheels'), self._item('Fog Lights')],
+            covered_labels=['tire tread', 'Alloy Wheel'],
+        )
+        self.assertEqual(labels, ['Fog Lights'])
+
+    def test_plain_body_markers_and_unsupported_claims_are_dropped(self):
+        labels = self._labels([
+            self._item('Glossy Hood Paint', category='detail'),
+            self._item('Clear Side Glass', category='detail'),
+            self._item('Straight Front Bumper', category='detail'),
+            self._item('Clean Alloy Wheels'),
+            self._item('Quiet Cabin Trim', description='Pristine interior that has been well kept.'),
+            self._item('Rear Bumper', description='Aligned panels do not suggest an impact in this view.'),
+            self._item('Chipped Hood Edge', category='imperfection', severity='caution', confidence=0.85),
+            self._item('Unworn Cloth Seat'),
+        ])
+        self.assertEqual(
+            sorted(labels), ['Chipped Hood Edge', 'Clean Alloy Wheels', 'Unworn Cloth Seat'],
+        )
+
+    def test_confidence_floors_are_stricter_for_damage(self):
+        labels = self._labels([
+            self._item('Weak Feature', confidence=0.6),
+            self._item('Solid Feature', confidence=0.72),
+            self._item('Maybe Dent', category='imperfection', severity='caution', confidence=0.72),
+            self._item('Clear Chip', category='imperfection', severity='caution', confidence=0.8),
+        ])
+        self.assertEqual(labels, ['Solid Feature', 'Clear Chip'])
+
     def test_normalize_grok_payload(self):
         from app.photo_highlights import ANALYSIS_VERSION, _normalize_grok_highlights
 
@@ -287,6 +362,40 @@ class AnalyzeSmokeTests(unittest.TestCase):
         grok_mock.assert_called_once()
         self.assertEqual(result['engine'], 'grok')
         self.assertEqual(result['highlights'][0]['label'], 'Grok Spot')
+
+    def test_slow_primary_model_falls_back_and_is_skipped_afterwards(self):
+        import app.photo_highlights as ph
+
+        calls = []
+
+        def fake(image_path, model, **kwargs):
+            calls.append(model)
+            if model == 'grok-slow':
+                raise RuntimeError('xAI request failed: The read operation timed out')
+            return {'scene': 'other', 'highlights': [], 'analysis_version': 7, 'engine': 'grok'}
+
+        env = {
+            'PHOTO_HIGHLIGHTS_GROK_MODEL': 'grok-slow',
+            'PHOTO_HIGHLIGHTS_GROK_FALLBACK_MODEL': 'grok-fast',
+            'XAI_API_KEY': 'test-key-not-real',
+        }
+        with mock.patch.dict(os.environ, env, clear=False), \
+                mock.patch.dict(ph._model_cooldown_until, {}, clear=True), \
+                mock.patch.object(ph, '_analyze_with_grok_model', side_effect=fake):
+            self.assertEqual(ph.analyze_with_grok('a.jpg')['engine'], 'grok')
+            self.assertEqual(calls, ['grok-slow', 'grok-fast'])
+            ph.analyze_with_grok('b.jpg')
+            self.assertEqual(calls, ['grok-slow', 'grok-fast', 'grok-fast'])
+
+    def test_all_models_failing_raises(self):
+        import app.photo_highlights as ph
+
+        env = {'PHOTO_HIGHLIGHTS_GROK_MODEL': 'a', 'PHOTO_HIGHLIGHTS_GROK_FALLBACK_MODEL': 'b'}
+        with mock.patch.dict(os.environ, env, clear=False), \
+                mock.patch.dict(ph._model_cooldown_until, {}, clear=True), \
+                mock.patch.object(ph, '_analyze_with_grok_model', side_effect=RuntimeError('boom')):
+            with self.assertRaises(RuntimeError):
+                ph.analyze_with_grok('a.jpg')
 
     def _tiny_image(self, td):
         import cv2
@@ -479,6 +588,39 @@ class HighlightQueueTests(unittest.TestCase):
         self.assertEqual(enqueue_stale_highlight_jobs(), 1)
         self.assertEqual(PhotoHighlightJob.query.one().vehicle_image_id, self.image.id)
         self.assertEqual(enqueue_stale_highlight_jobs(), 0)
+
+    def test_job_context_uses_all_feature_fields_and_other_photo_labels(self):
+        from app import db
+        from app.highlight_jobs import _combined_features, _covered_labels
+        from app.models import VehicleImage, VehicleImageHighlight
+        from app.photo_highlights import ANALYSIS_VERSION
+
+        self.vehicle.features = 'Backup Camera'
+        self.vehicle.interior_features = 'Heated Seats'
+        self.vehicle.safety_features = 'Blind Spot Monitor'
+        done = VehicleImage(
+            filename='done.jpg', highlight_status='ready', highlight_version=ANALYSIS_VERSION,
+        )
+        stale = VehicleImage(
+            filename='stale.jpg', highlight_status='ready', highlight_version=ANALYSIS_VERSION - 1,
+        )
+        self.vehicle.images.extend([done, stale])
+        db.session.commit()
+        for img, label, category in (
+            (done, 'Tire Tread', 'feature'), (done, 'Curb Rash', 'imperfection'),
+            (stale, 'Old Junk', 'feature'),
+        ):
+            db.session.add(VehicleImageHighlight(
+                vehicle_image_id=img.id, label=label, category=category,
+                source='auto', x_pct=50, y_pct=50, is_visible=True,
+            ))
+        db.session.commit()
+
+        self.assertEqual(
+            _combined_features(self.vehicle),
+            'Backup Camera, Heated Seats, Blind Spot Monitor',
+        )
+        self.assertEqual(_covered_labels(self.image), ['Tire Tread'])
 
     def test_force_allows_explicit_reanalysis(self):
         from app import db

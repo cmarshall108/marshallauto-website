@@ -651,7 +651,9 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PHOTO_HIGHLIGHTS_AUTO_ENQUEUE` | Auto-queue analysis on image upload (`true`/`false`, default true) |
 | `PHOTO_HIGHLIGHTS_MAX` | Max bubbles per photo (default `5`) |
 | `PHOTO_HIGHLIGHTS_ENGINE` | `grok` (default), `auto`, or `opencv` (local heuristics only) |
-| `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.7`) |
+| `PHOTO_HIGHLIGHTS_GROK_MODEL` | xAI vision model (default `grok-4.5`). Avoid `grok-4.7` and the reasoning models: they usually exceed the request timeout on full photos |
+| `PHOTO_HIGHLIGHTS_GROK_FALLBACK_MODEL` | Model tried when the primary fails or times out (default `grok-4.5`); a failed model is skipped for 15 minutes |
+| `PHOTO_HIGHLIGHTS_GROK_TIMEOUT` | Per-request timeout in seconds (default `90`) |
 | `XAI_API_KEY` | xAI API key for Grok vision highlights and optional VIN-spec estimates |
 | `VIN_GROK_MODEL` | Text model for conservative missing-spec estimates (default `grok-4.20-0309-non-reasoning`) |
 | `LICENSE_GROK_MODEL` | xAI vision model for license extraction and visual screening (default `grok-4.5`) |
@@ -764,6 +766,12 @@ Listing photos can show clickable hotspot bubbles for features (CarPlay, leather
 
 When `ANALYSIS_VERSION` is bumped, bubbles from older analyses are hidden and the worker re-queues those photos on startup.
 
+**Annotation quality rules** (prompt in `_build_grok_prompt`, enforced again in `_normalize_grok_highlights`):
+- Markers must carry information: visible condition (tires, wheels, seats, wear, damage) or what a feature does for the driver. The prompt includes the trim, engine, mileage, title status, and every listing feature field.
+- Parts every car has (mirrors, antenna, fuel door, plain paint/glass/bumpers) are dropped unless damaged.
+- A feature already marked on another photo of the same vehicle is not repeated.
+- Descriptions may not claim accident-free, rust-free, "well kept", or resale value; photos cannot prove those. Damage needs confidence ≥ 0.75; water drops, glare, and reflections are not damage.
+
 Coordinates are stored as percent of the **full source image**. The gallery JS maps them through `object-fit: cover` so bubbles sit on the painted car, not the cropped stage edges.
 
 ### How it works
@@ -781,7 +789,7 @@ Coordinates are stored as percent of the **full source image**. The gallery JS m
 ```bash
 XAI_API_KEY=xai-...
 PHOTO_HIGHLIGHTS_ENGINE=grok
-PHOTO_HIGHLIGHTS_GROK_MODEL=grok-4.7
+PHOTO_HIGHLIGHTS_GROK_MODEL=grok-4.5
 PHOTO_HIGHLIGHTS_MAX=5
 ```
 

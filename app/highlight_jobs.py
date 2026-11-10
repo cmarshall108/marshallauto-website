@@ -221,6 +221,36 @@ def _image_path_for(image) -> str:
     return os.path.join(current_app.config['UPLOAD_FOLDER'], 'vehicles', image.filename)
 
 
+def _combined_features(vehicle) -> str:
+    """Every feature field on the listing, so the model knows the real equipment."""
+    if not vehicle:
+        return ''
+    parts = [
+        getattr(vehicle, name, None)
+        for name in (
+            'features', 'exterior_features', 'interior_features',
+            'entertainment_features', 'mechanical_features', 'safety_features',
+        )
+    ]
+    return ', '.join(str(p).strip() for p in parts if p and str(p).strip())
+
+
+def _covered_labels(image) -> list:
+    """Feature labels already shown on this vehicle's other up-to-date photos."""
+    from app.photo_highlights import ANALYSIS_VERSION
+
+    labels = []
+    for other in image.vehicle.images if getattr(image, 'vehicle', None) else []:
+        if other.id == image.id or other.highlight_status != 'ready':
+            continue
+        if other.highlight_version is None or int(other.highlight_version) < ANALYSIS_VERSION:
+            continue
+        for h in other.highlights or []:
+            if (h.source or 'auto') == 'auto' and h.is_visible and h.category != 'imperfection':
+                labels.append(h.label)
+    return labels
+
+
 def process_job(job) -> bool:
     """Run analysis for a claimed job. Returns True on success."""
     from app import db
@@ -243,7 +273,7 @@ def process_job(job) -> bool:
     db.session.commit()
 
     vehicle = db.session.get(Vehicle, image.vehicle_id)
-    features_text = (vehicle.features if vehicle else None) or ''
+    features_text = _combined_features(vehicle)
     context = {}
     if vehicle:
         context = {
@@ -255,6 +285,12 @@ def process_job(job) -> bool:
             'year': vehicle.year,
             'make': vehicle.make,
             'model': vehicle.model,
+            'trim': vehicle.trim,
+            'engine': vehicle.engine,
+            'fuel_type': vehicle.fuel_type,
+            'mileage': vehicle.mileage,
+            'title_status': vehicle.title_status,
+            'covered_labels': _covered_labels(image),
         }
 
     path = _image_path_for(image)

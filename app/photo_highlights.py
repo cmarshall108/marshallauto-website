@@ -18,6 +18,7 @@ import math
 import mimetypes
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
@@ -25,7 +26,7 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_VERSION = 6
+ANALYSIS_VERSION = 7
 
 # Normalized feature keywords → display metadata.
 # Descriptions are shopper-facing: what the feature is, why it matters, and
@@ -2427,8 +2428,12 @@ def _grok_model() -> str:
     return (
         os.environ.get('PHOTO_HIGHLIGHTS_GROK_MODEL')
         or os.environ.get('XAI_MODEL')
-        or 'grok-4.7'
+        or 'grok-4.5'
     ).strip()
+
+
+def _grok_fallback_model() -> str:
+    return (os.environ.get('PHOTO_HIGHLIGHTS_GROK_FALLBACK_MODEL') or 'grok-4.5').strip()
 
 
 def _image_to_data_url(image_path: str, max_side: int = 1280) -> str:
@@ -2494,7 +2499,12 @@ def _normalize_icon(icon: Optional[str], category: str, severity: str) -> str:
     return 'info-circle'
 
 
-def _normalize_grok_highlights(payload: dict, max_highlights: int) -> dict:
+def _normalize_grok_highlights(
+    payload: dict,
+    max_highlights: int,
+    covered_labels: Optional[List[str]] = None,
+) -> dict:
+    covered_labels = {_normalize_label(c) for c in (covered_labels or [])}
     scene = str(payload.get('scene') or 'other').strip().lower()
     if scene not in SCENE_VALUES:
         # fuzzy map
@@ -2553,7 +2563,14 @@ def _normalize_grok_highlights(payload: dict, max_highlights: int) -> dict:
         except (TypeError, ValueError):
             conf = 0.7
         # Grok should already be conservative; still floor weak guesses
-        if conf < 0.55:
+        floor = GROK_MIN_IMPERFECTION_CONF if category == 'imperfection' else GROK_MIN_CONF
+        if conf < floor:
+            continue
+        if _is_low_value_label(label, category, severity):
+            continue
+        if _UNSUPPORTED_CLAIM.search(str(item.get('description') or item.get('text') or '')):
+            continue
+        if _normalize_label(label) in covered_labels:
             continue
         desc = str(item.get('description') or item.get('text') or '').strip()
         desc = _shopper_description(label, category, desc)
@@ -2575,7 +2592,7 @@ def _normalize_grok_highlights(payload: dict, max_highlights: int) -> dict:
         candidates,
         min_dist_pct=12.0,
         max_items=max(1, min(16, int(max_highlights or 12))),
-        min_confidence=float(os.environ.get('PHOTO_HIGHLIGHTS_MIN_CONF', '0.55')),
+        min_confidence=float(os.environ.get('PHOTO_HIGHLIGHTS_MIN_CONF', str(GROK_MIN_CONF))),
     )
     return {
         'scene': scene,
@@ -2583,6 +2600,46 @@ def _normalize_grok_highlights(payload: dict, max_highlights: int) -> dict:
         'analysis_version': ANALYSIS_VERSION,
         'engine': 'grok',
     }
+
+
+GROK_MIN_CONF = 0.7
+GROK_MIN_IMPERFECTION_CONF = 0.75
+
+# Parts every car has; marking them tells the shopper nothing unless they are damaged.
+_LOW_VALUE_LABEL = re.compile(
+    r'^(?:(?:side|rear ?view|driver\'?s?|passenger\'?s?)\s+)?(?:mirrors?|door handles?|antenna|'
+    r'roof antenna|fuel (?:filler )?door|gas cap|fuel cap|windshield wipers?|wipers?|'
+    r'license plate|chevrolet bowtie|(?:front )?grille|badge|emblem|'
+    r'(?:combination )?(?:tail ?lights?|taillights?|brake lights?)|windows?|doors?)$',
+    re.I,
+)
+
+# "Looks fine" markers on plain body parts carry no information.
+_PLAIN_BODY_LABEL = re.compile(
+    r'^(?!.*\b(?:alloy|wheel|tire|seat|rim)\b)(?:\w+[ -]){0,3}(?:paint|glass|bumper|panel|finish|hood|trunk)s?$',
+    re.I,
+)
+
+# Accident/rust/sales claims a photo cannot support; a dealer listing must not make them.
+_UNSUPPORTED_CLAIM = re.compile(
+    r'accident[- ]free|no accident|rust[- ]free|no rust|flood|well[- ]kept|well[- ]maintained|'
+    r'pristine|resale|does(?: not|n.t) suggest|no sign of (?:impact|damage history)|'
+    r'never been|like new|showroom',
+    re.I,
+)
+
+
+def _normalize_label(label: str) -> str:
+    text = re.sub(r'[^a-z0-9 ]+', ' ', (label or '').lower())
+    words = [w[:-1] if len(w) > 3 and w.endswith('s') else w for w in text.split()]
+    return ' '.join(words)
+
+
+def _is_low_value_label(label: str, category: str, severity: str) -> bool:
+    if category == 'imperfection' or severity in ('caution', 'issue'):
+        return False
+    text = (label or '').strip()
+    return bool(_LOW_VALUE_LABEL.match(text) or _PLAIN_BODY_LABEL.match(text))
 
 
 _GENERIC_DESC = re.compile(
@@ -2627,7 +2684,10 @@ def _build_grok_prompt(
 ) -> Tuple[str, str]:
     ctx = vehicle_context or {}
     vehicle_bits = []
-    for key in ('year', 'make', 'model', 'body_style', 'exterior_color', 'interior_color', 'drivetrain', 'transmission'):
+    for key in (
+        'year', 'make', 'model', 'trim', 'body_style', 'exterior_color', 'interior_color',
+        'engine', 'fuel_type', 'drivetrain', 'transmission', 'mileage', 'title_status',
+    ):
         val = ctx.get(key)
         if val not in (None, ''):
             vehicle_bits.append(f'{key}={val}')
@@ -2635,16 +2695,17 @@ def _build_grok_prompt(
     features_line = (features_text or '').strip() or '(none provided)'
     matched = match_feature_catalog(features_text)
     matched_labels = ', '.join(m['label'] for _, m in matched) or '(none matched)'
+    covered = [str(c).strip() for c in (ctx.get('covered_labels') or []) if str(c).strip()]
+    covered_line = ', '.join(dict.fromkeys(covered)) or '(none yet)'
 
     cap = max(1, min(16, int(max_highlights or 12)))
     system = (
-        'You write thorough Carvana-style photo hotspots for a used-car shopper. '
-        'Mark every distinct, visible feature in this photo — be complete, not sparse. '
-        'Each marker must sit on the part itself and tell the customer what it does for them, '
-        'one practical detail, and a short confirm-in-person note only if needed. '
-        'Use the listing features as a checklist: if that equipment is visible here, it must get a marker. '
-        'Also mark visible equipment that is not on the list. '
-        'Never invent options, mileage, prices, history, or damage. '
+        'You annotate used-car listing photos for a shopper deciding whether to visit and buy. '
+        'Every marker must teach the shopper something specific and useful that they could not '
+        'get from glancing at the photo: the actual visible condition of this part, or what a '
+        'feature does for them in daily use. Fewer, better markers beat many generic ones. '
+        'Each marker must sit on the part itself. '
+        'Never invent options, specs, mileage, prices, history, or damage. '
         'Never place markers on sky, driveway, buildings, people, plates, or empty background. '
         'Coordinates are percentages of the FULL image width/height (0-100), origin top-left. '
         'Respond with JSON only — no markdown, no commentary.'
@@ -2655,47 +2716,58 @@ def _build_grok_prompt(
 Vehicle: {vehicle_line}
 Listed features text: {features_line}
 Listing features to mark when visible in THIS photo: {matched_labels}
+Already marked on this vehicle's other photos: {covered_line}
 
-Be thorough. Mark each distinct visible item once, up to {cap}. Spread markers so they do not stack.
+What makes a marker worth showing, in priority order:
+1. CONDITION you can actually see in this photo, good or bad: tire tread and wear, wheel curb rash, paint chips or dents, seat bolster wear, stains, cracks, worn pedals, dash warning lights, cleanliness. Name the exact spot, how bad it looks, and what that means for the buyer (cosmetic only, a near-term cost, or fine as is). A clean, unworn part is useful news too ("Driver seat bolster shows no tearing").
+2. FEATURES that affect daily use, comfort, safety, or resale value (touchscreen and its phone support, sunroof, heated seats, remote start, backup camera, alloy wheels, fog lights, LED lighting, tow gear). Say what it does for the driver and tie it to the trim or listed equipment when you are sure.
+3. Skip commodity parts every car has unless damaged or unusual: plain mirrors, door handles, antenna, fuel door, ordinary grille, plain tail lights, wipers, badges. Also skip plain paint, glass, bumpers, and lamps that merely look undamaged: "looks fine" is not information.
 
-Exterior front: headlights (LED/HID/halogen/projector), daytime running lights, fog lights, grille and badge, hood scoop, bug shield, front camera, parking sensors, tow hooks, skid plate, winch, light bar.
-Exterior side: wheels and tire type, running boards or steps, roof rails or crossbars, window visors, tint, mirrors, door handles only if keyless/sensors are visible, fender flares, mud flaps, side steps, charge port.
-Exterior rear: tail lights, backup camera, hitch and wiring plug, tow hooks, bed liner, tonneau, toolbox, spoiler, power liftgate or tailgate, trailer plug, spare if visible.
-Wheel closeup: wheel finish, tire tread condition, tire type (all-terrain, new), curb rash.
-Interior dash: touchscreen, CarPlay/Android Auto area, digital cluster, steering-wheel controls, heated wheel, push-button start, drive modes, head-up display, climate controls, wireless charger, HomeLink.
-Interior cabin: leather or cloth, heated/ventilated seats, captain chairs, third row, sunroof or panoramic glass, ambient light, premium audio speakers, floor mats, fold-flat seats, car-seat anchors.
-Engine bay (scene=other): engine cover, turbo or supercharger if visible, battery, obvious leaks only when clearly wet.
+Honesty rules (this is a dealer listing, so accuracy matters more than enthusiasm):
+- Describe only what this one photo shows, and say "in this view" where a part is only partly visible.
+- Never imply accident-free, rust-free, repair-free, flood-free, or mechanically sound. Do not say a panel "does not suggest" damage or an impact.
+- No praise or sales language ("well kept", "sharp", "pristine", "great shape") and no resale-value or reliability claims.
+- Do not state exact tread depth, mileage, or prices. Words like "visible tread" or "light wear" are fine.
 
-Also mark one clear scratch, scuff, ding, chip, or curb rash when you can see it. If unsure, omit it. Max 2 imperfections.
+Do not repeat anything already marked on other photos unless THIS photo shows a different condition (for example a different wheel with curb rash).
 
-Do not mark plain paint, empty bumper skin, or the sky. Do not put cabin features on an exterior photo.
+Where to look by scene:
+Exterior front/side/rear: tires and wheels, lights, paint and panel condition, glass, bumpers, tow gear, rails, camera or sensors.
+Wheel closeup: wheel finish, curb rash, tire tread and brand type.
+Interior dash: touchscreen and what it supports, digital cluster, steering-wheel controls, climate controls, shifter, warning lights, wear on buttons and trim.
+Interior cabin: seat material and condition, bolster wear, stains, rear seat room, sunroof, floor mats, headliner.
+Engine bay (scene=other): visible leaks, corrosion, battery, belts; only what you can clearly see.
+
+Damage rules: only mark a scratch, dent, chip, rust, stain, or crack you can clearly see. Water drops, reflections, shadows, dirt, and glare are NOT damage. Never mark a dent or scratch on glass. If unsure, omit it. Max 2 imperfections, each with confidence >= 0.75.
 If the photo is too dark, blurry, or shows almost no vehicle, return an empty highlights list.
 
 Rules:
 1. scene must be one of: exterior_front, exterior_side, exterior_rear, wheel_closeup, interior_dash, interior_cabin, other
-2. Return up to {cap} highlights. Include every clearly visible feature, not just the best 2.
+2. Return up to {cap} highlights; 2-4 strong ones is better than {cap} weak ones. An empty list is acceptable.
 3. Each highlight needs: label, category (feature|imperfection|detail), severity (positive|info|caution|issue), x_pct, y_pct, confidence (0-1), description, icon (one of: phone, stars, thermometer-half, wind, brightness-high, camera-video, eye, signpost, speedometer, geo-alt, bluetooth, key, truck, distribute-horizontal, circle, check-circle, shuffle, speaker, people, door-open, power, exclamation-triangle, exclamation-circle, info-circle, display, bullseye, cloud-rain, window, shield, moon, wifi, broadcast, disc, arrows-expand, snow, house, mic, gear, fuel-pump, battery-charging, arrow-up, arrow-down, pause).
 4. x_pct/y_pct must sit ON the object. Not empty space.
-5. label is short and specific ("Apple CarPlay", "Trailer Hitch", "LED Headlights") — not "Feature" or "Detail".
-6. description is 1-2 sentences a shopper can use. Say what it does for them and one practical check. Do not say "listed on this vehicle", "highlighted for inspection", or "nice feature". Do not invent specs you cannot see.
-7. confidence >= 0.65 for anything you include.
+5. label is short and specific, 2-4 words ("Light Curb Rash", "Even Tire Wear", "MyLink Touchscreen") — never "Feature" or "Detail".
+6. description is 1-2 sentences. Sentence 1: what you actually see here (material, finish, wear level, location). Sentence 2: what it means for the buyer. Only tell the buyer to check something in person when you see a specific concern. Never use filler like "confirm it works" or "check in person" as a default ending. Do not say "listed on this vehicle", "highlighted for inspection", or "nice feature". Do not invent specs you cannot see.
+7. confidence >= 0.7 for anything you include.
 
-Good description: "Alloy wheels with some light curb rash on the outer lip — cosmetic only, and cheaper than a tire replacement. Look for a bend or a sidewall bubble before you worry about the rash."
-Bad description: "Alloy wheels are listed on this vehicle."
+Good: "Light curb rash on the outer lip of the front-right alloy, with the tire sidewall smooth. Purely cosmetic and cheap to refinish."
+Good: "Cloth seat with no tears or heavy bolster wear on the driver side. Normal for this age and fine for daily driving."
+Bad: "Side mirror covers the lane beside you. Confirm it adjusts smoothly."
+Bad: "Alloy wheels are listed on this vehicle."
 
 JSON schema:
 {{
   "scene": "exterior_side",
   "highlights": [
     {{
-      "label": "Alloy Wheels",
-      "category": "feature",
-      "severity": "positive",
+      "label": "Light Curb Rash",
+      "category": "imperfection",
+      "severity": "caution",
       "x_pct": 22.5,
       "y_pct": 68.0,
-      "confidence": 0.86,
-      "description": "Factory-style alloy wheel. Light curb rash on the lip is cosmetic; a bend or a bubble in the sidewall is what to flag in person.",
-      "icon": "circle"
+      "confidence": 0.82,
+      "description": "Light curb rash on the outer lip of the front-right alloy, with the tire sidewall smooth. Purely cosmetic and cheap to refinish.",
+      "icon": "exclamation-circle"
     }}
   ]
 }}
@@ -2703,8 +2775,9 @@ JSON schema:
     return system, user
 
 
-def analyze_with_grok(
+def _analyze_with_grok_model(
     image_path: str,
+    model: str,
     features_text: Optional[str] = None,
     vehicle_context: Optional[dict] = None,
     max_highlights: int = 12,
@@ -2715,7 +2788,6 @@ def analyze_with_grok(
 
     data_url = _image_to_data_url(image_path)
     system, user = _build_grok_prompt(features_text, vehicle_context, max_highlights)
-    model = _grok_model()
     timeout = float(os.environ.get('PHOTO_HIGHLIGHTS_GROK_TIMEOUT', '90'))
 
     body = {
@@ -2796,7 +2868,53 @@ def analyze_with_grok(
     if not parsed:
         raise RuntimeError(f'Could not parse Grok JSON: {str(content)[:400]}')
 
-    return _normalize_grok_highlights(parsed, max_highlights)
+    return _normalize_grok_highlights(
+        parsed,
+        max_highlights,
+        covered_labels=(vehicle_context or {}).get('covered_labels'),
+    )
+
+
+_MODEL_COOLDOWN_SECONDS = 900
+_model_cooldown_until: dict = {}
+
+
+def analyze_with_grok(
+    image_path: str,
+    features_text: Optional[str] = None,
+    vehicle_context: Optional[dict] = None,
+    max_highlights: int = 12,
+) -> dict:
+    """Run vision analysis, falling back to a fast model if the primary is too slow.
+
+    Slow reasoning models (e.g. grok-4.7) routinely exceed the request timeout on
+    full-resolution photos. After a model fails, it is skipped for a while so the
+    worker does not burn a full timeout on every photo.
+    """
+    models = [_grok_model()]
+    fallback = _grok_fallback_model()
+    if fallback and fallback not in models:
+        models.append(fallback)
+
+    now = time.monotonic()
+    ready = [m for m in models if _model_cooldown_until.get(m, 0) <= now]
+    attempts = ready or models[-1:]
+
+    last_exc: Optional[Exception] = None
+    for model in attempts:
+        try:
+            return _analyze_with_grok_model(
+                image_path, model,
+                features_text=features_text,
+                vehicle_context=vehicle_context,
+                max_highlights=max_highlights,
+            )
+        except Exception as exc:
+            last_exc = exc
+            if len(models) > 1:
+                _model_cooldown_until[model] = time.monotonic() + _MODEL_COOLDOWN_SECONDS
+            logger.warning('Grok model %s failed for highlights: %s', model, exc)
+    raise last_exc  # type: ignore[misc]
 
 
 def analyze_with_opencv(
