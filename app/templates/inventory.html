@@ -314,6 +314,33 @@
     </div>
 </section>
 
+{% if recently_sold %}
+<section class="section-padding border-top" id="recently-sold" aria-labelledby="recently-sold-heading">
+    <div class="container">
+        <h2 class="h4 fw-bold mb-1" id="recently-sold-heading">Recently Sold</h2>
+        <p class="text-muted mb-4">Vehicles we sold in the last six months. These are no longer available, but they show the kind of inventory we stock. Call us if you want something similar.</p>
+        <div class="row g-3">
+            {% for vehicle in recently_sold %}
+            {% set img = vehicle.primary_image() %}
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{{ url_for('main.vehicle_detail', slug=vehicle.slug) }}" class="text-decoration-none text-dark d-block h-100 border rounded-3 overflow-hidden bg-white">
+                    <div class="position-relative">
+                        <img src="{{ vehicle.primary_image_url() }}" class="w-100" style="aspect-ratio: 3 / 2; object-fit: cover; filter: grayscale(0.6);" alt="{{ vehicle.image_alt() }}" width="{{ img.width if img and img.width else 600 }}" height="{{ img.height if img and img.height else 400 }}" loading="lazy" decoding="async">
+                        <span class="badge bg-secondary position-absolute top-0 start-0 m-2">Sold</span>
+                    </div>
+                    <div class="p-3">
+                        <h3 class="h6 fw-bold mb-1">{{ vehicle.title }}</h3>
+                        <p class="small text-muted mb-0">{{ vehicle.mileage | format_mileage }}{% if vehicle.sold_at %} &middot; Sold {{ (vehicle.sold_at | to_dealership_time).strftime('%B %Y') }}{% endif %}</p>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="small mt-3 mb-0"><a href="{{ url_for('main.vehicle_archive') }}">View all previous listings and VIN records</a></p>
+    </div>
+</section>
+{% endif %}
+
 {% if inventory_links %}
 <section class="section-padding border-top">
     <div class="container">

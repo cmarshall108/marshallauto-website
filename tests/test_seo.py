@@ -385,6 +385,51 @@ class SeoTests(unittest.TestCase):
         )
         self.assertEqual(article['description'], description)
 
+    def add_sold(self, slug, days_ago, **extra):
+        from datetime import timedelta
+        from app.models import utcnow
+        vehicle = Vehicle(
+            slug=slug, year=2018, make='Honda', model='Civic', price=9000, mileage=70000,
+            condition='used', status='sold', sold_at=utcnow() - timedelta(days=days_ago), **extra,
+        )
+        db.session.add(vehicle)
+        db.session.commit()
+        return vehicle
+
+    def test_inventory_shows_recently_sold_vehicles_marked_sold(self):
+        self.add_sold('sold-recent', 10)
+        self.add_sold('sold-older', 120)
+        self.add_sold('sold-too-old', 400)
+        self.add_sold('sold-coming-soon', 5, is_coming_soon=True)
+        no_date = Vehicle(slug='sold-no-date', year=2017, make='Ford', model='Fit', price=5000,
+                          mileage=1, condition='used', status='sold')
+        db.session.add(no_date)
+        db.session.commit()
+
+        html = self.page('/inventory')
+        section = html.select_one('#recently-sold')
+        self.assertIsNotNone(section)
+        links = [a['href'] for a in section.select('a[href^="/inventory/"]')]
+        self.assertEqual(links[:2], ['/inventory/sold-recent', '/inventory/sold-older'])
+        self.assertEqual(len([l for l in links if l != '/inventory/history']), 2)
+        self.assertEqual(len(section.select('.badge')), 2)
+        self.assertIn('Sold', section.select_one('.badge').get_text())
+        grid_links = [a['href'] for a in html.select('.inventory-grid a[href^="/inventory/"]')]
+        self.assertNotIn('/inventory/sold-recent', grid_links)
+        self.assertIn('Showing 12 of 13 vehicles', html.get_text(' ', strip=True))
+
+    def test_recently_sold_is_capped_and_hidden_when_filtering_or_paging(self):
+        for number in range(10):
+            self.add_sold(f'sold-{number}', number + 1)
+        html = self.page('/inventory')
+        self.assertEqual(len(html.select('#recently-sold .col-6')), 8)
+        for path in ('/inventory?page=2', '/inventory?make=Toyota', '/inventory?sort=price_low',
+                     '/inventory/used-sedans-for-sale-in-sanford-nc'):
+            self.assertIsNone(self.page(path).select_one('#recently-sold'), path)
+
+    def test_recently_sold_section_absent_without_sold_vehicles(self):
+        self.assertIsNone(self.page('/inventory').select_one('#recently-sold'))
+
     def test_blog_posts_link_to_available_vehicles(self):
         post = BlogPost(title='Buying tips', slug='buying-tips', content='<p>Tips.</p>', is_published=True)
         sold = Vehicle(

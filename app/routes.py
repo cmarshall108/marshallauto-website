@@ -107,6 +107,30 @@ def _available_body_styles():
     ]
 
 
+RECENTLY_SOLD_DAYS = 183
+RECENTLY_SOLD_LIMIT = 8
+
+
+def _recently_sold_vehicles():
+    """Vehicles sold within roughly the last six months, newest first."""
+    from datetime import timedelta
+    from app.models import utcnow
+
+    return (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter(
+            Vehicle.status == 'sold',
+            Vehicle.is_coming_soon.is_(False),
+            Vehicle.sold_at.isnot(None),
+            Vehicle.sold_at >= utcnow() - timedelta(days=RECENTLY_SOLD_DAYS),
+        )
+        .order_by(Vehicle.sold_at.desc(), Vehicle.id.desc())
+        .limit(RECENTLY_SOLD_LIMIT)
+        .all()
+    )
+
+
 def _vehicle_list_query():
     """Base available-vehicle query with images eagerly loaded."""
     return (
@@ -376,6 +400,11 @@ def _render_inventory(page, make=None, model=None, body_style=None, title_status
         buyer_guides=published_buyer_guides(),
         search_alert_form=search_alert_form,
         has_filters=bool(has_filters),
+        recently_sold=(
+            _recently_sold_vehicles()
+            if request.endpoint == 'main.inventory' and page == 1 and not has_filters and sort == 'newest'
+            else []
+        ),
     )
 
 
