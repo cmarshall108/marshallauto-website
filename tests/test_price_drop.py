@@ -68,6 +68,23 @@ class PriceDropTests(unittest.TestCase):
         self.assertEqual(info['original'], Decimal('15000'))
         self.assertEqual(info['savings'], Decimal('2500'))
 
+    def test_drops_of_one_dollar_or_less_are_not_advertised(self):
+        one_dollar_drop = self.add_vehicle(
+            previous_price=Decimal('15000'),
+            price=Decimal('14999'),
+        )
+        sub_dollar_drop = self.add_vehicle(
+            slug='2019-honda-civic-sub-dollar',
+            sale_price=Decimal('14999.01'),
+        )
+
+        self.assertIsNone(one_dollar_drop.price_drop_info)
+        self.assertIsNone(sub_dollar_drop.price_drop_info)
+
+        inventory = BeautifulSoup(self.client.get('/inventory').data, 'html.parser')
+        self.assertIsNone(inventory.select_one('.price-drop-deal'))
+        self.assertIsNone(inventory.select_one('.price-drop-was'))
+
     def test_sold_listing_does_not_advertise_a_price_drop(self):
         vehicle = self.add_vehicle(
             status='sold',

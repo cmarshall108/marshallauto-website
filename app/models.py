@@ -498,7 +498,7 @@ class Vehicle(db.Model):
             return None
         original = max(candidates)
         savings = original - current
-        if savings < Decimal('1') or original <= 0 or current <= 0:
+        if savings <= Decimal('1') or original <= 0 or current <= 0:
             return None
         return {
             'original': original,
