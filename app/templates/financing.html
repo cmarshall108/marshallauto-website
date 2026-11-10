@@ -165,7 +165,7 @@
                     <section class="card border-0 shadow-sm p-3 p-md-4 mb-3">
                         <h2 class="h5 fw-bold">1. Choose a vehicle and amount</h2>
                         <div class="row g-3">
-                            <div class="col-md-8">
+                            <div class="col-md-6">
                                 <label for="vehicle_id" class="form-label small fw-semibold">Vehicle of interest <span class="text-danger">*</span></label>
                                 <select class="form-select" id="vehicle_id" name="vehicle_id" required data-vehicle-select>
                                     <option value="">Choose an available vehicle</option>
@@ -177,7 +177,7 @@
                                 </select>
                                 {% if form_errors.get('vehicle_id') %}<div class="text-danger small mt-1">{{ form_errors.get('vehicle_id') }}</div>{% endif %}
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="requested_amount" class="form-label small fw-semibold">Amount requested <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
@@ -185,6 +185,15 @@
                                 </div>
                                 {% if form_errors.get('requested_amount') %}<div class="text-danger small mt-1">{{ form_errors.get('requested_amount') }}</div>{% endif %}
                                 <div class="form-text">Enter the credit amount you are requesting.</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="down_payment" class="form-label small fw-semibold">Down payment <span class="text-muted fw-normal">(optional)</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input class="form-control" id="down_payment" name="down_payment" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" value="{{ form_values.get('down_payment', '') }}">
+                                </div>
+                                {% if form_errors.get('down_payment') %}<div class="text-danger small mt-1">{{ form_errors.get('down_payment') }}</div>{% endif %}
+                                <div class="form-text">How much do you plan to put down?</div>
                             </div>
                         </div>
                         <div class="small text-muted mt-2">Purpose: vehicle purchase · Application source: Marshall Auto website</div>

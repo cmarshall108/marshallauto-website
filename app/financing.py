@@ -543,6 +543,16 @@ def validate_application(form, vehicle):
     if requested_amount is not None and requested_amount <= 0:
         errors['requested_amount'] = 'Enter an amount greater than $0.'
 
+    raw_down_payment = form.get('down_payment') or ''
+    if len(raw_down_payment.strip()) > _TEXT_LIMITS['housing_payment']:
+        errors['down_payment'] = 'Enter an amount with no more than 12 characters.'
+    down_payment = _parse_money(
+        _clean(raw_down_payment, _TEXT_LIMITS['housing_payment']),
+        'down_payment', errors, required=False,
+    )
+    if down_payment is not None and down_payment < 0:
+        errors['down_payment'] = 'Enter an amount of $0 or more.'
+
     joint_credit = form.get('joint_credit') == 'yes'
     applicant = _collect_person(form, 'applicant', errors, True)
     coapplicant = (
@@ -572,6 +582,7 @@ def validate_application(form, vehicle):
             'mileage': vehicle.mileage,
         },
         'requested_amount': requested_amount,
+        'down_payment': down_payment,
         'applicant': applicant,
         'coapplicant': coapplicant,
         'joint_credit': joint_credit,
@@ -591,6 +602,7 @@ def validate_application(form, vehicle):
             form.get(f'{prefix}_signature'), 128,
         )
     values['requested_amount'] = _clean(form.get('requested_amount'), 12)
+    values['down_payment'] = _clean(form.get('down_payment'), 12)
     values['joint_credit'] = joint_credit
 
     if errors:
@@ -935,6 +947,11 @@ def _build_supplemental_page(application):
         60, 564,
         _pdf_safe(f"Amount requested: {_money_text(application['requested_amount'])}"),
     )
+    if application.get('down_payment') is not None:
+        pdf.drawString(
+            300, 564,
+            _pdf_safe(f"Down payment: {_money_text(application['down_payment'])}"),
+        )
     pdf.drawString(
         60, 548,
         f"Credit type: {'Joint' if application['joint_credit'] else 'Individual'}",
