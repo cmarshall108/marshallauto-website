@@ -47,7 +47,7 @@ class Config:
     # Official FTC Buyers Guide blank. Filled copies are generated per vehicle;
     # this file is never written and stays outside app/static.
     BUYERS_GUIDE_PDF = os.path.join(
-        basedir, 'app', 'private_assets', 'Buyers-Guide.pdf',
+        basedir, 'app', 'private_assets', 'cfr_buyers_guides_english.pdf',
     )
     # Generate with Fernet.generate_key(); back up securely and keep stable while
     # encrypted applications exist. No application data is accepted without it.
