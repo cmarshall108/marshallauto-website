@@ -267,6 +267,22 @@ class SeoTests(unittest.TestCase):
         db.session.commit()
         self.assertFalse(any('/inventory' in url for url in self.sitemap_pages()))
 
+    def test_sitemap_lists_every_stocked_make_landing(self):
+        makes = ['Acura', 'Audi', 'BMW', 'Buick', 'Chevrolet', 'Dodge', 'Ford', 'GMC',
+                 'Honda', 'Jeep', 'Mazda', 'Volvo']
+        for index, make in enumerate(makes):
+            db.session.add(Vehicle(
+                slug=f'make-car-{index}', year=2020, make=make, model='Base',
+                price=12000, mileage=50000, body_style='Sedan', condition='used',
+                status='available', title_status='clean',
+            ))
+        db.session.commit()
+        pages = self.sitemap_pages()
+        for make in makes:
+            self.assertIn(
+                f'http://localhost/inventory/used-{make.lower()}-for-sale-in-raleigh-nc', pages,
+            )
+
     def test_sitemap_landings_are_indexable_and_self_canonical(self):
         for url in self.sitemap_pages():
             if '-for-sale-in-' not in url:

@@ -803,7 +803,7 @@ def _inventory_landing_links(city, state, makes, body_styles, has_rebuilt):
     }
     categories = []
     if city.lower() in primary_cities:
-        categories.extend((make, make.lower().replace(' ', '-')) for make in makes[:8]
+        categories.extend((make, make.lower().replace(' ', '-')) for make in makes
                           if make.lower().replace(' ', '-') not in BODY_STYLE_SLUG_MAP
                           and make.lower() != 'cars')
     categories.extend((style, BODY_STYLE_PLURAL_SLUG[style]) for style in body_styles
@@ -2142,7 +2142,7 @@ def sitemap():
             'lastmod': landing['lastmod'].isoformat() + 'Z' if landing['lastmod'] else None,
         })
 
-    top_makes = _available_makes()[:8]
+    top_makes = _available_makes()
     body_styles = _available_body_styles()
     has_rebuilt = any(vehicle.title_status == 'rebuilt' for vehicle in available_vehicles)
 
