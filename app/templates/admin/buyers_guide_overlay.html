@@ -1,0 +1,110 @@
+{% extends "admin/base.html" %}
+{% block title %}Buyers Guide - {{ vehicle.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 no-print">
+    <div>
+        <h2 class="fw-bold mb-1">FTC Buyers Guide</h2>
+        <div>{{ vehicle.title }}{% if vehicle.stock_number %} &middot; Stock #{{ vehicle.stock_number }}{% endif %}</div>
+    </div>
+    <a href="{{ url_for('admin.vehicle_edit', id=vehicle.id) }}" class="btn btn-outline-secondary">Back to Vehicle</a>
+</div>
+
+<div class="alert alert-info no-print">
+    Review the guide over the official blank. Vehicle and dealer boxes start from inventory and business settings. Change any box for this copy only, then generate the filled PDF. The blank FTC file is not changed.
+</div>
+
+{% if errors %}
+<div class="alert alert-danger no-print">
+    <ul class="mb-0">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<form method="GET" class="card border-0 shadow-sm p-3 mb-3 no-print">
+    <label class="form-label fw-semibold" for="guide_type">Guide type</label>
+    <div class="d-flex flex-wrap gap-2 align-items-end">
+        <select class="form-select w-auto" id="guide_type" name="guide_type">
+            <option value="as_is" {% if guide_type == 'as_is' %}selected{% endif %}>AS IS — no dealer warranty</option>
+            <option value="implied" {% if guide_type == 'implied' %}selected{% endif %}>Implied warranties only</option>
+        </select>
+        <button type="submit" class="btn btn-outline-primary">Switch blank</button>
+    </div>
+    <div class="form-text">AS IS is the usual default for used vehicles sold without a dealer warranty. Implied warranties only is for states that prohibit pure AS IS sales.</div>
+</form>
+
+<form method="POST" data-mvr-overlay>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="guide_type" value="{{ guide_type }}">
+
+    <h3 class="h6 fw-bold no-print">Front</h3>
+    <div class="mvr-sheet-wrap mb-4">
+        <div class="mvr-sheet">
+            <img src="{{ url_for('static', filename=blank_images.front) }}" alt="Blank Buyers Guide front" class="mvr-sheet-image">
+            {% for field in fields if field.sheet == 'front' %}
+                {% if field.kind == 'text' %}
+                <input
+                    class="mvr-field"
+                    type="text"
+                    name="{{ field.key }}"
+                    value="{{ field.value }}"
+                    maxlength="{{ field.max_length }}"
+                    aria-label="{{ field.label }}"
+                    title="{{ field.label }}"
+                    autocomplete="off"
+                    style="left: {{ field.left }}%; top: {{ field.top }}%; width: {{ field.width }}%; height: {{ field.height }}%;"
+                >
+                {% else %}
+                <input
+                    class="mvr-check"
+                    type="radio"
+                    name="{{ field.group }}"
+                    value="{{ field.key }}"
+                    aria-label="{{ field.label }}"
+                    title="{{ field.label }}"
+                    {% if field.checked %}checked data-was-checked="true"{% endif %}
+                    style="left: {{ field.left }}%; top: {{ field.top }}%; width: {{ field.width }}%; height: {{ field.height }}%;"
+                >
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <h3 class="h6 fw-bold no-print">Back — dealer information</h3>
+    <div class="mvr-sheet-wrap">
+        <div class="mvr-sheet">
+            <img src="{{ url_for('static', filename=blank_images.back) }}" alt="Blank Buyers Guide back" class="mvr-sheet-image">
+            {% for field in fields if field.sheet == 'back' %}
+                <input
+                    class="mvr-field"
+                    type="text"
+                    name="{{ field.key }}"
+                    value="{{ field.value }}"
+                    maxlength="{{ field.max_length }}"
+                    aria-label="{{ field.label }}"
+                    title="{{ field.label }}"
+                    autocomplete="off"
+                    style="left: {{ field.left }}%; top: {{ field.top }}%; width: {{ field.width }}%; height: {{ field.height }}%;"
+                >
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-3 no-print">
+        <button type="submit" class="btn btn-primary">Generate Filled PDF</button>
+    </div>
+</form>
+
+{% if preview_url %}
+<section class="mt-4" id="mvr-output">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 no-print">
+        <h3 class="h5 fw-bold mb-0">Filled Buyers Guide</h3>
+        <a href="{{ preview_url }}" class="btn btn-outline-primary" download="{{ download_name }}">Download PDF</a>
+    </div>
+    <iframe class="mvr-preview" src="{{ preview_url }}" title="Filled Buyers Guide PDF"></iframe>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ asset_url('js/admin-mvr-overlay.js') }}"></script>
+{% endblock %}

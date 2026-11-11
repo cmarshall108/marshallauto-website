@@ -44,6 +44,11 @@ class Config:
     # are never written and are outside app/static so they are not web-served.
     MVR_180_PDF = os.path.join(basedir, 'app', 'private_assets', 'MVR-180.pdf')
     MVR_181_PDF = os.path.join(basedir, 'app', 'private_assets', 'MVR-181.pdf')
+    # Official FTC Buyers Guide blank. Filled copies are generated per vehicle;
+    # this file is never written and stays outside app/static.
+    BUYERS_GUIDE_PDF = os.path.join(
+        basedir, 'app', 'private_assets', 'Buyers-Guide.pdf',
+    )
     # Generate with Fernet.generate_key(); back up securely and keep stable while
     # encrypted applications exist. No application data is accepted without it.
     FINANCING_ENCRYPTION_KEY = os.environ.get('FINANCING_ENCRYPTION_KEY')

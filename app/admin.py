@@ -64,6 +64,7 @@ from app.mvr_forms import (
     default_overlay_values, download_name, normalize_reconstructed,
     overlay_fields, parse_overlay_submission,
 )
+from app import buyers_guide_form
 from app.pricing import split_otd_sale_price
 from app.marketplace_import import (
     MarketplaceError, attach_import, discard_photos, fetch_listing,
@@ -1165,6 +1166,60 @@ def mvr_preview(token):
         download_name=item['filename'],
         max_age=0,
     )
+
+
+def _buyers_guide_editor(vehicle, values=None, errors=None, preview_token=None):
+    template_path = current_app.config['BUYERS_GUIDE_PDF']
+    if values is None:
+        guide_type = buyers_guide_form.normalize_guide_type(request.args.get('guide_type'))
+        values = buyers_guide_form.default_overlay_values(
+            vehicle, current_app.config, guide_type=guide_type,
+        )
+    guide_type = buyers_guide_form.normalize_guide_type(values.get('guide_type'))
+    try:
+        fields = buyers_guide_form.overlay_fields(guide_type, template_path, values)
+    except FileNotFoundError:
+        flash('The Buyers Guide form template is missing.', 'danger')
+        return redirect(url_for('admin.vehicle_edit', id=vehicle.id))
+    preview_url = None
+    filename = buyers_guide_form.download_name(vehicle)
+    if preview_token:
+        preview_url = url_for('admin.mvr_preview', token=preview_token)
+    return render_template(
+        'admin/buyers_guide_overlay.html',
+        vehicle=vehicle,
+        guide_type=guide_type,
+        blank_images=buyers_guide_form.blank_form_images(guide_type),
+        fields=fields,
+        errors=errors or [],
+        preview_url=preview_url,
+        download_name=filename,
+    )
+
+
+@admin_bp.route('/vehicles/<int:id>/buyers-guide', methods=['GET', 'POST'])
+@login_required
+def vehicle_buyers_guide(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    if request.method == 'GET':
+        return _buyers_guide_editor(vehicle)
+    values, errors = buyers_guide_form.parse_overlay_submission(request.form)
+    if errors:
+        return _buyers_guide_editor(vehicle, values=values, errors=errors)
+    try:
+        pdf_bytes = buyers_guide_form.build_overlay_pdf(
+            current_app.config['BUYERS_GUIDE_PDF'], values,
+        )
+    except FileNotFoundError:
+        flash('The Buyers Guide form template is missing.', 'danger')
+        return redirect(url_for('admin.vehicle_edit', id=vehicle.id))
+    token = _store_mvr_preview(
+        vehicle.id,
+        buyers_guide_form.FORM_CODE,
+        pdf_bytes,
+        buyers_guide_form.download_name(vehicle),
+    )
+    return _buyers_guide_editor(vehicle, values=values, preview_token=token)
 
 
 CSV_IMPORT_FIELDS = [

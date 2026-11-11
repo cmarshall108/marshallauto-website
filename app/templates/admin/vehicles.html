@@ -77,6 +77,7 @@
                                     <a href="{{ url_for('admin.vehicle_bill_of_sale', id=vehicle.id) }}" aria-label="Print bill of sale for {{ vehicle.title }}">Bill of Sale</a>
                                     <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" title="Review the form on the official blank, then fill this copy." aria-label="Fill MVR-180 odometer disclosure for {{ vehicle.title }}">MVR-180</a>
                                     <a href="{{ url_for('admin.vehicle_mvr_181', id=vehicle.id) }}" title="Fill NC damage disclosure from title status. Salvage is marked reconstructed unless specifically set otherwise. Unknown answers and signatures are left blank." aria-label="Fill MVR-181 damage disclosure for {{ vehicle.title }}">MVR-181</a>
+                                    <a href="{{ url_for('admin.vehicle_buyers_guide', id=vehicle.id) }}" title="Prefill the FTC Buyers Guide from this vehicle and dealer settings." aria-label="Fill Buyers Guide for {{ vehicle.title }}">Buyers Guide</a>
                                     <a href="{{ url_for('admin.vehicle_qr_print', id=vehicle.id) }}" aria-label="Print window QR code for {{ vehicle.title }}">Window QR</a>
                                 </div>
                             </details>
