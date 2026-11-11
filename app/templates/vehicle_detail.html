@@ -833,7 +833,7 @@ bi-check-circle
 
             <!-- Sidebar -->
             <div class="col-lg-4">
-                <div class="card border-0 shadow p-4 mb-4 sticky-lg-top" style="top: 5.5rem;">
+                <div class="card border-0 shadow p-4 mb-4 vehicle-detail-sidebar">
                     <h5 class="fw-bold mb-3">Have Questions?</h5>
                     {% if vehicle.is_available %}
                     <p class="text-muted">Interested in this vehicle? Start a secure online application. The lender determines eligibility, approval, and terms.</p>
@@ -862,8 +862,8 @@ bi-check-circle
 
         <!-- Related Vehicles -->
         {% if related %}
-        <div class="mt-5">
-            <h2 class="fw-bold mb-4 h3">Similar Vehicles</h2>
+        <div class="vehicle-similar-section mt-5 pt-2">
+            <h2 class="fw-bold mb-4 h3 vehicle-similar-heading">Similar Vehicles</h2>
             <div class="inventory-grid" itemscope itemtype="https://schema.org/ItemList">
                 <meta itemprop="name" content="Similar Vehicles to {{ vehicle.title }}">
                 {% for rv in related %}
