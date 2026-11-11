@@ -585,6 +585,7 @@ def index():
 
     return render_template(
         'index.html',
+        buyer_guides=published_buyer_guides(),
         featured=featured,
         makes=makes,
         models=models,
@@ -688,7 +689,7 @@ def coming_soon():
         'coming_soon.html',
         vehicles=vehicles,
         breadcrumbs=breadcrumbs,
-        meta_title=f"Coming Soon Vehicles | {current_app.config['BUSINESS_NAME']}",
+        meta_title=f"Coming Soon: Used Cars Arriving in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
             f"Get an early look at vehicles coming soon to {current_app.config['BUSINESS_NAME']} "
             f"in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. "
@@ -1009,10 +1010,10 @@ def service_area():
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
         structured_faq=structured_data_faq(faqs),
-        meta_title=f"Used Car Dealer Service Area | {current_app.config['BUSINESS_NAME']}",
+        meta_title=f"Used Cars Serving Central NC | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
             f"{current_app.config['BUSINESS_NAME']} serves Sanford, Chapel Hill, Durham, Raleigh, Cary, Apex, "
-            f"Fayetteville, and surrounding NC communities with quality used cars and financing."
+            f"Fayetteville, and surrounding NC communities. Browse used cars, trucks, and SUVs by city and ask about financing."
         ),
         page_type='service_area',
     )
@@ -1586,9 +1587,9 @@ def contact():
         structured_website=structured_data_website(),
         meta_title=f"Contact {current_app.config['BUSINESS_NAME']} | Used Car Dealer in {current_app.config['BUSINESS_CITY']}",
         meta_description=(
-            f"Contact {current_app.config['BUSINESS_NAME']} today. Call {current_app.config['BUSINESS_PHONE']} "
-            f"or visit us in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} "
-            f"to schedule a test drive or appraisal."
+            f"Call {current_app.config['BUSINESS_PHONE']} or visit {current_app.config['BUSINESS_ADDRESS']}, "
+            f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} "
+            f"{current_app.config['BUSINESS_ZIP']}. Ask about a vehicle, schedule a test drive, or get a trade-in appraisal."
         ),
         page_type='contact',
     )
@@ -1665,6 +1666,7 @@ def about():
     ])
     return render_template(
         'about.html',
+        buyer_guides=published_buyer_guides(),
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
@@ -1703,6 +1705,7 @@ def financing():
     ).all()
     return render_template(
         'financing.html',
+        buyer_guides=published_buyer_guides(),
         financing_vehicles=vehicles,
         selected_vehicle_id=request.args.get('vehicle_id', type=int),
         form_values={},
@@ -1908,11 +1911,12 @@ def sell_your_car():
     ]
     return render_template(
         'sell_your_car.html',
+        buyer_guides=published_buyer_guides(),
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
         structured_faq=structured_data_faq(faqs),
-        meta_title=f"Sell Your Car in {current_app.config['BUSINESS_CITY']} | {current_app.config['BUSINESS_NAME']}",
+        meta_title=f"Sell or Trade In Your Car in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']} | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
             f"Sell your car to {current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']}, "
             f"{current_app.config['BUSINESS_STATE']}. Get a fair cash offer, fast payment, and hassle-free paperwork. Trade-ins welcome."
@@ -1940,11 +1944,11 @@ def blog_list():
         breadcrumbs=breadcrumbs,
         structured_local=structured_data_local_business(),
         structured_website=structured_data_website(),
-        meta_title=f"Car Buying Guides & News | {current_app.config['BUSINESS_NAME']}",
+        meta_title=f"Used Car Buying Guides for NC Shoppers | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
-            f"Car buying guides, financing tips, and news from {current_app.config['BUSINESS_NAME']} in "
-            f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. Learn how to "
-            f"shop for a used car and get the most for your trade-in."
+            f"Plain-English guides from {current_app.config['BUSINESS_NAME']} in "
+            f"{current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}: rebuilt vs. salvage titles, "
+            f"financing questions, and a used car inspection checklist."
         ),
         page_type='blog',
     )

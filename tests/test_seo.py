@@ -71,6 +71,19 @@ class SeoTests(unittest.TestCase):
                 self.assertEqual(html.select_one('meta[property="og:description"]')['content'], description)
                 self.assertEqual(html.select_one('meta[name="twitter:description"]')['content'], description)
 
+    def test_guides_are_linked_from_key_pages_and_titles_are_distinct(self):
+        self.app.test_cli_runner().invoke(args=['publish-buyer-guides'])
+        slug = BUYER_GUIDES[0]['slug']
+        titles = set()
+        for path in ('/', '/about', '/financing', '/sell-your-car', '/contact',
+                     '/service-area', '/blog', '/coming-soon'):
+            with self.subTest(path=path):
+                html = self.page(path)
+                titles.add(html.title.get_text(strip=True))
+                if path not in ('/contact', '/blog', '/coming-soon'):
+                    self.assertIsNotNone(html.select_one(f'a[href="/blog/{slug}"]'))
+        self.assertEqual(len(titles), 8)
+
     def test_homepage_preloads_hero_image_for_faster_paint(self):
         html = self.page('/')
         preloads = html.select('link[rel="preload"][as="image"][fetchpriority="high"]')
