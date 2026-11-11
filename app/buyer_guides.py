@@ -251,6 +251,120 @@ what to ask about branded vehicles. Ready to look?
 <a href="/contact">contact us with your questions</a>.</p>
 """,
     },
+    {
+        'slug': 'used-car-mileage-guide',
+        'title': 'Used-Car Mileage: What Is Too High, and What Should You Check?',
+        'excerpt': 'There is no mileage number that makes every used car a good or bad buy. Learn how to weigh odometer readings, maintenance records, age, condition, and price.',
+        'content': """
+<p>“How many miles is too many?” is one of the first questions shoppers ask
+about a used car. It is also the wrong question to answer with a single cutoff.
+Odometer mileage is useful context, but it cannot tell you on its own how a
+vehicle was maintained or what it will need next.</p>
+<h2>Read the miles alongside the car's age</h2>
+<p>Compare the odometer with the model year and the vehicle's dated service,
+inspection, and title records. A mileage history that rises steadily is easier
+to understand than one with a long gap or a sudden change. If an entry does not
+make sense, ask the seller to explain it and have the records reviewed before
+you decide. A history report can help, but it may not include every service
+visit or event.</p>
+<p>How a car was used matters, too, but do not assume that highway miles are
+automatically harmless or that city miles mean a car is worn out. Ask about
+maintenance and have the vehicle's current condition assessed. Evidence is more
+useful than a guess based on the previous owner's commute.</p>
+<h2>Look for a maintenance story, not just a low number</h2>
+<p>Ask for available service receipts and check them against the maintenance
+schedule for that exact year, make, and model. Pay attention to overdue or
+poorly documented maintenance that could affect major systems. An independent
+mechanic can assess wear on the engine, transmission, suspension, tires, and
+brakes and explain which repairs are due now versus later. That written
+assessment gives you a better basis for budgeting than the odometer alone.</p>
+<h2>Consider the whole cost of ownership</h2>
+<p>A lower-mileage car is not automatically the better value if its price is
+higher or its condition and records raise unanswered questions. Compare the
+purchase price, inspection findings, likely maintenance, insurance quote, and
+fuel costs. For fuel economy estimates, search the specific year, make, and
+model on <a href="https://www.fueleconomy.gov/">FuelEconomy.gov</a>; your actual
+results will vary with driving, maintenance, weather, and vehicle condition.</p>
+<p>Before you visit, save the listing and VIN, confirm the vehicle is available,
+and ask whether you can arrange an independent inspection. Our
+<a href="/blog/used-car-inspection-checklist">used-car inspection checklist</a>
+covers records and the final paperwork. If the vehicle has a branded title,
+read our <a href="/blog/rebuilt-vs-salvage-titles-north-carolina">North Carolina
+salvage and rebuilt-title guide</a>, too. You can
+<a href="/inventory">compare vehicles in our current inventory</a> or
+<a href="/contact">contact us with a question about a specific car</a>.</p>
+<h2>One more VIN check</h2>
+<p>Before buying, check the VIN for unrepaired safety recalls using
+<a href="https://www.nhtsa.gov/recalls">NHTSA's recall lookup</a>. A recall
+search does not replace a mechanical inspection, and it may not show every
+manufacturer campaign. Mileage, records, and a professional assessment each
+answer different questions; use all three rather than relying on any one of
+them.</p>
+""",
+    },
+    {
+        'slug': 'how-to-compare-used-cars',
+        'title': 'How to Compare Used Cars: A Side-by-Side Buyer Checklist',
+        'excerpt': 'Comparing used cars is easier when you weigh the same details for each one. Use this practical checklist for condition, history, price, and everyday fit.',
+        'content': """
+<p>When two used cars both look promising, it is easy to fixate on the asking
+price or whichever one you saw most recently. A simple side-by-side comparison
+helps you slow down and notice the differences that matter after the first
+week of ownership. Start with how you will use the car, then compare the same
+details for every candidate.</p>
+<h2>Write down what your day-to-day driving requires</h2>
+<p>Think about the routes you actually drive, how many people usually ride
+along, and what you need to carry. A small car may be easier to park and use
+less fuel; a larger vehicle may suit your passenger or cargo needs better.
+There is no universal best choice. Make a short list of must-haves, nice-to-
+haves, and deal-breakers before the features in a listing make the decision
+for you.</p>
+<h2>Compare like with like</h2>
+<p>Record the year, make, model, trim, mileage, title status, advertised price,
+and VIN for each vehicle. Similar model names can have different equipment,
+engines, and safety features, so verify what is actually on the car instead of
+assuming every trim is the same. Check the VIN against the listing and the
+documents you receive.</p>
+<p>Then compare what you can verify: maintenance records, available history,
+disclosed condition, and the findings from an independent inspection. Ask the
+same questions about each vehicle. If one has an unanswered history gap or
+needs work, note it rather than treating an incomplete record as proof of
+either good or bad condition. Our
+<a href="/blog/used-car-mileage-guide">guide to used-car mileage</a> explains
+why the odometer should be read alongside a vehicle's age and maintenance.</p>
+<h2>Compare the cost you will actually pay</h2>
+<p>Ask for an itemized out-the-door price for each car. Add a quote for
+insurance using the VIN, likely maintenance identified by an inspector, and
+fuel costs based on the way you drive. The EPA's
+<a href="https://www.fueleconomy.gov/">FuelEconomy.gov</a> offers estimates
+that can help you compare models, but real-world mileage varies.</p>
+<p>If you plan to finance, compare the APR, loan term, amount financed, and
+total of payments, not just the monthly amount. The
+<a href="https://www.consumerfinance.gov/consumer-tools/auto-loans/">CFPB's
+auto-loan tools</a> can help you understand and compare financing offers.
+Approval and terms depend on the lender, borrower, and vehicle.</p>
+<h2>Give condition and paperwork equal weight</h2>
+<p>Arrange an independent inspection before committing, and ask the seller to
+explain anything you do not understand in the report. Check the title and
+written sale terms; an inspection, history report, or test drive is not a
+substitute for the others. Our
+<a href="/blog/used-car-inspection-checklist">practical inspection
+checklist</a> walks through the records, visit, and paperwork. For branded
+vehicles in North Carolina, see our
+<a href="/blog/rebuilt-vs-salvage-titles-north-carolina">title guide</a>.</p>
+<p>There may not be a perfect choice, but you can make a well-informed one.
+Compare your notes, follow up on unanswered questions, and choose the car
+whose condition and total cost fit your needs. Ready to start a shortlist?
+<a href="/inventory">Browse our current vehicles</a> or
+<a href="/contact">ask us about a specific listing</a>.</p>
+<h2>Official buying guidance</h2>
+<p>The Federal Trade Commission explains the
+<a href="https://www.ftc.gov/business-guidance/resources/used-motor-vehicle-trade-regulation-rule">Used Car Rule and Buyers Guide</a>,
+including the information dealers must provide to shoppers. Read the guide
+provided with the vehicle and make sure any written warranty terms match what
+you were told.</p>
+""",
+    },
 )
 
 # Guides published before per-guide tracking, covered by the original one-time marker.

@@ -262,10 +262,11 @@ public price. Run `flask db upgrade` before deploying this feature.
 
 ## Buyer guides and local SEO
 
-Three starter articles cover North Carolina salvage/rebuilt titles, rebuilt-title
-financing, and a used-car inspection checklist. Their legal and loan references
-link to NC General Statutes and the CFPB; they do not promise safety certification,
-financing approval, or insurance coverage.
+Six starter articles cover North Carolina salvage/rebuilt titles, rebuilt-title
+financing, used-car inspections, winter shopping, mileage, and comparing cars.
+They link to relevant government sources, including NC General Statutes, the
+CFPB, FTC, NHTSA, and EPA; they do not promise safety certification, financing
+approval, or insurance coverage.
 
 After upgrading the database, publish them with:
 
