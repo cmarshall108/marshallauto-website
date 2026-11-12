@@ -1,8 +1,10 @@
+import ipaddress
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
-from flask import Flask, Request, abort, current_app, request
+from flask import Flask, Request, abort, current_app, redirect, request
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -85,6 +87,34 @@ def create_app(config_class=None):
 
     # Trust X-Forwarded-* headers behind reverse proxies (Heroku, nginx, etc.)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    @app.before_request
+    def redirect_ip_host_to_canonical_domain():
+        if not app.config.get('CANONICAL_IP_REDIRECT') or request.method not in ('GET', 'HEAD'):
+            return None
+
+        canonical = urlsplit(app.config.get('SITE_URL') or '')
+        request_host = urlsplit(request.host_url).hostname
+        if not canonical.hostname or not request_host:
+            return None
+        try:
+            requested_ip = ipaddress.ip_address(request_host)
+        except ValueError:
+            return None
+        try:
+            if requested_ip == ipaddress.ip_address(canonical.hostname):
+                return None
+        except ValueError:
+            pass
+
+        target = urlunsplit((
+            canonical.scheme,
+            canonical.netloc,
+            request.path,
+            request.query_string.decode('latin-1'),
+            '',
+        ))
+        return redirect(target, code=301)
 
     # Ensure upload directories exist
     os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'vehicles'), exist_ok=True)

@@ -162,6 +162,7 @@ class Config:
 
     # Business info
     SITE_URL = os.environ.get('SITE_URL') or 'https://marshallautosanford.com'
+    CANONICAL_IP_REDIRECT = False
     BUSINESS_NAME = os.environ.get('BUSINESS_NAME') or 'Marshall Auto, LLC'
     BUSINESS_PHONE = os.environ.get('BUSINESS_PHONE') or '(919)-215-0702'
     BUSINESS_EMAIL = os.environ.get('BUSINESS_EMAIL') or 'sales@marshallautosanford.com'
@@ -274,6 +275,7 @@ class ProductionConfig(Config):
     REMEMBER_COOKIE_SECURE = True
     PREFERRED_URL_SCHEME = 'https'
     SITE_URL = 'https://marshallautosanford.com'
+    CANONICAL_IP_REDIRECT = True
 
     @classmethod
     def init_app(cls, app):

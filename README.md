@@ -905,6 +905,9 @@ existing database model. Sitemap responses may be cached for up to one hour.
 ### Search engine rollout
 
 1. Deploy the changes and confirm `SITE_URL` is the canonical HTTPS public domain.
+   Production redirects GET and HEAD requests made to a raw IP address to this
+   domain, preserving the path and query string. Check Search Console for any
+   indexed IP-address URLs and request recrawling after deployment.
 2. Verify the domain in Google Search Console and Bing Webmaster Tools. The admin
   settings support Google's verification tag; DNS verification also works for
   either service.

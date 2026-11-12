@@ -251,6 +251,22 @@ class SeoTests(unittest.TestCase):
         robots = self.client.get('/robots.txt', headers=proxy_headers)
         self.assertIn(f'Sitemap: {site_url}/sitemap.xml', robots.get_data(as_text=True))
 
+    def test_ip_host_redirects_safe_requests_to_canonical_domain(self):
+        self.app.config['CANONICAL_IP_REDIRECT'] = True
+        self.app.config['SERVER_NAME'] = '66.179.208.91'
+        response = self.client.get(
+            '/inventory?page=2&utm_source=ip',
+            base_url='http://66.179.208.91',
+        )
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response.headers['Location'],
+            'http://localhost/inventory?page=2&utm_source=ip',
+        )
+
+        response = self.client.post('/', base_url='http://66.179.208.91')
+        self.assertEqual(response.status_code, 405)
+
     def test_sitemap_dates_are_only_real_content_timestamps(self):
         vehicle = Vehicle.query.filter_by(slug='test-car-0').one()
         vehicle.updated_at = datetime(2026, 9, 1)
