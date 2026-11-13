@@ -28,7 +28,8 @@ from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
 from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
 from app.utils import (
-    aggregate_rating_data, business_hours, client_ip, dealership_now, format_mileage, format_mileage_badge, format_price,
+    aggregate_rating_data, business_hours, client_ip, dealership_now, format_email_address,
+    format_mileage, format_mileage_badge, format_price,
     format_phone_number, notify_new_lead, parse_optional_int, rate_limit_exceeded, sanitize_gsc_tag,
     slugify,
     send_lead_confirmation, structured_data_breadcrumb, structured_data_faq,
@@ -1479,7 +1480,7 @@ def _build_lead_from_form(form, source='contact'):
             vehicle_id = None
     attr = _attribution_from_request()
     name = (form.name.data or '').strip()[:128]
-    email = (form.email.data or '').strip()[:128]
+    email = (format_email_address(form.email.data) or (form.email.data or '').strip())[:128]
     phone = format_phone_number(form.phone.data)[:32] or None
     message = (form.message.data or '').strip() or None
 
@@ -1524,9 +1525,15 @@ def _notify_lead(lead):
             'Lead %s quarantined as spam (score=%s): %s',
             lead.id, lead.spam_score, lead.spam_reasons,
         )
-    else:
-        notify_new_lead(lead)
-        send_lead_confirmation(lead)
+        return
+    try:
+        from app.outreach import upsert_outreach_contact_from_lead
+        upsert_outreach_contact_from_lead(lead, commit=True)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Outreach contact sync failed for lead %s', lead.id)
+    notify_new_lead(lead)
+    send_lead_confirmation(lead)
 
 
 def _create_lead_from_form(form, source='contact'):
@@ -1656,6 +1663,86 @@ def analytics_collect():
 
     body, status = process_collect_payload(data or {})
     return jsonify(body), status
+
+
+@main.route('/alerts/unsubscribe/<token>', methods=['GET', 'POST'])
+def outreach_unsubscribe(token):
+    """One-click / confirmed stop for monthly new-car texts and emails."""
+    from app.outreach import find_contact_by_token, opt_out_all, opt_out_email, opt_out_sms
+
+    contact = find_contact_by_token(token)
+    if contact is None:
+        abort(404)
+
+    done = False
+    if request.method == 'POST':
+        action = (request.form.get('action') or 'all').strip().lower()
+        if action == 'sms':
+            opt_out_sms(contact, reason='web_unsubscribe_sms')
+        elif action == 'email':
+            opt_out_email(contact, reason='web_unsubscribe_email')
+        else:
+            opt_out_all(contact, reason='web_unsubscribe_all')
+        db.session.commit()
+        done = True
+        flash('You are unsubscribed. We will not send further monthly inventory messages on the channels you stopped.', 'success')
+
+    return render_template(
+        'outreach_unsubscribe.html',
+        contact=contact,
+        done=done,
+        meta_title=f"Stop inventory alerts | {current_app.config['BUSINESS_NAME']}",
+        meta_description='Stop monthly new-car texts or emails from Marshall Auto anytime.',
+        robots='noindex, nofollow',
+        page_type='other',
+    )
+
+
+@main.route('/alerts/stop-texts', methods=['GET', 'POST'])
+def outreach_stop_texts():
+    """Stop monthly texts by phone number — no account required."""
+    from app.forms import OutreachStopTextsForm
+    from app.outreach import find_contact_by_phone, opt_out_sms
+    from app.utils import format_phone_number
+
+    form = OutreachStopTextsForm()
+    stopped = False
+    not_found = False
+    if form.validate_on_submit():
+        if rate_limit_exceeded(
+            f"outreach-stop:{client_ip()}",
+            current_app.config.get('CONTACT_RATE_LIMIT', 8),
+            current_app.config.get('CONTACT_RATE_WINDOW', 600),
+        ):
+            flash('Too many attempts. Please try again later or call us.', 'warning')
+            return redirect(url_for('main.outreach_stop_texts'))
+        contact = find_contact_by_phone(form.phone.data)
+        if contact is None:
+            not_found = True
+            flash(
+                'We could not find that mobile number on our text list. '
+                'If you still receive a message, use the stop link in the text or call us.',
+                'warning',
+            )
+        else:
+            opt_out_sms(contact, reason='web_stop_texts')
+            db.session.commit()
+            stopped = True
+            flash(
+                f"You're all set. We will no longer send monthly inventory texts to "
+                f"{format_phone_number(form.phone.data) or 'that number'}.",
+                'success',
+            )
+    return render_template(
+        'outreach_stop_texts.html',
+        form=form,
+        stopped=stopped,
+        not_found=not_found,
+        meta_title=f"Stop inventory texts | {current_app.config['BUSINESS_NAME']}",
+        meta_description='Stop monthly new-car text messages from Marshall Auto.',
+        robots='noindex, nofollow',
+        page_type='other',
+    )
 
 
 @main.route('/about')

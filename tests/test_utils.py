@@ -8,9 +8,9 @@ from flask import Flask
 
 from app.utils import (
     _ffmpeg_path, _opening_hours_spec, business_hours, dealership_local_to_utc,
-    format_currency, format_mileage_badge,
-    format_phone_number, is_low_mileage, is_safe_redirect, notify_new_lead,
-    to_dealership_time,
+    format_currency, format_email_address, format_mileage_badge,
+    format_phone_number, is_low_mileage, is_safe_redirect, normalize_phone_e164,
+    notify_new_lead, to_dealership_time,
 )
 
 
@@ -86,10 +86,17 @@ class PhoneNumberFormattingTests(unittest.TestCase):
     def test_formats_valid_us_and_international_numbers(self):
         self.assertEqual(format_phone_number('9195550182'), '(919) 555-0182')
         self.assertEqual(format_phone_number('+442071838750'), '+44 20 7183 8750')
+        self.assertEqual(normalize_phone_e164('9195550182'), '+19195550182')
+        self.assertEqual(normalize_phone_e164('+44 20 7183 8750'), '+442071838750')
 
     def test_preserves_invalid_and_empty_values(self):
         self.assertEqual(format_phone_number('123'), '123')
         self.assertEqual(format_phone_number('  '), '')
+        self.assertIsNone(normalize_phone_e164('123'))
+
+    def test_formats_email_addresses(self):
+        self.assertEqual(format_email_address('  A.B@Example.COM '), 'A.B@example.com')
+        self.assertEqual(format_email_address(''), '')
 
 
 class FfmpegResolutionTests(unittest.TestCase):

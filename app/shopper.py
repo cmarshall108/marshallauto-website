@@ -10,7 +10,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.models import InventoryAlert, Lead, TestDrive, Vehicle, VehicleHoldRequest, utcnow
-from app.utils import dealership_now, format_phone_number, to_dealership_time
+from app.utils import dealership_now, format_email_address, format_phone_number, to_dealership_time
 
 HOLD_HOURS = 72
 APPOINTMENT_HOURS = (9, 10, 11, 12, 13, 14, 15, 16, 17)
@@ -32,9 +32,10 @@ def appointment_slots(days=7):
 
 def _lead(name, email, phone, message, vehicle, source):
     phone = format_phone_number(phone)
+    email = format_email_address(email) or (email or '').strip()
     lead = Lead(
         name=name.strip(),
-        email=email.strip(),
+        email=email,
         phone=(phone or '').strip() or None,
         message=message,
         vehicle_id=vehicle.id if vehicle is not None else None,
@@ -357,6 +358,12 @@ def _send_alert(alert, vehicle):
 
 def _notify(lead):
     from app.utils import notify_new_lead, send_lead_confirmation
+    try:
+        from app.outreach import upsert_outreach_contact_from_lead
+        upsert_outreach_contact_from_lead(lead, commit=True)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Outreach contact sync failed for lead %s', lead.id)
     notify_new_lead(lead)
     send_lead_confirmation(lead)
 

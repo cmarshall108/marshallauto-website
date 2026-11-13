@@ -1177,6 +1177,47 @@ class Lead(db.Model):
     vehicle = db.relationship('Vehicle', backref=db.backref('leads', lazy='dynamic'))
 
 
+class OutreachContact(db.Model):
+    """Normalized lead contact for monthly new-inventory outreach.
+
+    Separate from the leads inbox so staff can keep a clean, deduplicated list
+    of people to text or email about new cars, with durable opt-out state.
+    """
+    __tablename__ = 'outreach_contacts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    email = db.Column(db.String(128), nullable=True, index=True)
+    phone = db.Column(db.String(32), nullable=True)
+    phone_e164 = db.Column(db.String(20), nullable=True, unique=True, index=True)
+    last_lead_id = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=True, index=True)
+    source = db.Column(db.String(64), nullable=True)
+
+    sms_opt_in = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    email_opt_in = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    sms_opted_out_at = db.Column(db.DateTime, nullable=True)
+    email_opted_out_at = db.Column(db.DateTime, nullable=True)
+    opt_out_reason = db.Column(db.String(128), nullable=True)
+
+    unsubscribe_token = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    last_sms_at = db.Column(db.DateTime, nullable=True)
+    last_email_at = db.Column(db.DateTime, nullable=True)
+    last_outreach_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    last_lead = db.relationship('Lead', foreign_keys=[last_lead_id])
+
+    def __init__(self, **kwargs):
+        if not kwargs.get('unsubscribe_token'):
+            kwargs['unsubscribe_token'] = secrets.token_urlsafe(24)
+        super().__init__(**kwargs)
+
+    @property
+    def first_name(self):
+        return (self.name or 'there').strip().split(' ', 1)[0] or 'there'
+
+
 class FinancingApplication(db.Model):
     """Application metadata only; applicant information exists only in an encrypted PDF."""
     __tablename__ = 'financing_applications'

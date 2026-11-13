@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+
+{% block content %}
+<section class="section-padding">
+    <div class="container" style="max-width: 640px;">
+        <div class="card border-0 shadow p-4 p-md-5">
+            <h1 class="h3 fw-bold mb-3">Inventory message preferences</h1>
+            {% if done %}
+            <p class="mb-2">Your preference has been saved.</p>
+            <p class="text-muted mb-4">
+                You can still reach us anytime at
+                <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}">{{ business_phone }}</a>
+                or <a href="{{ url_for('main.contact') }}">our contact page</a>.
+            </p>
+            <a href="{{ url_for('main.inventory') }}" class="btn btn-primary">Browse inventory</a>
+            {% else %}
+            <p class="mb-3">
+                Hi{% if contact.first_name and contact.first_name != 'there' %} {{ contact.first_name }}{% endif %},
+                you are on Marshall Auto’s occasional new-car list
+                (about one message per month when we have fresh inventory).
+            </p>
+            <p class="text-muted small mb-4">
+                {% if contact.phone %}<span class="d-block">Texts: {{ contact.phone }}
+                    {% if not contact.sms_opt_in %}<span class="badge bg-secondary ms-1">already stopped</span>{% endif %}
+                </span>{% endif %}
+                {% if contact.email %}<span class="d-block">Email: {{ contact.email }}
+                    {% if not contact.email_opt_in %}<span class="badge bg-secondary ms-1">already stopped</span>{% endif %}
+                </span>{% endif %}
+            </p>
+            <form method="POST" class="d-grid gap-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if contact.sms_opt_in and contact.phone %}
+                <button type="submit" name="action" value="sms" class="btn btn-outline-primary">
+                    Stop texts only
+                </button>
+                {% endif %}
+                {% if contact.email_opt_in and contact.email %}
+                <button type="submit" name="action" value="email" class="btn btn-outline-primary">
+                    Stop emails only
+                </button>
+                {% endif %}
+                <button type="submit" name="action" value="all" class="btn btn-primary">
+                    Stop all inventory messages
+                </button>
+            </form>
+            <p class="small text-muted mt-4 mb-0">
+                This only stops automated new-car updates. It does not cancel an active conversation
+                with our team about a vehicle you already inquired about.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

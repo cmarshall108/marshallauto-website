@@ -253,6 +253,24 @@ class Config:
     SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0'))
     ALERT_WORKER_INTERVAL_SECONDS = int(os.environ.get('ALERT_WORKER_INTERVAL_SECONDS', '300'))
 
+    # Monthly new-car outreach to formatted lead contacts (app/outreach.py).
+    OUTREACH_ENABLED = os.environ.get('OUTREACH_ENABLED', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    OUTREACH_SEND_SMS = os.environ.get('OUTREACH_SEND_SMS', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    OUTREACH_SEND_EMAIL = os.environ.get('OUTREACH_SEND_EMAIL', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    # Minimum days between outreach to the same contact (timer may fire monthly).
+    OUTREACH_MIN_DAYS = int(os.environ.get('OUTREACH_MIN_DAYS', '28'))
+    OUTREACH_VEHICLE_LIMIT = int(os.environ.get('OUTREACH_VEHICLE_LIMIT', '5'))
+    # Log-only mode: mark sends successful without calling Textbelt/SMTP.
+    OUTREACH_DRY_RUN = os.environ.get('OUTREACH_DRY_RUN', 'false').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+
     # IndexNow (Bing/Yandex and partners). Google ignores it today; leave key empty to disable.
     # Generate once: python -c "import secrets; print(secrets.token_hex(16))"
     INDEXNOW_ENABLED = os.environ.get('INDEXNOW_ENABLED', 'true').lower() in (
@@ -314,6 +332,9 @@ class TestingConfig(Config):
     INDEXNOW_ENABLED = False
     INDEXNOW_KEY = 'test-indexnow-key'
     INDEXNOW_TIMEOUT = 1.0
+    OUTREACH_ENABLED = True
+    OUTREACH_DRY_RUN = True
+    OUTREACH_MIN_DAYS = 28
 
 
 config_by_name = {

@@ -566,7 +566,13 @@ starts this worker by default (`START_HIGHLIGHT_WORKER=1`); other deployments mu
 it separately, even if photo highlights are disabled. The same launcher starts the
 inventory alert worker (`START_ALERT_WORKER=1`, every `ALERT_WORKER_INTERVAL_SECONDS`,
 default 300). `deploy/install.sh` also enables `marshallauto-alerts.timer` as a
-five-minute backup. Redis, Sentry, and the image CDN remain optional: startup writes
+five-minute backup and `marshallauto-outreach.timer` for monthly new-car texts/emails
+to formatted lead contacts (1st of each month). Non-spam leads are normalized into the
+`outreach_contacts` table automatically; backfill with `flask sync-outreach-contacts`
+and send early with `flask send-monthly-outreach` or `python -m app.outreach_worker`.
+Customers stop texts at `/alerts/stop-texts` or via the personal link in each message
+(`/alerts/unsubscribe/<token>`). Staff manage the list under **Admin → Outreach**.
+Redis, Sentry, and the image CDN remain optional: startup writes
 safe cache and fee defaults into `.env` only when those keys are missing, and leaves
 `REDIS_URL`, `SENTRY_DSN`, and `IMAGE_CDN_BASE_URL` blank. Install ffmpeg and run
 `flask db upgrade` before deployment. The automatic deploy script already runs that
@@ -627,7 +633,13 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `FINANCING_MAX_CONTENT_LENGTH` | Maximum online financing form size in bytes (default 96 KiB) |
 | `FINANCING_RATE_LIMIT` | Financing submissions per client IP per window (default 5) |
 | `FINANCING_RATE_WINDOW` | Financing submission rate-limit window in seconds (default 3600) |
-| `TEXTBELT_API_KEY` | Textbelt API key for test-drive confirmation texts and offline salesperson alerts |
+| `TEXTBELT_API_KEY` | Textbelt API key for test-drive confirmation texts, offline salesperson alerts, and monthly new-car outreach texts |
+| `OUTREACH_ENABLED` | Monthly new-car outreach to lead contacts (`true`/`false`, default true) |
+| `OUTREACH_SEND_SMS` | Send monthly outreach by SMS when Textbelt is configured (default true) |
+| `OUTREACH_SEND_EMAIL` | Send monthly outreach by email when SMTP is configured (default true) |
+| `OUTREACH_MIN_DAYS` | Minimum days between outreach to the same contact (default `28`) |
+| `OUTREACH_VEHICLE_LIMIT` | How many newest vehicles to mention (default `5`) |
+| `OUTREACH_DRY_RUN` | Log-only monthly outreach without calling Textbelt/SMTP (default false) |
 | `DATABASE_URL` | Database connection string (defaults to SQLite) |
 | `ADMIN_USERNAME` | Admin login username |
 | `ADMIN_PASSWORD` | Admin login password |

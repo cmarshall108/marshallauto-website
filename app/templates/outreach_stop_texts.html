@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block meta_title %}{{ meta_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+
+{% block content %}
+<section class="section-padding">
+    <div class="container" style="max-width: 560px;">
+        <div class="card border-0 shadow p-4 p-md-5">
+            <h1 class="h3 fw-bold mb-3">Stop inventory texts</h1>
+            <p class="mb-4">
+                Enter the mobile number that receives Marshall Auto’s monthly new-car texts.
+                We will remove it from the text list right away. No account required.
+            </p>
+            {% if stopped %}
+            <div class="alert alert-success">Texts stopped for that number.</div>
+            <a href="{{ url_for('main.inventory') }}" class="btn btn-primary">Browse inventory</a>
+            {% else %}
+            <form method="POST" class="row g-3">
+                {{ form.hidden_tag() }}
+                <div class="col-12">
+                    <label class="form-label" for="phone">Mobile number</label>
+                    {{ form.phone(class="form-control form-control-lg", placeholder="(919) 555-0100", autocomplete="tel") }}
+                    {% if form.phone.errors %}
+                    <div class="text-danger small">{{ form.phone.errors[0] }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-12 d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">Stop texts</button>
+                </div>
+            </form>
+            <p class="small text-muted mt-4 mb-0">
+                Prefer email opt-out? Use the unsubscribe link in any inventory email, or
+                <a href="{{ url_for('main.contact') }}">contact us</a> and we will help.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

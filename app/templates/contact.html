@@ -87,6 +87,11 @@
                                 {{ form.honeypot(class="form-control", tabindex="-1", autocomplete="off") }}
                             </div>
                             <div class="col-12">
+                                <p class="small text-muted mb-3">
+                                    We may occasionally text or email about new vehicles (about once a month).
+                                    Stop anytime via the link in each message or
+                                    <a href="{{ url_for('main.outreach_stop_texts') }}">stop texts here</a>.
+                                </p>
                                 <button type="submit" class="btn btn-primary btn-lg">Send Message</button>
                             </div>
                         </div>

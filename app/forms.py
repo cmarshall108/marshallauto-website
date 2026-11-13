@@ -581,6 +581,11 @@ class ContactForm(FlaskForm):
             raise ValidationError('Invalid vehicle reference.')
 
 
+class OutreachStopTextsForm(FlaskForm):
+    phone = StringField('Mobile number', validators=[DataRequired(), Length(max=32)])
+    submit = SubmitField('Stop texts')
+
+
 class ReviewForm(FlaskForm):
     author_name = StringField('Author Name *', validators=[DataRequired(), Length(max=128)])
     rating = SelectField('Rating *', coerce=int, choices=[

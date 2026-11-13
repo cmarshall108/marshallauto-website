@@ -104,6 +104,34 @@ def format_phone_number(phone, region='US'):
     return phonenumbers.format_number(parsed, style)
 
 
+def normalize_phone_e164(phone, region='US'):
+    """Return E.164 for valid numbers, otherwise None (for SMS providers)."""
+    value = (phone or '').strip()
+    if not value:
+        return None
+    try:
+        parsed = phonenumbers.parse(value, region)
+    except phonenumbers.NumberParseException:
+        return None
+    if not phonenumbers.is_valid_number(parsed):
+        return None
+    return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+
+
+def format_email_address(email):
+    """Normalize email casing/domain; return '' when empty, original strip on failure."""
+    value = (email or '').strip()
+    if not value:
+        return ''
+    try:
+        from email_validator import EmailNotValidError, validate_email
+        result = validate_email(value, check_deliverability=False)
+        return result.normalized
+    except Exception:
+        # Keep a best-effort lowercase address when the library rejects edge cases.
+        return value.lower()
+
+
 def allowed_file(filename, allowed_extensions):
     return bool(filename) and '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in allowed_extensions

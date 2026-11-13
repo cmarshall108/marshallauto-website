@@ -33,7 +33,8 @@ from app.forms import (
     VehicleAcquisitionCostForm, VehicleForm, VehicleSaleForm, VehicleSaleReceiptForm,
 )
 from app.models import (
-    AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, PageView,
+    AnalyticsEvent, BlogPost, CarfaxReport, DealerTag, FinancingApplication, Lead, OutreachContact,
+    PageView,
     Review, ServiceRecord, InventoryAlert, RebuildCostEntry, RebuildCostReceipt,
     SiteSetting, TestDrive, TestDriveReminderDismissal, User, Vehicle, VehicleHoldRequest, VehicleImage,
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
@@ -3025,6 +3026,100 @@ def financials():
         'admin/financials.html',
         **build_financial_dashboard(request.args),
     )
+
+
+# ------------------------------ OUTREACH CONTACTS ------------------------------
+
+@admin_bp.route('/outreach-contacts')
+@login_required
+def outreach_contacts():
+    q = (request.args.get('q') or '').strip()
+    status = (request.args.get('status') or 'all').strip().lower()
+    query = OutreachContact.query
+    if q:
+        like = f'%{q}%'
+        query = query.filter(or_(
+            OutreachContact.name.ilike(like),
+            OutreachContact.email.ilike(like),
+            OutreachContact.phone.ilike(like),
+            OutreachContact.phone_e164.ilike(like),
+        ))
+    if status == 'sms':
+        query = query.filter(OutreachContact.sms_opt_in.is_(True))
+    elif status == 'email':
+        query = query.filter(OutreachContact.email_opt_in.is_(True))
+    elif status == 'stopped':
+        query = query.filter(
+            OutreachContact.sms_opt_in.is_(False),
+            OutreachContact.email_opt_in.is_(False),
+        )
+    pagination = query.order_by(OutreachContact.updated_at.desc(), OutreachContact.id.desc()).paginate(
+        page=request.args.get('page', 1, type=int), per_page=50, error_out=False,
+    )
+    return render_template(
+        'admin/outreach_contacts.html',
+        pagination=pagination,
+        q=q,
+        status=status,
+        total=OutreachContact.query.count(),
+        sms_active=OutreachContact.query.filter_by(sms_opt_in=True).count(),
+        email_active=OutreachContact.query.filter_by(email_opt_in=True).count(),
+    )
+
+
+@admin_bp.route('/outreach-contacts/sync', methods=['POST'])
+@login_required
+def outreach_contacts_sync():
+    from app.outreach import sync_outreach_contacts_from_leads
+    stats = sync_outreach_contacts_from_leads()
+    flash(
+        f"Synced outreach list from leads. "
+        f"Created {stats['created']}, updated {stats['updated']}, total {stats['total']}.",
+        'success',
+    )
+    return redirect(url_for('admin.outreach_contacts'))
+
+
+@admin_bp.route('/outreach-contacts/<int:id>/sms', methods=['POST'])
+@login_required
+def outreach_contact_toggle_sms(id):
+    from app.outreach import opt_out_sms
+    contact = db.session.get(OutreachContact, id) or abort(404)
+    if contact.sms_opt_in:
+        opt_out_sms(contact, reason='admin_toggle')
+        flash(f'SMS stopped for {contact.name}.', 'success')
+    else:
+        contact.sms_opt_in = True
+        contact.sms_opted_out_at = None
+        contact.updated_at = utcnow()
+        flash(f'SMS re-enabled for {contact.name}.', 'success')
+    db.session.commit()
+    return redirect(url_for(
+        'admin.outreach_contacts',
+        q=request.form.get('q') or None,
+        status=request.form.get('status') or None,
+    ))
+
+
+@admin_bp.route('/outreach-contacts/<int:id>/email', methods=['POST'])
+@login_required
+def outreach_contact_toggle_email(id):
+    from app.outreach import opt_out_email
+    contact = db.session.get(OutreachContact, id) or abort(404)
+    if contact.email_opt_in:
+        opt_out_email(contact, reason='admin_toggle')
+        flash(f'Email stopped for {contact.name}.', 'success')
+    else:
+        contact.email_opt_in = True
+        contact.email_opted_out_at = None
+        contact.updated_at = utcnow()
+        flash(f'Email re-enabled for {contact.name}.', 'success')
+    db.session.commit()
+    return redirect(url_for(
+        'admin.outreach_contacts',
+        q=request.form.get('q') or None,
+        status=request.form.get('status') or None,
+    ))
 
 
 # ------------------------------ LEADS ------------------------------

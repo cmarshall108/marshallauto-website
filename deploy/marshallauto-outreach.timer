@@ -1,0 +1,12 @@
+[Unit]
+Description=Send monthly new-car outreach on the 1st at 10:00 America/New_York
+
+[Timer]
+# First of each month at 10:00 Eastern. Persistent catches missed runs.
+OnCalendar=*-*-01 10:00:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=marshallauto-outreach.service
+
+[Install]
+WantedBy=timers.target

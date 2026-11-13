@@ -357,7 +357,11 @@
                     <small>&copy; {{ now.year if now is defined else now().year }} {{ business_name }}. All rights reserved.</small>
                 </div>
                 <div class="col-md-6 text-center text-md-end">
-                    <small><a href="{{ url_for('main.sitemap') }}" class="text-white-50 text-decoration-none">Sitemap</a></small>
+                    <small>
+                        <a href="{{ url_for('main.outreach_stop_texts') }}" class="text-white-50 text-decoration-none">Stop inventory texts</a>
+                        <span class="text-white-50 mx-2">·</span>
+                        <a href="{{ url_for('main.sitemap') }}" class="text-white-50 text-decoration-none">Sitemap</a>
+                    </small>
                 </div>
             </div>
         </div>
