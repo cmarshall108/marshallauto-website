@@ -46,8 +46,8 @@
         {% for test in safety_ratings.CrashTests %}
         <div class="col-md-6 col-xl-3">
             <article class="nhtsa-crash-card h-100">
-                {% if test.picture %}
                 <figure class="nhtsa-crash-photo mb-0">
+                    {% if test.picture %}
                     <img src="{{ test.picture }}"
                          alt="NHTSA {{ test.label | lower }} test photo for {{ safety_ratings.VehicleDescription or vehicle.title }}"
                          loading="lazy"
@@ -55,12 +55,13 @@
                          width="640"
                          height="360">
                     <figcaption>{{ test.label }} test</figcaption>
+                    {% else %}
+                    <div class="nhtsa-crash-photo-empty" aria-hidden="true">
+                        <i class="bi bi-car-front"></i>
+                        <span>{{ test.label }}</span>
+                    </div>
+                    {% endif %}
                 </figure>
-                {% else %}
-                <div class="nhtsa-crash-photo nhtsa-crash-photo-empty" aria-hidden="true">
-                    <i class="bi bi-car-front"></i>
-                </div>
-                {% endif %}
                 <div class="nhtsa-crash-body">
                     <div class="d-flex justify-content-between align-items-start gap-2">
                         <h4 class="h6 fw-bold mb-1">{{ test.label }}</h4>

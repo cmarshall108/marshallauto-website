@@ -969,18 +969,22 @@
 }
 .public-site .nhtsa-stars-lg { font-size: 1.2rem; }
 .public-site .nhtsa-crash-card {
+    position: relative;
     background: #fff;
     border: 1px solid var(--line, #d7deea);
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 8px 20px rgba(20, 34, 56, 0.04);
+    isolation: isolate;
 }
 .public-site .nhtsa-crash-photo {
     margin: 0;
     background: #e8eef7;
     aspect-ratio: 16 / 10;
     position: relative;
+    z-index: 0;
     overflow: hidden;
+    isolation: isolate;
 }
 .public-site .nhtsa-crash-photo img {
     width: 100%;
@@ -988,11 +992,11 @@
     object-fit: cover;
     display: block;
 }
-.public-site .nhtsa-crash-photo figcaption,
-.public-site .nhtsa-crash-photo-empty {
+.public-site .nhtsa-crash-photo figcaption {
     position: absolute;
     left: 0.65rem;
     bottom: 0.55rem;
+    z-index: 1;
     background: rgba(20, 34, 56, 0.78);
     color: #fff;
     border-radius: 999px;
@@ -1000,14 +1004,29 @@
     font-size: 0.72rem;
     font-weight: 600;
 }
+/* Keep empty-state in normal flow inside .nhtsa-crash-photo. Absolute + inset:0 on
+   the photo box itself escaped to a page-level containing block and covered the
+   inventory gallery when the Safety tab opened. */
 .public-site .nhtsa-crash-photo-empty {
+    position: absolute;
     inset: 0;
+    z-index: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin: 0;
     border-radius: 0;
-    display: grid;
-    place-items: center;
-    font-size: 2rem;
-    color: rgba(255, 255, 255, 0.85);
     background: linear-gradient(135deg, #4b6288, #142238);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.public-site .nhtsa-crash-photo-empty .bi {
+    font-size: 1.75rem;
+    line-height: 1;
+    opacity: 0.9;
 }
 .public-site .nhtsa-crash-body { padding: 0.85rem 0.9rem 1rem; }
 .public-site .nhtsa-bar {
