@@ -43,6 +43,7 @@ def _ssl_context() -> ssl.SSLContext | None:
 NHTSA_DECODE_URL = (
     'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/{vin}?format=json'
 )
+NHTSA_SAFETY_BASE_URL = 'https://api.nhtsa.gov/SafetyRatings'
 EPA_BASE_URL = 'https://www.fueleconomy.gov/ws/rest/vehicle'
 
 # VIN characters exclude I, O, Q.
@@ -55,6 +56,9 @@ _CACHE_MAX = 64
 _EPA_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
 _EPA_CACHE_TTL_SECONDS = 3600
 _EPA_CACHE_MAX = 128
+_SAFETY_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
+_SAFETY_CACHE_TTL_SECONDS = 3600
+_SAFETY_CACHE_MAX = 256
 
 # NHTSA equipment field -> catalog-friendly feature label.
 # Only applied when the decoded value indicates the equipment is present.
@@ -527,6 +531,7 @@ _VIN_DECODE_GROUPS = (
     ('Vehicle Identity', 'identity'),
     ('Powertrain', 'powertrain'),
     ('Dimensions & Chassis', 'chassis'),
+    ('NHTSA 5-Star Safety Ratings', 'safety_ratings'),
     ('Safety & Equipment', 'safety'),
     ('Occupants & Restraints', 'occupants'),
     ('Manufacturer & Assembly', 'manufacturing'),
@@ -583,7 +588,16 @@ _VIN_DECODE_OMIT_VALUES = {
     'unknown',
 }
 
-_VIN_DECODE_OMIT_FIELDS = {'ErrorCode', 'ErrorText'}
+_VIN_DECODE_OMIT_FIELDS = {
+    'ErrorCode', 'ErrorText',
+    'OverallStars', 'FrontStars', 'SideStars', 'RolloverStars',
+    'FrontDriverStars', 'FrontPassengerStars', 'SideDriverStars',
+    'SidePassengerStars', 'SidePoleStars',
+    'CrashTests', 'SafetyTech', 'Summary', 'RolloverPercent', 'NoTip',
+    'NhtsaVehicleUrl', 'NhtsaRatingsUrl', 'source',
+    'FrontCrashPicture', 'SideCrashPicture', 'SidePolePicture',
+    'FrontCrashVideo', 'SideCrashVideo', 'SidePoleVideo',
+}
 
 _GROK_ENUM_ESTIMATES = {
     'drivetrain': {
@@ -723,6 +737,26 @@ def _humanize_vin_field(field: str) -> str:
         if field[4:] == 'id':
             return 'EPA Vehicle ID'
         return f'EPA {_humanize_vin_field(field[4:])}'
+    if field.startswith('Safety '):
+        bare = field[7:]
+        labels = {
+            'OverallRating': 'Overall Rating',
+            'OverallFrontCrashRating': 'Frontal Crash Rating',
+            'OverallSideCrashRating': 'Side Crash Rating',
+            'RolloverRating': 'Rollover Rating',
+            'VehicleDescription': 'Rated Configuration',
+            'VehicleId': 'NHTSA Vehicle ID',
+            'NHTSAElectronicStabilityControl': 'Electronic Stability Control',
+            'NHTSAForwardCollisionWarning': 'Forward Collision Warning',
+            'NHTSALaneDepartureWarning': 'Lane Departure Warning',
+            'OverallStars': 'Overall Stars',
+            'FrontStars': 'Frontal Stars',
+            'SideStars': 'Side Stars',
+            'RolloverStars': 'Rollover Stars',
+        }
+        if bare in labels:
+            return labels[bare]
+        return _humanize_vin_field(bare)
     if field in _VIN_DECODE_LABELS:
         return _VIN_DECODE_LABELS[field]
     words = re.findall(r'[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+', field)
@@ -734,7 +768,20 @@ def _humanize_vin_field(field: str) -> str:
     )
 
 
+_SAFETY_RATING_FIELDS = {
+    'OverallRating', 'OverallFrontCrashRating', 'OverallSideCrashRating',
+    'RolloverRating', 'FrontCrashDriversideRating', 'FrontCrashPassengersideRating',
+    'SideCrashDriversideRating', 'SideCrashPassengersideRating', 'SidePoleCrashRating',
+    'NHTSAElectronicStabilityControl', 'NHTSAForwardCollisionWarning',
+    'NHTSALaneDepartureWarning', 'VehicleDescription', 'VehicleId',
+    'ModelYear', 'Make', 'Model', 'dynamicTipResult', 'RolloverPossibility',
+    'ComplaintsCount', 'RecallsCount', 'InvestigationCount',
+}
+
+
 def _vin_decode_group(field: str) -> str:
+    if field.startswith('Safety '):
+        return 'safety_ratings'
     if field.startswith('EPA '):
         return 'epa'
     name = field.casefold()
@@ -794,7 +841,12 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
         if source == 'Grok':
             continue
         if isinstance(source_data, dict):
-            prefix = 'EPA ' if source == 'EPA' else ''
+            if source == 'EPA':
+                prefix = 'EPA '
+            elif source == 'SafetyRatings':
+                prefix = 'Safety '
+            else:
+                prefix = ''
             fields.extend(
                 (f'{prefix}{field}', value)
                 for field, value in source_data.items()
@@ -803,7 +855,12 @@ def group_vin_decode_data(raw_data: str | dict[str, Any] | None) -> list[dict[st
             fields.append((source, source_data))
 
     for field, raw_value in fields:
-        if field in _VIN_DECODE_OMIT_FIELDS or raw_value is None:
+        bare_field = str(field)
+        if bare_field.startswith('EPA '):
+            bare_field = bare_field[4:]
+        elif bare_field.startswith('Safety '):
+            bare_field = bare_field[7:]
+        if field in _VIN_DECODE_OMIT_FIELDS or bare_field in _VIN_DECODE_OMIT_FIELDS or raw_value is None:
             continue
         value = str(raw_value).strip()
         if value.casefold() in _VIN_DECODE_OMIT_VALUES:
@@ -1355,6 +1412,695 @@ def _epa_cache_set(key: str, payload: dict[str, Any] | None) -> None:
         oldest = min(_EPA_CACHE.items(), key=lambda kv: kv[1][0])[0]
         _EPA_CACHE.pop(oldest, None)
     _EPA_CACHE[key] = (time.time(), payload)
+
+
+def _safety_cache_get(key: str) -> tuple[bool, dict[str, Any] | None]:
+    entry = _SAFETY_CACHE.get(key)
+    if not entry:
+        return False, None
+    ts, payload = entry
+    if time.time() - ts > _SAFETY_CACHE_TTL_SECONDS:
+        _SAFETY_CACHE.pop(key, None)
+        return False, None
+    return True, payload
+
+
+def _safety_cache_set(key: str, payload: dict[str, Any] | None) -> None:
+    if len(_SAFETY_CACHE) >= _SAFETY_CACHE_MAX:
+        oldest = min(_SAFETY_CACHE.items(), key=lambda kv: kv[1][0])[0]
+        _SAFETY_CACHE.pop(oldest, None)
+    _SAFETY_CACHE[key] = (time.time(), payload)
+
+
+def parse_nhtsa_star_rating(value: Any) -> int | None:
+    """Return 1-5 when NHTSA provides a star rating, otherwise None."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.casefold() in {
+        'not rated', 'n/a', 'na', 'not available', 'unknown',
+    }:
+        return None
+    try:
+        stars = int(float(text))
+    except (TypeError, ValueError):
+        return None
+    return stars if 1 <= stars <= 5 else None
+
+
+def _safety_json(url: str, timeout: float = 8.0) -> dict[str, Any]:
+    body = _http_get_bytes(url, timeout=timeout, accept='application/json')
+    try:
+        payload = json.loads(body.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError('NHTSA Safety Ratings returned invalid JSON') from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError('NHTSA Safety Ratings returned unexpected payload')
+    return payload
+
+
+def _normalize_safety_token(value: str | None) -> str:
+    return re.sub(r'[^a-z0-9]+', ' ', (value or '').casefold()).strip()
+
+
+def _drivetrain_tokens(drivetrain: str | None) -> set[str]:
+    text = _normalize_safety_token(drivetrain)
+    tokens: set[str] = set()
+    if not text:
+        return tokens
+    if 'awd' in text or 'all wheel' in text:
+        tokens.add('awd')
+    if '4wd' in text or '4x4' in text or 'four wheel' in text:
+        tokens.add('4wd')
+    if 'fwd' in text or 'front wheel' in text:
+        tokens.add('fwd')
+    if 'rwd' in text or 'rear wheel' in text:
+        tokens.add('rwd')
+    return tokens
+
+
+def _body_tokens(body_style: str | None) -> set[str]:
+    text = _normalize_safety_token(body_style)
+    tokens: set[str] = set()
+    if not text:
+        return tokens
+    mapping = {
+        'suv': {'suv', 'sport utility'},
+        'sedan': {'sedan', '4 dr', '4dr'},
+        'coupe': {'coupe', '2 dr', '2dr'},
+        'hatchback': {'hatchback', 'hatch'},
+        'wagon': {'wagon'},
+        'truck': {'truck', 'pickup', 'crew cab', 'extended cab', 'regular cab'},
+        'van': {'van', 'minivan'},
+        'convertible': {'convertible'},
+    }
+    for kind, needles in mapping.items():
+        if any(needle in text for needle in needles) or kind in text:
+            tokens.add(kind)
+    return tokens
+
+
+def _score_safety_model_name(candidate: str, model: str, fuel_type: str | None) -> int:
+    cand = _normalize_safety_token(candidate)
+    target = _normalize_safety_token(model)
+    if not cand or not target:
+        return -1
+    score = 0
+    if cand == target:
+        score = 100
+    elif cand.startswith(target) or target.startswith(cand):
+        score = 80
+    elif target in cand or cand in target:
+        score = 60
+    else:
+        target_parts = set(target.split())
+        cand_parts = set(cand.split())
+        overlap = target_parts & cand_parts
+        if not overlap:
+            return -1
+        score = 20 + (10 * len(overlap))
+    fuel = _normalize_safety_token(fuel_type)
+    hybrid_need = 'hybrid' in fuel or 'plug' in fuel
+    hybrid_have = 'hybrid' in cand
+    if hybrid_need and hybrid_have:
+        score += 15
+    elif hybrid_need and not hybrid_have:
+        score -= 10
+    elif hybrid_have and not hybrid_need:
+        score -= 5
+    return score
+
+
+def _score_safety_variant(
+    description: str,
+    *,
+    drivetrain: str | None,
+    body_style: str | None,
+) -> int:
+    desc = _normalize_safety_token(description)
+    score = 0
+    drive_tokens = _drivetrain_tokens(drivetrain)
+    if 'awd' in drive_tokens and 'awd' in desc:
+        score += 20
+    elif '4wd' in drive_tokens and ('4wd' in desc or '4x4' in desc):
+        score += 20
+    elif 'fwd' in drive_tokens and 'fwd' in desc:
+        score += 20
+    elif 'rwd' in drive_tokens and 'rwd' in desc:
+        score += 20
+    elif drive_tokens:
+        # Prefer exact drivetrain matches; mild penalty when mismatched.
+        if any(token in desc for token in ('awd', '4wd', 'fwd', 'rwd', '4x4')):
+            score -= 5
+
+    body_tokens = _body_tokens(body_style)
+    for token in body_tokens:
+        if token == 'suv' and 'suv' in desc:
+            score += 12
+        elif token == 'sedan' and ('sedan' in desc or '4 dr' in desc or '4dr' in desc):
+            score += 12
+        elif token == 'coupe' and ('coupe' in desc or '2 dr' in desc or '2dr' in desc):
+            score += 12
+        elif token == 'truck' and any(t in desc for t in ('truck', 'pickup', 'cab')):
+            score += 12
+        elif token == 'van' and 'van' in desc:
+            score += 12
+        elif token == 'hatchback' and 'hatch' in desc:
+            score += 12
+        elif token == 'wagon' and 'wagon' in desc:
+            score += 12
+        elif token == 'convertible' and 'convertible' in desc:
+            score += 12
+    return score
+
+
+def _safety_models_for_make(year: int, make: str, timeout: float = 8.0) -> list[str]:
+    url = (
+        f'{NHTSA_SAFETY_BASE_URL}/modelyear/{int(year)}/make/'
+        f'{urllib.parse.quote(make, safe="")}'
+    )
+    payload = _safety_json(url, timeout=timeout)
+    models = []
+    for row in payload.get('Results') or []:
+        if not isinstance(row, dict):
+            continue
+        model = str(row.get('Model') or '').strip()
+        if model:
+            models.append(model)
+    return models
+
+
+def _safety_variants_for_model(
+    year: int,
+    make: str,
+    model: str,
+    timeout: float = 8.0,
+) -> list[dict[str, Any]]:
+    url = (
+        f'{NHTSA_SAFETY_BASE_URL}/modelyear/{int(year)}/make/'
+        f'{urllib.parse.quote(make, safe="")}/model/'
+        f'{urllib.parse.quote(model, safe="")}'
+    )
+    payload = _safety_json(url, timeout=timeout)
+    variants = []
+    for row in payload.get('Results') or []:
+        if not isinstance(row, dict):
+            continue
+        vehicle_id = row.get('VehicleId')
+        try:
+            vehicle_id = int(vehicle_id)
+        except (TypeError, ValueError):
+            continue
+        if vehicle_id <= 0:
+            continue
+        variants.append({
+            'VehicleId': vehicle_id,
+            'VehicleDescription': str(row.get('VehicleDescription') or '').strip(),
+            'Model': str(row.get('Model') or model).strip(),
+        })
+    return variants
+
+
+def _safety_vehicle_detail(vehicle_id: int, timeout: float = 8.0) -> dict[str, Any] | None:
+    url = f'{NHTSA_SAFETY_BASE_URL}/VehicleId/{int(vehicle_id)}'
+    payload = _safety_json(url, timeout=timeout)
+    results = payload.get('Results') or []
+    if not results or not isinstance(results[0], dict):
+        return None
+    return dict(results[0])
+
+
+def _safety_media_url(value: Any) -> str | None:
+    url = str(value or '').strip()
+    if not url:
+        return None
+    # NHTSA sometimes returns legacy WMV crash videos; keep for outbound links only.
+    if url.startswith('//'):
+        url = f'https:{url}'
+    if url.startswith('http://'):
+        url = 'https://' + url[len('http://'):]
+    if not url.startswith('https://'):
+        return None
+    return url
+
+
+def _safety_int(value: Any) -> int | None:
+    try:
+        if value is None or value == '':
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safety_float(value: Any) -> float | None:
+    try:
+        if value is None or value == '':
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_safety_result(detail: dict[str, Any], *, matched_model: str) -> dict[str, Any]:
+    """Keep a stable, display-friendly subset of the NHTSA Safety Ratings payload."""
+    overall = str(detail.get('OverallRating') or '').strip()
+    front = str(detail.get('OverallFrontCrashRating') or '').strip()
+    side = str(detail.get('OverallSideCrashRating') or '').strip()
+    rollover = str(detail.get('RolloverRating') or '').strip()
+    front_driver = str(detail.get('FrontCrashDriversideRating') or '').strip()
+    front_passenger = str(detail.get('FrontCrashPassengersideRating') or '').strip()
+    side_driver = str(detail.get('SideCrashDriversideRating') or '').strip()
+    side_passenger = str(detail.get('SideCrashPassengersideRating') or '').strip()
+    side_pole = str(detail.get('SidePoleCrashRating') or '').strip()
+    barrier_front = str(detail.get('combinedSideBarrierAndPoleRating-Front') or '').strip()
+    barrier_rear = str(detail.get('combinedSideBarrierAndPoleRating-Rear') or '').strip()
+    barrier_overall = str(detail.get('sideBarrierRating-Overall') or '').strip()
+    result = {
+        'VehicleId': detail.get('VehicleId'),
+        'ModelYear': detail.get('ModelYear'),
+        'Make': detail.get('Make'),
+        'Model': detail.get('Model') or matched_model,
+        'VehicleDescription': str(detail.get('VehicleDescription') or '').strip(),
+        'OverallRating': overall,
+        'OverallFrontCrashRating': front,
+        'OverallSideCrashRating': side,
+        'RolloverRating': rollover,
+        'FrontCrashDriversideRating': front_driver,
+        'FrontCrashPassengersideRating': front_passenger,
+        'SideCrashDriversideRating': side_driver,
+        'SideCrashPassengersideRating': side_passenger,
+        'SidePoleCrashRating': side_pole,
+        'SideBarrierRatingOverall': barrier_overall,
+        'CombinedSideBarrierAndPoleRatingFront': barrier_front,
+        'CombinedSideBarrierAndPoleRatingRear': barrier_rear,
+        'RolloverPossibility': _safety_float(detail.get('RolloverPossibility')),
+        'dynamicTipResult': str(detail.get('dynamicTipResult') or '').strip(),
+        'NHTSAElectronicStabilityControl': str(
+            detail.get('NHTSAElectronicStabilityControl') or ''
+        ).strip(),
+        'NHTSAForwardCollisionWarning': str(
+            detail.get('NHTSAForwardCollisionWarning') or ''
+        ).strip(),
+        'NHTSALaneDepartureWarning': str(
+            detail.get('NHTSALaneDepartureWarning') or ''
+        ).strip(),
+        'ComplaintsCount': _safety_int(detail.get('ComplaintsCount')),
+        'RecallsCount': _safety_int(detail.get('RecallsCount')),
+        'InvestigationCount': _safety_int(detail.get('InvestigationCount')),
+        'FrontCrashPicture': _safety_media_url(detail.get('FrontCrashPicture')),
+        'SideCrashPicture': _safety_media_url(detail.get('SideCrashPicture')),
+        'SidePolePicture': _safety_media_url(detail.get('SidePolePicture')),
+        'FrontCrashVideo': _safety_media_url(detail.get('FrontCrashVideo')),
+        'SideCrashVideo': _safety_media_url(detail.get('SideCrashVideo')),
+        'SidePoleVideo': _safety_media_url(detail.get('SidePoleVideo')),
+        'OverallStars': parse_nhtsa_star_rating(overall),
+        'FrontStars': parse_nhtsa_star_rating(front),
+        'SideStars': parse_nhtsa_star_rating(side),
+        'RolloverStars': parse_nhtsa_star_rating(rollover),
+        'FrontDriverStars': parse_nhtsa_star_rating(front_driver),
+        'FrontPassengerStars': parse_nhtsa_star_rating(front_passenger),
+        'SideDriverStars': parse_nhtsa_star_rating(side_driver),
+        'SidePassengerStars': parse_nhtsa_star_rating(side_passenger),
+        'SidePoleStars': parse_nhtsa_star_rating(side_pole),
+        'source': 'nhtsa-safety-ratings',
+    }
+    return result
+
+
+def present_nhtsa_safety_ratings(ratings: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Enrich stored ratings for templates: crash media, meters, and summary copy."""
+    if not isinstance(ratings, dict) or not ratings:
+        return None
+    data = dict(ratings)
+
+    def stars_for(*keys: str) -> int | None:
+        for key in keys:
+            value = data.get(key)
+            if isinstance(value, int) and 1 <= value <= 5:
+                return value
+            parsed = parse_nhtsa_star_rating(value)
+            if parsed:
+                return parsed
+        return None
+
+    data['OverallStars'] = stars_for('OverallStars', 'OverallRating')
+    data['FrontStars'] = stars_for('FrontStars', 'OverallFrontCrashRating')
+    data['SideStars'] = stars_for('SideStars', 'OverallSideCrashRating')
+    data['RolloverStars'] = stars_for('RolloverStars', 'RolloverRating')
+    data['FrontDriverStars'] = stars_for('FrontDriverStars', 'FrontCrashDriversideRating')
+    data['FrontPassengerStars'] = stars_for(
+        'FrontPassengerStars', 'FrontCrashPassengersideRating',
+    )
+    data['SideDriverStars'] = stars_for('SideDriverStars', 'SideCrashDriversideRating')
+    data['SidePassengerStars'] = stars_for(
+        'SidePassengerStars', 'SideCrashPassengersideRating',
+    )
+    data['SidePoleStars'] = stars_for('SidePoleStars', 'SidePoleCrashRating')
+
+    possibility = _safety_float(data.get('RolloverPossibility'))
+    data['RolloverPossibility'] = possibility
+    data['RolloverPercent'] = (
+        round(possibility * 100, 1) if possibility is not None else None
+    )
+
+    tip = str(data.get('dynamicTipResult') or '').strip()
+    data['dynamicTipResult'] = tip
+    data['NoTip'] = tip.casefold() in {'no tip', 'no-tip', 'did not tip'}
+
+    crash_tests = []
+    for key, label, overall_key, seats, picture_key, video_key in (
+        (
+            'frontal',
+            'Frontal crash',
+            'FrontStars',
+            (
+                ('Driver', 'FrontDriverStars', 'FrontCrashDriversideRating'),
+                ('Passenger', 'FrontPassengerStars', 'FrontCrashPassengersideRating'),
+            ),
+            'FrontCrashPicture',
+            'FrontCrashVideo',
+        ),
+        (
+            'side',
+            'Side crash',
+            'SideStars',
+            (
+                ('Driver', 'SideDriverStars', 'SideCrashDriversideRating'),
+                ('Passenger', 'SidePassengerStars', 'SideCrashPassengersideRating'),
+            ),
+            'SideCrashPicture',
+            'SideCrashVideo',
+        ),
+        (
+            'pole',
+            'Side pole crash',
+            'SidePoleStars',
+            (),
+            'SidePolePicture',
+            'SidePoleVideo',
+        ),
+        (
+            'rollover',
+            'Rollover',
+            'RolloverStars',
+            (),
+            None,
+            None,
+        ),
+    ):
+        stars = data.get(overall_key)
+        raw_map = {
+            'frontal': data.get('OverallFrontCrashRating'),
+            'side': data.get('OverallSideCrashRating'),
+            'pole': data.get('SidePoleCrashRating'),
+            'rollover': data.get('RolloverRating'),
+        }
+        picture = _safety_media_url(data.get(picture_key)) if picture_key else None
+        video = _safety_media_url(data.get(video_key)) if video_key else None
+        seat_rows = []
+        for seat_label, seat_stars_key, seat_raw_key in seats:
+            seat_stars = data.get(seat_stars_key)
+            seat_raw = str(data.get(seat_raw_key) or '').strip()
+            if seat_stars or seat_raw:
+                seat_rows.append({
+                    'label': seat_label,
+                    'stars': seat_stars,
+                    'raw': seat_raw or None,
+                })
+        if not any((stars, raw_map.get(key), picture, seat_rows, key == 'rollover' and possibility is not None)):
+            continue
+        crash_tests.append({
+            'key': key,
+            'label': label,
+            'stars': stars,
+            'raw': raw_map.get(key) or None,
+            'picture': picture,
+            'video': video,
+            'seats': seat_rows,
+            'fill_percent': (stars or 0) * 20,
+        })
+    data['CrashTests'] = crash_tests
+
+    techs = []
+    for label, key, icon in (
+        ('Electronic stability control', 'NHTSAElectronicStabilityControl', 'bi-shield-check'),
+        ('Forward collision warning', 'NHTSAForwardCollisionWarning', 'bi-exclamation-triangle'),
+        ('Lane departure warning', 'NHTSALaneDepartureWarning', 'bi-signpost-split'),
+    ):
+        value = str(data.get(key) or '').strip()
+        if value:
+            techs.append({'label': label, 'value': value, 'icon': icon})
+    data['SafetyTech'] = techs
+
+    year = data.get('ModelYear') or ''
+    make = str(data.get('Make') or '').title()
+    model = str(data.get('Model') or '').title()
+    description = data.get('VehicleDescription') or f'{year} {make} {model}'.strip()
+    overall_stars = data.get('OverallStars')
+    if overall_stars:
+        summary = (
+            f'The {description} earned an overall NHTSA 5-Star Safety Rating of '
+            f'{overall_stars} out of 5 in the New Car Assessment Program (NCAP).'
+        )
+    elif data.get('OverallRating'):
+        summary = (
+            f'NHTSA lists the {description} overall crash rating as '
+            f'{data.get("OverallRating")}.'
+        )
+    else:
+        summary = (
+            f'NHTSA safety testing information is available for the {description} '
+            f'configuration.'
+        )
+    parts = []
+    if data.get('FrontStars'):
+        parts.append(f'frontal crash {data["FrontStars"]}/5')
+    if data.get('SideStars'):
+        parts.append(f'side crash {data["SideStars"]}/5')
+    if data.get('RolloverStars'):
+        parts.append(f'rollover {data["RolloverStars"]}/5')
+    if parts:
+        summary += ' Category results: ' + ', '.join(parts) + '.'
+    if data.get('RolloverPercent') is not None:
+        summary += (
+            f' NHTSA estimates a {data["RolloverPercent"]}% chance of rollover '
+            f'in a single-vehicle crash'
+        )
+        if data.get('NoTip'):
+            summary += ' and recorded no tip in the dynamic test'
+        summary += '.'
+    if techs:
+        tech_bits = [f'{item["label"].lower()} {item["value"].lower()}' for item in techs]
+        summary += ' Crash-avoidance equipment on the tested configuration: ' + '; '.join(tech_bits) + '.'
+    summary += (
+        ' Ratings apply to the NHTSA-tested configuration and may differ from this '
+        'exact vehicle.'
+    )
+    data['Summary'] = summary
+
+    vehicle_id = data.get('VehicleId')
+    if vehicle_id:
+        data['NhtsaVehicleUrl'] = (
+            f'https://www.nhtsa.gov/vehicle/{urllib.parse.quote(str(vehicle_id), safe="")}'
+        )
+    else:
+        data['NhtsaVehicleUrl'] = 'https://www.nhtsa.gov/ratings'
+    data['NhtsaRatingsUrl'] = 'https://www.nhtsa.gov/ratings'
+    return data
+
+
+def lookup_nhtsa_safety_ratings(
+    *,
+    year: int | None,
+    make: str | None,
+    model: str | None,
+    drivetrain: str | None = None,
+    body_style: str | None = None,
+    fuel_type: str | None = None,
+    timeout: float = 8.0,
+    use_cache: bool = True,
+) -> dict[str, Any] | None:
+    """Fetch NHTSA NCAP 5-star ratings for a year/make/model configuration."""
+    try:
+        year_int = int(year) if year is not None else 0
+    except (TypeError, ValueError):
+        year_int = 0
+    make_value = (make or '').strip()
+    model_value = (model or '').strip()
+    if year_int < 1990 or not make_value or not model_value:
+        return None
+
+    cache_key = '|'.join([
+        str(year_int),
+        make_value.casefold(),
+        model_value.casefold(),
+        (drivetrain or '').casefold(),
+        (body_style or '').casefold(),
+        (fuel_type or '').casefold(),
+    ])
+    if use_cache:
+        hit, cached = _safety_cache_get(cache_key)
+        if hit:
+            return dict(cached) if cached else None
+
+    try:
+        variants = _safety_variants_for_model(
+            year_int, make_value, model_value, timeout=timeout,
+        )
+        matched_model = model_value
+        if not variants:
+            model_candidates = _safety_models_for_make(year_int, make_value, timeout=timeout)
+            ranked = sorted(
+                (
+                    (_score_safety_model_name(candidate, model_value, fuel_type), candidate)
+                    for candidate in model_candidates
+                ),
+                key=lambda item: item[0],
+                reverse=True,
+            )
+            for score, candidate in ranked:
+                if score < 20:
+                    break
+                variants = _safety_variants_for_model(
+                    year_int, make_value, candidate, timeout=timeout,
+                )
+                if variants:
+                    matched_model = candidate
+                    break
+        if not variants:
+            if use_cache:
+                _safety_cache_set(cache_key, None)
+            return None
+
+        ranked_variants = sorted(
+            variants,
+            key=lambda row: (
+                _score_safety_variant(
+                    row.get('VehicleDescription') or '',
+                    drivetrain=drivetrain,
+                    body_style=body_style,
+                ),
+                -(row.get('VehicleId') or 0),
+            ),
+            reverse=True,
+        )
+        detail = None
+        chosen = None
+        for row in ranked_variants:
+            detail = _safety_vehicle_detail(int(row['VehicleId']), timeout=timeout)
+            if detail:
+                chosen = row
+                break
+        if not detail or not chosen:
+            if use_cache:
+                _safety_cache_set(cache_key, None)
+            return None
+        result = _normalize_safety_result(detail, matched_model=matched_model)
+        if use_cache:
+            _safety_cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.debug(
+            'NHTSA safety ratings lookup failed for %s %s %s',
+            year_int, make_value, model_value, exc_info=True,
+        )
+        return None
+
+
+def apply_nhtsa_safety_ratings_to_vehicle(vehicle, ratings: dict[str, Any] | None) -> bool:
+    """Copy normalized SafetyRatings onto Vehicle columns. Returns True if changed."""
+    if vehicle is None:
+        return False
+    changed = False
+
+    def set_field(name: str, value: Any) -> None:
+        nonlocal changed
+        if getattr(vehicle, name, None) != value:
+            setattr(vehicle, name, value)
+            changed = True
+
+    if not ratings:
+        return False
+
+    set_field('nhtsa_vehicle_id', ratings.get('VehicleId'))
+    set_field('nhtsa_overall_rating', str(ratings.get('OverallRating') or '').strip() or None)
+    set_field(
+        'nhtsa_front_rating',
+        str(ratings.get('OverallFrontCrashRating') or '').strip() or None,
+    )
+    set_field(
+        'nhtsa_side_rating',
+        str(ratings.get('OverallSideCrashRating') or '').strip() or None,
+    )
+    set_field(
+        'nhtsa_rollover_rating',
+        str(ratings.get('RolloverRating') or '').strip() or None,
+    )
+    set_field(
+        'nhtsa_safety_description',
+        str(ratings.get('VehicleDescription') or '').strip() or None,
+    )
+    set_field('nhtsa_safety_data', json.dumps(ratings, separators=(',', ':')))
+    from app.models import utcnow as _utcnow
+    set_field('nhtsa_safety_checked_at', _utcnow())
+    return changed
+
+
+def safety_ratings_from_vehicle(vehicle) -> dict[str, Any] | None:
+    """Best available SafetyRatings dict for templates (column JSON or vin_decode_data)."""
+    if vehicle is None:
+        return None
+    raw = getattr(vehicle, 'nhtsa_safety_data', None)
+    if raw:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict) and data:
+                return present_nhtsa_safety_ratings(data)
+        except (TypeError, json.JSONDecodeError):
+            pass
+    try:
+        decoded = json.loads(getattr(vehicle, 'vin_decode_data', None) or '')
+    except (TypeError, json.JSONDecodeError):
+        decoded = None
+    if isinstance(decoded, dict):
+        ratings = decoded.get('SafetyRatings')
+        if isinstance(ratings, dict) and ratings:
+            return present_nhtsa_safety_ratings(ratings)
+    overall = getattr(vehicle, 'nhtsa_overall_rating', None)
+    if overall:
+        return present_nhtsa_safety_ratings({
+            'OverallRating': overall,
+            'OverallFrontCrashRating': getattr(vehicle, 'nhtsa_front_rating', None),
+            'OverallSideCrashRating': getattr(vehicle, 'nhtsa_side_rating', None),
+            'RolloverRating': getattr(vehicle, 'nhtsa_rollover_rating', None),
+            'VehicleDescription': getattr(vehicle, 'nhtsa_safety_description', None),
+            'VehicleId': getattr(vehicle, 'nhtsa_vehicle_id', None),
+            'ModelYear': getattr(vehicle, 'year', None),
+            'Make': getattr(vehicle, 'make', None),
+            'Model': getattr(vehicle, 'model', None),
+        })
+    return None
+
+
+def nhtsa_safety_seo_blurb(vehicle) -> str | None:
+    """Short crawlable safety sentence for meta descriptions and JSON-LD."""
+    ratings = safety_ratings_from_vehicle(vehicle)
+    if not ratings:
+        return None
+    stars = ratings.get('OverallStars')
+    description = ratings.get('VehicleDescription') or getattr(vehicle, 'title', 'this vehicle')
+    if stars:
+        return (
+            f'NHTSA overall safety rating {stars}/5 for the {description} '
+            f'crash-test configuration.'
+        )
+    if ratings.get('OverallRating'):
+        return (
+            f'NHTSA overall crash rating: {ratings["OverallRating"]} '
+            f'({description}).'
+        )
+    return None
 
 
 def _epa_menu_items(path: str, params: dict[str, str], timeout: float = 8.0) -> list[tuple[str, str]]:
@@ -1956,6 +2702,32 @@ def decode_vin(raw_vin: str | None, *, use_cache: bool = True) -> dict[str, Any]
         sources.append('epa')
     else:
         warnings.append('Fuel economy not found in EPA database for this configuration.')
+
+    # NHTSA NCAP 5-star safety ratings (best-effort; never fails the whole decode)
+    safety = None
+    try:
+        safety = lookup_nhtsa_safety_ratings(
+            year=vehicle.get('year'),
+            make=vehicle.get('make'),
+            model=vehicle.get('model'),
+            drivetrain=vehicle.get('drivetrain'),
+            body_style=vehicle.get('body_style'),
+            fuel_type=vehicle.get('fuel_type'),
+            use_cache=use_cache,
+        )
+    except Exception:
+        safety = None
+    if safety:
+        vehicle['vin_decode_data']['SafetyRatings'] = safety
+        vehicle['nhtsa_overall_rating'] = safety.get('OverallRating') or None
+        vehicle['nhtsa_front_rating'] = safety.get('OverallFrontCrashRating') or None
+        vehicle['nhtsa_side_rating'] = safety.get('OverallSideCrashRating') or None
+        vehicle['nhtsa_rollover_rating'] = safety.get('RolloverRating') or None
+        vehicle['nhtsa_vehicle_id'] = safety.get('VehicleId')
+        vehicle['nhtsa_safety_description'] = safety.get('VehicleDescription') or None
+        sources.append('nhtsa-safety')
+    else:
+        warnings.append('NHTSA 5-star safety ratings were not found for this configuration.')
 
     if is_vin_grok_enrichment_enabled():
         try:

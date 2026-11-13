@@ -317,6 +317,15 @@ class Vehicle(db.Model):
     safety_features = db.Column(db.Text, nullable=True)
     additional_specifications = db.Column(db.Text, nullable=True)
     vin_decode_data = db.Column(db.Text, nullable=True)
+    # NHTSA NCAP 5-star Safety Ratings (api.nhtsa.gov/SafetyRatings)
+    nhtsa_overall_rating = db.Column(db.String(16), nullable=True)
+    nhtsa_front_rating = db.Column(db.String(16), nullable=True)
+    nhtsa_side_rating = db.Column(db.String(16), nullable=True)
+    nhtsa_rollover_rating = db.Column(db.String(16), nullable=True)
+    nhtsa_vehicle_id = db.Column(db.Integer, nullable=True)
+    nhtsa_safety_description = db.Column(db.String(160), nullable=True)
+    nhtsa_safety_data = db.Column(db.Text, nullable=True)
+    nhtsa_safety_checked_at = db.Column(db.DateTime, nullable=True)
 
     # SEO
     seo_title = db.Column(db.String(160), nullable=True)
@@ -431,6 +440,18 @@ class Vehicle(db.Model):
             features,
             _feature_values(self.features),
         )
+
+    @property
+    def nhtsa_overall_stars(self):
+        """1-5 NHTSA overall crash rating when available."""
+        value = (self.nhtsa_overall_rating or '').strip()
+        if not value or value.casefold() in {'not rated', 'n/a', 'na'}:
+            return None
+        try:
+            stars = int(float(value))
+        except (TypeError, ValueError):
+            return None
+        return stars if 1 <= stars <= 5 else None
 
     def savings_info(self):
         """Savings vs. retail clean-title market value, or None if not applicable.

@@ -1,0 +1,208 @@
+{# Rich NHTSA NCAP safety block. Expects `safety_ratings` from present_nhtsa_safety_ratings. #}
+{% if safety_ratings %}
+<section class="nhtsa-safety-panel mb-4" id="nhtsa-safety" aria-labelledby="nhtsa-safety-heading">
+    <div class="nhtsa-safety-hero">
+        <div class="nhtsa-safety-hero-copy">
+            <p class="nhtsa-kicker mb-1">
+                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                Official NHTSA crash-test data
+            </p>
+            <h3 class="h4 fw-bold mb-2" id="nhtsa-safety-heading">NHTSA 5-Star Safety Ratings</h3>
+            {% if safety_ratings.VehicleDescription %}
+            <p class="mb-2 nhtsa-config">
+                Rated configuration:
+                <strong>{{ safety_ratings.VehicleDescription }}</strong>
+            </p>
+            {% endif %}
+            <p class="mb-0 nhtsa-summary">{{ safety_ratings.Summary }}</p>
+        </div>
+        <div class="nhtsa-overall-meter" aria-label="Overall NHTSA rating">
+            {% if safety_ratings.OverallStars %}
+            <div class="nhtsa-meter-ring" style="--nhtsa-fill: {{ safety_ratings.OverallStars * 20 }};">
+                <div class="nhtsa-meter-core">
+                    <span class="nhtsa-meter-score">{{ safety_ratings.OverallStars }}</span>
+                    <span class="nhtsa-meter-of">/5</span>
+                </div>
+            </div>
+            <div class="nhtsa-stars nhtsa-stars-lg mt-2" aria-hidden="true">
+                {% for i in range(1, 6) %}
+                <i class="bi bi-star{{ '-fill' if i <= safety_ratings.OverallStars else '' }}"></i>
+                {% endfor %}
+            </div>
+            <div class="small fw-semibold mt-1">Overall crash rating</div>
+            {% elif safety_ratings.OverallRating %}
+            <div class="nhtsa-meter-core nhtsa-meter-core-solo">
+                <span class="nhtsa-meter-score-sm">{{ safety_ratings.OverallRating }}</span>
+            </div>
+            <div class="small fw-semibold mt-2">Overall crash rating</div>
+            {% else %}
+            <div class="small text-muted">Overall rating not published for this configuration.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if safety_ratings.CrashTests %}
+    <div class="row g-3 nhtsa-crash-grid mt-1">
+        {% for test in safety_ratings.CrashTests %}
+        <div class="col-md-6 col-xl-3">
+            <article class="nhtsa-crash-card h-100">
+                {% if test.picture %}
+                <figure class="nhtsa-crash-photo mb-0">
+                    <img src="{{ test.picture }}"
+                         alt="NHTSA {{ test.label | lower }} test photo for {{ safety_ratings.VehicleDescription or vehicle.title }}"
+                         loading="lazy"
+                         decoding="async"
+                         width="640"
+                         height="360">
+                    <figcaption>{{ test.label }} test</figcaption>
+                </figure>
+                {% else %}
+                <div class="nhtsa-crash-photo nhtsa-crash-photo-empty" aria-hidden="true">
+                    <i class="bi bi-car-front"></i>
+                </div>
+                {% endif %}
+                <div class="nhtsa-crash-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <h4 class="h6 fw-bold mb-1">{{ test.label }}</h4>
+                        {% if test.stars %}
+                        <span class="badge badge-nhtsa-safety">{{ test.stars }}/5</span>
+                        {% elif test.raw %}
+                        <span class="badge text-bg-secondary">{{ test.raw }}</span>
+                        {% endif %}
+                    </div>
+                    {% if test.stars %}
+                    <div class="nhtsa-stars mb-2" aria-label="{{ test.stars }} out of 5 stars">
+                        {% for i in range(1, 6) %}
+                        <i class="bi bi-star{{ '-fill' if i <= test.stars else '' }}" aria-hidden="true"></i>
+                        {% endfor %}
+                    </div>
+                    <div class="nhtsa-bar" role="img" aria-label="{{ test.stars }} of 5 stars">
+                        <span style="width: {{ test.fill_percent }}%;"></span>
+                    </div>
+                    {% elif test.raw %}
+                    <p class="small text-muted mb-2">NHTSA result: {{ test.raw }}</p>
+                    {% endif %}
+
+                    {% if test.seats %}
+                    <ul class="nhtsa-seat-list list-unstyled mb-0 mt-2">
+                        {% for seat in test.seats %}
+                        <li>
+                            <span>{{ seat.label }}</span>
+                            {% if seat.stars %}
+                            <span class="nhtsa-seat-stars" aria-label="{{ seat.stars }} out of 5">
+                                {% for i in range(1, 6) %}
+                                <i class="bi bi-star{{ '-fill' if i <= seat.stars else '' }}" aria-hidden="true"></i>
+                                {% endfor %}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">{{ seat.raw }}</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    {% if test.key == 'rollover' %}
+                    <div class="nhtsa-rollover-stats mt-2">
+                        {% if safety_ratings.RolloverPercent is not none %}
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>Estimated rollover risk</span>
+                            <strong>{{ safety_ratings.RolloverPercent }}%</strong>
+                        </div>
+                        <div class="nhtsa-bar nhtsa-bar-risk" role="img" aria-label="{{ safety_ratings.RolloverPercent }} percent rollover risk">
+                            <span style="width: {{ safety_ratings.RolloverPercent if safety_ratings.RolloverPercent < 100 else 100 }}%;"></span>
+                        </div>
+                        {% endif %}
+                        {% if safety_ratings.dynamicTipResult %}
+                        <p class="small mb-0 mt-2">
+                            Dynamic tip result:
+                            <strong>{{ safety_ratings.dynamicTipResult }}</strong>
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if test.video %}
+                    <a class="small d-inline-block mt-2" href="{{ test.video }}" target="_blank" rel="noopener">
+                        Crash-test video (NHTSA)
+                    </a>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if safety_ratings.SafetyTech or safety_ratings.ComplaintsCount is not none or safety_ratings.RecallsCount is not none %}
+    <div class="row g-3 mt-1">
+        {% if safety_ratings.SafetyTech %}
+        <div class="col-lg-7">
+            <div class="nhtsa-subcard h-100">
+                <h4 class="h6 fw-bold mb-3">Crash-avoidance equipment (tested config)</h4>
+                <div class="nhtsa-tech-grid">
+                    {% for tech in safety_ratings.SafetyTech %}
+                    <div class="nhtsa-tech-chip">
+                        <i class="bi {{ tech.icon }}" aria-hidden="true"></i>
+                        <div>
+                            <div class="fw-semibold">{{ tech.label }}</div>
+                            <div class="small text-muted">{{ tech.value }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="col-lg-{{ 5 if safety_ratings.SafetyTech else 12 }}">
+            <div class="nhtsa-subcard h-100">
+                <h4 class="h6 fw-bold mb-3">NHTSA vehicle activity</h4>
+                <div class="row g-2 nhtsa-stat-grid text-center">
+                    <div class="col-4">
+                        <div class="nhtsa-stat">
+                            <div class="nhtsa-stat-value">{{ safety_ratings.ComplaintsCount if safety_ratings.ComplaintsCount is not none else '—' }}</div>
+                            <div class="small text-muted">Complaints</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="nhtsa-stat">
+                            <div class="nhtsa-stat-value">{{ safety_ratings.RecallsCount if safety_ratings.RecallsCount is not none else '—' }}</div>
+                            <div class="small text-muted">Recalls</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="nhtsa-stat">
+                            <div class="nhtsa-stat-value">{{ safety_ratings.InvestigationCount if safety_ratings.InvestigationCount is not none else '—' }}</div>
+                            <div class="small text-muted">Investigations</div>
+                        </div>
+                    </div>
+                </div>
+                <p class="small text-muted mb-0 mt-3">
+                    Counts are NHTSA totals for this rated configuration and can change over time.
+                    Always verify open recalls by VIN before purchase.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="nhtsa-footnote mt-3">
+        <p class="small text-muted mb-2">
+            Source: National Highway Traffic Safety Administration (NHTSA) New Car Assessment Program.
+            Star ratings measure relative crash protection under controlled laboratory tests — not a guarantee for every real-world crash.
+            This listing may differ in options, equipment, or prior history from the exact vehicle NHTSA tested.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-primary" href="{{ safety_ratings.NhtsaVehicleUrl }}" target="_blank" rel="noopener">
+                View on NHTSA.gov
+            </a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ safety_ratings.NhtsaRatingsUrl }}" target="_blank" rel="noopener">
+                How 5-star ratings work
+            </a>
+            <a class="btn btn-sm btn-outline-secondary" href="#safety">
+                Jump to safety equipment
+            </a>
+        </div>
+    </div>
+</section>
+{% endif %}

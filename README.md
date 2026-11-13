@@ -34,7 +34,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Printable customer sale receipts. Sales tax is 3% of the entered OTD sale price, and the agreed vehicle price is that OTD amount minus the tax. Doc, warranty, and tags fees, down payment, trade allowance, calculated cash due, salesman, and as-is/title terms are included
   - Filled NC MVR-180 odometer and MVR-181 damage disclosure PDFs from an inventory vehicle. Staff review an overlay of the official blank, can change readings and checked boxes for that copy, then see the filled PDF. The odometer starts from the mileage saved on the vehicle. Blank DMV templates stay unchanged. Salvage titles are marked reconstructed unless staff specifically select otherwise. Signatures and unknown damage answers are left blank
   - Craigslist and public Facebook Marketplace import with local photos and scheduled source refreshes
-  - VIN decode (NHTSA vPIC + EPA) to prefill vehicle specifications, MPG, and default safety features; up to three independent EPA model-option requests run concurrently per lookup; optional conservative Grok estimates for missing data and free reuse of completed Grok photo annotations; resumable bulk backfill for existing inventory
+  - VIN decode (NHTSA vPIC + EPA) to prefill vehicle specifications, MPG, and default safety features; NHTSA NCAP 5-star Safety Ratings (overall/front/side/rollover) matched by year/make/model and drivetrain; up to three independent EPA model-option requests run concurrently per lookup; optional conservative Grok estimates for missing data and free reuse of completed Grok photo annotations; resumable bulk backfill for existing inventory
   - Cascading typeahead suggestions for make/model/trim, colors, and features
   - “LOW MILES!” badge on inventory cards under 75,000 miles
   - Manage service records per vehicle
@@ -756,9 +756,14 @@ the complete NHTSA/EPA decode for existing vehicles:
 
 ```bash
 venv/bin/python -m flask --app run:app backfill-vin-data
+venv/bin/python -m flask --app run:app backfill-nhtsa-safety
 ```
 
-The command processes vehicles with a VIN that lack saved decode data or
+`backfill-nhtsa-safety` fills NHTSA 5-star ratings for every inventory vehicle
+with year/make/model (VIN optional). Ratings appear on inventory cards and the
+vehicle Safety tab. Use `--force` to refresh existing ratings.
+
+The VIN command processes vehicles with a VIN that lack saved decode data or
 supplemental data. If `XAI_API_KEY` is set, it makes one short text-model request
 only when eligible specifications are missing; each response is capped at 128
 generated tokens. A failed or empty estimate is recorded to prevent repeat

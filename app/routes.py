@@ -26,7 +26,10 @@ from app.financing import (
 from app.buyer_guides import published_buyer_guides
 from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
-from app.vin_decode import group_vin_decode_data, is_valid_vin, normalize_vin
+from app.vin_decode import (
+    group_vin_decode_data, is_valid_vin, normalize_vin, nhtsa_safety_seo_blurb,
+    safety_ratings_from_vehicle,
+)
 from app.utils import (
     aggregate_rating_data, business_hours, client_ip, dealership_now, format_email_address,
     format_mileage, format_mileage_badge, format_price,
@@ -1287,12 +1290,24 @@ def vehicle_detail(slug):
             f"in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. "
             "View its listing details and browse similar used cars, trucks, and SUVs currently for sale."
         )
+    safety_blurb = nhtsa_safety_seo_blurb(vehicle)
+    if safety_blurb and vehicle.status == 'available' and not vehicle.seo_description:
+        # Keep under common SERP length while adding unique safety context.
+        combined = f"{meta_description} {safety_blurb}"
+        meta_description = combined if len(combined) <= 320 else f"{meta_description[:200].rstrip()}… {safety_blurb}"
+        if len(meta_description) > 320:
+            meta_description = meta_description[:317].rsplit(' ', 1)[0] + '…'
     if vehicle.vin:
         meta_description = f"VIN {vehicle.vin}. {meta_description}"
+        if len(meta_description) > 320:
+            meta_description = meta_description[:317].rsplit(' ', 1)[0] + '…'
     meta_keywords = vehicle.meta_keywords or ', '.join(filter(None, [
         str(vehicle.year), vehicle.make, vehicle.model, vehicle.trim,
         vehicle.body_style, vehicle.exterior_color, current_app.config['BUSINESS_CITY'],
-        current_app.config['BUSINESS_STATE'], 'used car for sale', title_phrase
+        current_app.config['BUSINESS_STATE'], 'used car for sale', title_phrase,
+        'NHTSA safety rating' if vehicle.nhtsa_overall_stars else '',
+        f'{vehicle.nhtsa_overall_stars}-star NHTSA' if vehicle.nhtsa_overall_stars else '',
+        'crash test ratings' if vehicle.nhtsa_overall_rating else '',
     ]))
 
     og_image = vehicle.primary_image_url(absolute=True)
@@ -1313,9 +1328,11 @@ def vehicle_detail(slug):
     }
 
     vin_decode_groups = group_vin_decode_data(vehicle.vin_decode_data)
+    safety_ratings = safety_ratings_from_vehicle(vehicle)
     return render_template(
         'vehicle_detail.html',
         vehicle=vehicle,
+        safety_ratings=safety_ratings,
         vin_decode_groups=vin_decode_groups,
         vin_decode_field_count=sum(len(group['fields']) for group in vin_decode_groups),
         buyer_guides=published_buyer_guides(),

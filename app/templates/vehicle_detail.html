@@ -332,6 +332,16 @@ bi-check-circle
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
                         <div class="d-flex flex-wrap gap-1 align-items-center">
                             <span class="badge bg-secondary">{{ vehicle.condition | title }}</span>
+                            {% if vehicle.nhtsa_overall_stars %}
+                            <a href="#nhtsa-safety" class="badge badge-nhtsa-safety text-decoration-none" title="View NHTSA crash-test ratings">
+                                <span class="nhtsa-badge-stars" aria-hidden="true">
+                                    {% for i in range(1, 6) %}
+                                    <i class="bi bi-star{{ '-fill' if i <= vehicle.nhtsa_overall_stars else '' }}"></i>
+                                    {% endfor %}
+                                </span>
+                                NHTSA {{ vehicle.nhtsa_overall_stars }}/5
+                            </a>
+                            {% endif %}
                             {% if vehicle.title_status == 'rebuilt' %}
                             <span class="badge bg-warning text-dark">Rebuilt Title</span>
                             {% elif vehicle.title_status == 'salvage' %}
@@ -669,6 +679,12 @@ bi-check-circle
                     ] %}
                     <div class="tab-pane fade" id="{{ category | lower }}" role="tabpanel" aria-labelledby="{{ category | lower }}-tab" tabindex="0">
                         <h3 class="h5 fw-bold mb-3">{{ category }}</h3>
+                        {% if category == 'Safety' %}
+                        {% include '_nhtsa_safety.html' %}
+                        {% if safety_ratings %}
+                        <h4 class="h6 fw-bold mb-3" id="safety-equipment">Safety equipment on this vehicle</h4>
+                        {% endif %}
+                        {% endif %}
                         {% if category == 'Entertainment' %}
                         {% set equipment = vehicle.entertainment_feature_list %}
                         {% else %}
@@ -680,8 +696,10 @@ bi-check-circle
                             <li>{{ item.strip()|replace('Photo-observed (verify): ', '') }}</li>
                             {% endfor %}
                         </ul>
-                        {% else %}
+                        {% elif category != 'Safety' or not safety_ratings %}
                         <p class="text-muted mb-0">No {{ category | lower }} equipment details have been provided for this vehicle.</p>
+                        {% elif category == 'Safety' and safety_ratings %}
+                        <p class="text-muted mb-0">No additional on-vehicle safety equipment notes have been entered yet.</p>
                         {% endif %}
                     </div>
                     {% endfor %}

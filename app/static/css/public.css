@@ -870,3 +870,220 @@
     font-weight: 600;
     letter-spacing: 0.01em;
 }
+
+/* NHTSA crash-test panel */
+.public-site .badge-nhtsa-safety {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #0b3d91;
+    color: #fff;
+}
+.public-site .nhtsa-badge-stars {
+    display: inline-flex;
+    gap: 0.05rem;
+    font-size: 0.7rem;
+    color: #f5d76e;
+    line-height: 1;
+}
+.public-site .nhtsa-inline-rating {
+    color: #0b3d91;
+    font-weight: 600;
+}
+.public-site .nhtsa-safety-panel {
+    border: 1px solid var(--line, #d7deea);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at top right, rgba(11, 61, 145, 0.08), transparent 42%),
+        linear-gradient(180deg, #f8fbff 0%, #f3f6fb 100%);
+    padding: 1.15rem 1.2rem 1.25rem;
+    overflow: hidden;
+}
+.public-site .nhtsa-safety-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1.25rem;
+    align-items: center;
+}
+.public-site .nhtsa-kicker {
+    color: #0b3d91;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.public-site .nhtsa-summary {
+    color: #445164;
+    line-height: 1.55;
+}
+.public-site .nhtsa-config {
+    color: #59677a;
+}
+.public-site .nhtsa-overall-meter {
+    text-align: center;
+    min-width: 8.5rem;
+}
+.public-site .nhtsa-meter-ring {
+    --nhtsa-fill: 0;
+    width: 7.25rem;
+    height: 7.25rem;
+    margin: 0 auto;
+    border-radius: 50%;
+    background:
+        radial-gradient(closest-side, #fff 76%, transparent 77% 100%),
+        conic-gradient(#0b3d91 calc(var(--nhtsa-fill) * 1%), #d7deea 0);
+    display: grid;
+    place-items: center;
+    box-shadow: inset 0 0 0 1px rgba(11, 61, 145, 0.08);
+}
+.public-site .nhtsa-meter-core {
+    text-align: center;
+    line-height: 1;
+}
+.public-site .nhtsa-meter-core-solo {
+    background: #fff;
+    border: 1px solid var(--line, #d7deea);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+}
+.public-site .nhtsa-meter-score {
+    display: block;
+    font-size: 2.35rem;
+    font-weight: 800;
+    color: #142238;
+    letter-spacing: -0.04em;
+}
+.public-site .nhtsa-meter-score-sm {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #142238;
+}
+.public-site .nhtsa-meter-of {
+    color: #59677a;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+.public-site .nhtsa-stars {
+    color: #c4a574;
+    letter-spacing: 0.04em;
+}
+.public-site .nhtsa-stars-lg { font-size: 1.2rem; }
+.public-site .nhtsa-crash-card {
+    background: #fff;
+    border: 1px solid var(--line, #d7deea);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(20, 34, 56, 0.04);
+}
+.public-site .nhtsa-crash-photo {
+    margin: 0;
+    background: #e8eef7;
+    aspect-ratio: 16 / 10;
+    position: relative;
+    overflow: hidden;
+}
+.public-site .nhtsa-crash-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.public-site .nhtsa-crash-photo figcaption,
+.public-site .nhtsa-crash-photo-empty {
+    position: absolute;
+    left: 0.65rem;
+    bottom: 0.55rem;
+    background: rgba(20, 34, 56, 0.78);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.public-site .nhtsa-crash-photo-empty {
+    inset: 0;
+    border-radius: 0;
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.85);
+    background: linear-gradient(135deg, #4b6288, #142238);
+}
+.public-site .nhtsa-crash-body { padding: 0.85rem 0.9rem 1rem; }
+.public-site .nhtsa-bar {
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #e6ebf3;
+    overflow: hidden;
+}
+.public-site .nhtsa-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #0b3d91, #3d7bd6);
+}
+.public-site .nhtsa-bar-risk > span {
+    background: linear-gradient(90deg, #c4a574, #b07528);
+}
+.public-site .nhtsa-seat-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+    font-size: 0.86rem;
+    padding: 0.2rem 0;
+    border-top: 1px dashed #e4e9f1;
+}
+.public-site .nhtsa-seat-list li:first-child { border-top: 0; }
+.public-site .nhtsa-seat-stars {
+    color: #c4a574;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+.public-site .nhtsa-subcard {
+    background: #fff;
+    border: 1px solid var(--line, #d7deea);
+    border-radius: 14px;
+    padding: 1rem;
+}
+.public-site .nhtsa-tech-grid {
+    display: grid;
+    gap: 0.65rem;
+}
+.public-site .nhtsa-tech-chip {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    border: 1px solid #e4e9f1;
+    border-radius: 12px;
+    padding: 0.7rem 0.8rem;
+    background: #f8fafc;
+}
+.public-site .nhtsa-tech-chip .bi {
+    color: #0b3d91;
+    font-size: 1.15rem;
+    margin-top: 0.1rem;
+}
+.public-site .nhtsa-stat {
+    background: #f8fafc;
+    border: 1px solid #e4e9f1;
+    border-radius: 12px;
+    padding: 0.75rem 0.4rem;
+}
+.public-site .nhtsa-stat-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #142238;
+    letter-spacing: -0.03em;
+}
+.public-site .nhtsa-footnote {
+    border-top: 1px solid #e4e9f1;
+    padding-top: 0.9rem;
+}
+@media (max-width: 767.98px) {
+    .public-site .nhtsa-safety-hero {
+        grid-template-columns: 1fr;
+        text-align: left;
+    }
+    .public-site .nhtsa-overall-meter { justify-self: start; }
+}

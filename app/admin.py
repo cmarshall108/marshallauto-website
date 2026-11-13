@@ -84,8 +84,8 @@ from app.video_jobs import (
 )
 from app.vehicle_catalog import build_vehicle_catalog, suggest_field
 from app.vin_decode import (
-    collect_grok_photo_annotations, decode_vin, merge_grok_photo_annotations,
-    normalize_vin,
+    apply_nhtsa_safety_ratings_to_vehicle, collect_grok_photo_annotations, decode_vin,
+    merge_grok_photo_annotations, normalize_vin,
 )
 from app.two_factor import (
     consume_code, decrypt_secret, encrypt_secret, mark_session_verified, pending_user,
@@ -3653,8 +3653,22 @@ def _vehicle_suggestion_catalog():
     })
 
 
+def _safety_ratings_from_form(form):
+    raw = (form.vin_decode_data.data or '').strip()
+    if not raw:
+        return None
+    try:
+        decoded = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(decoded, dict):
+        return None
+    ratings = decoded.get('SafetyRatings')
+    return ratings if isinstance(ratings, dict) and ratings else None
+
+
 def _vehicle_from_form(form):
-    return Vehicle(
+    vehicle = Vehicle(
         year=form.year.data,
         make=form.make.data.strip(),
         model=form.model.data.strip(),
@@ -3698,6 +3712,8 @@ def _vehicle_from_form(form):
         seo_description=form.seo_description.data,
         meta_keywords=form.meta_keywords.data,
     )
+    apply_nhtsa_safety_ratings_to_vehicle(vehicle, _safety_ratings_from_form(form))
+    return vehicle
 
 
 def _apply_vehicle_form(vehicle, form):
@@ -3709,6 +3725,7 @@ def _apply_vehicle_form(vehicle, form):
     vehicle.vin_decode_data = (
         form.vin_decode_data.data.strip() if form.vin_decode_data.data else None
     )
+    apply_nhtsa_safety_ratings_to_vehicle(vehicle, _safety_ratings_from_form(form))
     vehicle.stock_number = form.stock_number.data.strip().upper() if form.stock_number.data else None
     vehicle.price = form.price.data
     vehicle.sale_price = form.sale_price.data

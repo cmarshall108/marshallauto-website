@@ -1528,5 +1528,40 @@ def structured_data_vehicle(vehicle):
         }
         data['review'] = [r.structured_data for r in approved_reviews[:5]]
 
+    # NHTSA NCAP crash ratings as additional properties (not customer reviews).
+    try:
+        from app.vin_decode import nhtsa_safety_seo_blurb, safety_ratings_from_vehicle
+        ratings = safety_ratings_from_vehicle(vehicle)
+    except Exception:
+        ratings = None
+    if ratings:
+        props = []
+        mapping = (
+            ('NHTSA overall safety rating', ratings.get('OverallStars') or ratings.get('OverallRating')),
+            ('NHTSA frontal crash rating', ratings.get('FrontStars') or ratings.get('OverallFrontCrashRating')),
+            ('NHTSA side crash rating', ratings.get('SideStars') or ratings.get('OverallSideCrashRating')),
+            ('NHTSA rollover rating', ratings.get('RolloverStars') or ratings.get('RolloverRating')),
+        )
+        for name, value in mapping:
+            if value in (None, ''):
+                continue
+            props.append({
+                '@type': 'PropertyValue',
+                'name': name,
+                'value': f'{value}/5' if isinstance(value, int) else str(value),
+            })
+        if ratings.get('VehicleDescription'):
+            props.append({
+                '@type': 'PropertyValue',
+                'name': 'NHTSA rated configuration',
+                'value': ratings['VehicleDescription'],
+            })
+        if props:
+            data['additionalProperty'] = props
+        blurb = nhtsa_safety_seo_blurb(vehicle)
+        if blurb and not vehicle.seo_description:
+            base = data.get('description') or ''
+            data['description'] = f'{base} {blurb}'.strip()
+
     # Drop empty/None values for cleaner JSON-LD
     return {k: v for k, v in data.items() if v not in (None, '', [])}
