@@ -165,5 +165,11 @@ if ! FLASK_APP=run.py "$PYTHON" -m flask backfill-vin-data; then
   log "WARNING: VIN data backfill was incomplete; rerun flask backfill-vin-data"
 fi
 
+# Non-fatal and resumable: NHTSA 5-star safety ratings for inventory (year/make/model).
+# Skips vehicles already checked; use flask backfill-nhtsa-safety --force to refresh.
+if ! FLASK_APP=run.py "$PYTHON" -m flask backfill-nhtsa-safety; then
+  log "WARNING: NHTSA safety backfill was incomplete; rerun flask backfill-nhtsa-safety"
+fi
+
 # Keep the 10 most recent snapshots.
 ls -1dt "$BACKUP_ROOT"/instance-* 2>/dev/null | tail -n +11 | xargs -r rm -rf

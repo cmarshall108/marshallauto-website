@@ -761,7 +761,10 @@ venv/bin/python -m flask --app run:app backfill-nhtsa-safety
 
 `backfill-nhtsa-safety` fills NHTSA 5-star ratings for every inventory vehicle
 with year/make/model (VIN optional). Ratings appear on inventory cards and the
-vehicle Safety tab. Use `--force` to refresh existing ratings.
+vehicle Safety tab. Use `--force` to refresh existing ratings. The Ubuntu
+auto-deployer runs this resumable backfill after each successful deploy (same
+pattern as `backfill-vin-data`); failed or incomplete runs are logged and
+retried on the next deploy.
 
 The VIN command processes vehicles with a VIN that lack saved decode data or
 supplemental data. If `XAI_API_KEY` is set, it makes one short text-model request
