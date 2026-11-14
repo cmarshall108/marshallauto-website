@@ -75,7 +75,8 @@ def _canonical_url():
     if page and page > 1 and request.endpoint in {
         'main.inventory', 'main.vehicle_archive', 'main.blog_list',
         'main.inventory_by_city', 'main.inventory_by_make_or_body_city',
-        'main.inventory_rebuilt_by_city',
+        'main.inventory_rebuilt_by_city', 'main.inventory_cheap_by_city',
+        'main.inventory_luxury_by_city', 'main.inventory_certified_by_city',
     }:
         args['page'] = page
     return current_app.config['SITE_URL'].rstrip('/') + url_for(request.endpoint, **args)
@@ -109,6 +110,46 @@ def _available_body_styles():
         .all()
         if b[0]
     ]
+
+
+def _get_price_tier(price):
+    """Categorize vehicle by price for SEO keyword targeting."""
+    if price < 10000:
+        return {
+            "tier": "Cheap",
+            "keywords": ["cheap", "affordable", "budget", "great deal"],
+            "display": "Cheap"
+        }
+    elif price < 15000:
+        return {
+            "tier": "Affordable",
+            "keywords": ["affordable", "budget-friendly", "under $15k", "great deal"],
+            "display": "Affordable"
+        }
+    elif price < 30000:
+        return {
+            "tier": "Mid-range",
+            "keywords": ["mid-range", "value", "reliable", "popular"],
+            "display": "Mid-range"
+        }
+    else:
+        return {
+            "tier": "Premium",
+            "keywords": ["luxury", "premium", "high-end", "sophisticated"],
+            "display": "Premium"
+        }
+
+
+def _get_condition_keywords(vehicle):
+    """Extract condition-based SEO keywords."""
+    keywords = []
+    if vehicle.condition == 'certified':
+        keywords.extend(["certified pre-owned", "CPO", "inspected"])
+    if vehicle.title_status == 'rebuilt':
+        keywords.extend(["rebuilt title", "discounted", "salvage title"])
+    elif vehicle.title_status == 'clean':
+        keywords.extend(["clean title"])
+    return keywords
 
 
 RECENTLY_SOLD_DAYS = 183
@@ -982,6 +1023,178 @@ def inventory_rebuilt_by_city(city, state):
     )
 
 
+@main.route('/inventory/cheap-used-cars-under-<int:max_price>-in-<city>-<state>')
+def inventory_cheap_by_city(max_price, city, state):
+    """Budget-friendly vehicle landing page for price-conscious shoppers."""
+    area_slug = f"{city.lower()}-{state.lower()}"
+    area = _service_area_map().get(area_slug)
+    if not area:
+        return redirect(url_for('main.inventory', max_price=max_price))
+    
+    city_name, state_name = area
+    biz = current_app.config['BUSINESS_NAME']
+    page = request.args.get('page', 1, type=int)
+    sort = request.args.get('sort', 'newest')
+    
+    canonical = url_for(
+        'main.inventory_cheap_by_city',
+        max_price=max_price, city=city, state=state, _external=True,
+    )
+    
+    h1 = f"Cheap Used Cars Under ${max_price:,} for Sale in {city_name}, {state_name}"
+    intro = (
+        f"Looking for an affordable used car? Browse budget-friendly vehicles under ${max_price:,} "
+        f"near {city_name}, {state_name}. {biz} specializes in offering quality pre-owned cars "
+        f"at competitive prices. Financing available through Lendmark Financial Services. "
+        f"Call {current_app.config['BUSINESS_PHONE']} or visit us to find your next affordable car."
+    )
+    
+    meta_title = f"Cheap Used Cars Under ${max_price:,} in {city_name}, {state_name} | {biz}"
+    meta_description = (
+        f"Find affordable used cars under ${max_price:,} in {city_name}, {state_name}. "
+        f"Budget-friendly vehicles with financing options available. Browse {biz} inventory today."
+    )
+    
+    breadcrumb = structured_data_breadcrumb([
+        ("Home", current_app.config['SITE_URL']),
+        ("Used Cars for Sale", url_for('main.inventory', _external=True)),
+        (f"Affordable Cars Under ${max_price:,}", canonical)
+    ])
+    
+    faqs = [
+        (f"What's the cheapest used car you have near {city_name}?",
+         f"Our inventory of vehicles under ${max_price:,} changes frequently. Call {current_app.config['BUSINESS_PHONE']} "
+         f"or browse online to see the latest affordable options available."),
+        (f"Can I get financing for an affordable used car?",
+         f"Yes! Lendmark Financial Services offers competitive rates for used vehicles. Fill out our online application "
+         f"to see your options."),
+        ("What should I look for in a budget car?",
+         "Focus on mileage, maintenance history, and mechanical condition. Our pre-inspected vehicles come with CarFax reports. "
+         "Our sales team can help you find the best value in your budget."),
+    ]
+    
+    return _render_inventory(
+        page=page, max_price=max_price, sort=sort,
+        landing_h1=h1, landing_intro=intro,
+        landing_meta_title=meta_title, landing_meta_description=meta_description,
+        landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+        landing_faqs=faqs,
+    )
+
+
+@main.route('/inventory/luxury-used-cars-<int:min_price>-plus-in-<city>-<state>')
+def inventory_luxury_by_city(min_price, city, state):
+    """Premium/luxury vehicle landing page."""
+    area_slug = f"{city.lower()}-{state.lower()}"
+    area = _service_area_map().get(area_slug)
+    if not area:
+        return redirect(url_for('main.inventory', min_price=min_price))
+    
+    city_name, state_name = area
+    biz = current_app.config['BUSINESS_NAME']
+    page = request.args.get('page', 1, type=int)
+    sort = request.args.get('sort', 'newest')
+    
+    canonical = url_for(
+        'main.inventory_luxury_by_city',
+        min_price=min_price, city=city, state=state, _external=True,
+    )
+    
+    h1 = f"Luxury Used Cars ${min_price:,}+ for Sale in {city_name}, {state_name}"
+    intro = (
+        f"Discover premium used vehicles ${min_price:,} and above near {city_name}, {state_name}. "
+        f"{biz} stocks luxury cars with high-end features, low mileage, and certified histories. "
+        f"Premium financing available. Call {current_app.config['BUSINESS_PHONE']} to schedule a test drive."
+    )
+    
+    meta_title = f"Luxury Used Cars ${min_price:,}+ in {city_name}, {state_name} | {biz}"
+    meta_description = (
+        f"Browse premium and luxury used vehicles ${min_price:,}+ in {city_name}, {state_name}. "
+        f"High-end cars with financing available at {biz}."
+    )
+    
+    breadcrumb = structured_data_breadcrumb([
+        ("Home", current_app.config['SITE_URL']),
+        ("Used Cars for Sale", url_for('main.inventory', _external=True)),
+        (f"Luxury Cars ${min_price:,}+", canonical)
+    ])
+    
+    faqs = [
+        (f"What luxury cars do you have in stock?",
+         f"Our luxury inventory changes regularly. Browse our current selections online or call {current_app.config['BUSINESS_PHONE']} "
+         f"to discuss premium options."),
+        ("Do you offer certified pre-owned luxury vehicles?",
+         "Yes! Many of our luxury vehicles come with extended warranties and service records. Ask about our CPO program."),
+        ("What financing options are available for luxury cars?",
+         "We work with multiple lenders for premium vehicles. Apply online or contact our finance team for competitive rates."),
+    ]
+    
+    return _render_inventory(
+        page=page, min_price=min_price, sort=sort,
+        landing_h1=h1, landing_intro=intro,
+        landing_meta_title=meta_title, landing_meta_description=meta_description,
+        landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+        landing_faqs=faqs,
+    )
+
+
+@main.route('/inventory/certified-pre-owned-in-<city>-<state>')
+def inventory_certified_by_city(city, state):
+    """Certified Pre-Owned vehicle landing page."""
+    area_slug = f"{city.lower()}-{state.lower()}"
+    area = _service_area_map().get(area_slug)
+    if not area:
+        return redirect(url_for('main.inventory', condition='certified'))
+    
+    city_name, state_name = area
+    biz = current_app.config['BUSINESS_NAME']
+    page = request.args.get('page', 1, type=int)
+    sort = request.args.get('sort', 'newest')
+    
+    canonical = url_for(
+        'main.inventory_certified_by_city',
+        city=city, state=state, _external=True,
+    )
+    
+    h1 = f"Certified Pre-Owned Vehicles for Sale in {city_name}, {state_name}"
+    intro = (
+        f"Browse certified pre-owned (CPO) vehicles near {city_name}, {state_name}. "
+        f"{biz} offers inspected and certified used cars, trucks, and SUVs with extended warranties "
+        f"and comprehensive service records. Get peace of mind with every purchase. "
+        f"Financing available through Lendmark Financial Services."
+    )
+    
+    meta_title = f"Certified Pre-Owned Vehicles for Sale in {city_name}, {state_name} | {biz}"
+    meta_description = (
+        f"Shop certified pre-owned cars near {city_name}, {state_name}. Inspected vehicles with warranties. "
+        f"Financing available at {biz}."
+    )
+    
+    breadcrumb = structured_data_breadcrumb([
+        ("Home", current_app.config['SITE_URL']),
+        ("Used Cars for Sale", url_for('main.inventory', _external=True)),
+        (f"Certified Pre-Owned in {city_name}", canonical)
+    ])
+    
+    faqs = [
+        ("What does 'certified pre-owned' mean?",
+         "Certified vehicles have passed rigorous multi-point inspections and come with extended warranties. "
+         "They offer more protection and peace of mind than regular used cars."),
+        (f"What's included with a CPO vehicle from {biz}?",
+         "Warranty coverage, full service history, and detailed inspection reports. Ask our team for specific details on each vehicle."),
+        ("Is CPO financing different?",
+         "Many lenders offer better rates for certified vehicles due to lower risk. Apply online to compare your options."),
+    ]
+    
+    return _render_inventory(
+        page=page, condition='certified', sort=sort,
+        landing_h1=h1, landing_intro=intro,
+        landing_meta_title=meta_title, landing_meta_description=meta_description,
+        landing_breadcrumb=breadcrumb, landing_canonical=canonical,
+        landing_faqs=faqs,
+    )
+
+
 @main.route('/service-area')
 def service_area():
     """Service area hub page for local SEO."""
@@ -1271,20 +1484,45 @@ def vehicle_detail(slug):
     location_phrase = f" in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}"
     listing_status = 'for Sale' if vehicle.status == 'available' else ('Sold' if vehicle.status == 'sold' else 'Unavailable')
     vin_phrase = f" | VIN {vehicle.vin}" if vehicle.vin else ''
-    meta_title = (
-        vehicle.seo_title if vehicle.seo_title and vehicle.status == 'available'
-        else f"{vehicle.title} {listing_status}{location_phrase} | {current_app.config['BUSINESS_NAME']}"
-    ) + vin_phrase
+    
+    # Enhanced meta title with price tier keywords
+    if vehicle.status == 'available':
+        price_tier = _get_price_tier(vehicle.display_price)
+        if vehicle.seo_title:
+            meta_title = f"{vehicle.seo_title} | {current_app.config['BUSINESS_NAME']}"
+        else:
+            price_keyword = price_tier["display"]
+            meta_title = (
+                f"{price_keyword} {vehicle.title} ${vehicle.display_price:,.0f} "
+                f"for Sale{location_phrase} | {current_app.config['BUSINESS_NAME']}"
+            )
+    else:
+        meta_title = f"{vehicle.title} {listing_status}{location_phrase} | {current_app.config['BUSINESS_NAME']}"
+    
+    meta_title += vin_phrase
 
     title_phrase = (
         f"{vehicle.title_status.replace('_', ' ').title()} title" if vehicle.title_status
         else "clean title"
     )
-    meta_description = vehicle.seo_description or (
-        f"Shop this {vehicle.title} with {vehicle.mileage:,} miles at {current_app.config['BUSINESS_NAME']}. "
-        f"{vehicle.condition.title()} condition, {title_phrase}. Financing is available through Lendmark Financial Services; visit us to apply for this vehicle."
-    )
-    if vehicle.status != 'available':
+    
+    # Enhanced meta description with price tier and condition keywords
+    if vehicle.status == 'available':
+        price_tier = _get_price_tier(vehicle.display_price)
+        condition_kw = _get_condition_keywords(vehicle)
+        condition_phrase = f", {', '.join(condition_kw)}" if condition_kw else ""
+        
+        if vehicle.seo_description:
+            meta_description = vehicle.seo_description
+        else:
+            meta_description = (
+                f"Shop this {vehicle.title} with {vehicle.mileage:,} miles at "
+                f"{current_app.config['BUSINESS_NAME']}{condition_phrase}. "
+                f"Asking: ${vehicle.display_price:,.0f}. "
+                f"{vehicle.condition.title()} condition, {title_phrase}. "
+                f"Financing available through Lendmark Financial Services."
+            )
+    else:
         meta_description = (
             f"This {vehicle.title} is {listing_status.lower()} at {current_app.config['BUSINESS_NAME']} "
             f"in {current_app.config['BUSINESS_CITY']}, {current_app.config['BUSINESS_STATE']}. "
@@ -1301,14 +1539,41 @@ def vehicle_detail(slug):
         meta_description = f"VIN {vehicle.vin}. {meta_description}"
         if len(meta_description) > 320:
             meta_description = meta_description[:317].rsplit(' ', 1)[0] + '…'
-    meta_keywords = vehicle.meta_keywords or ', '.join(filter(None, [
-        str(vehicle.year), vehicle.make, vehicle.model, vehicle.trim,
-        vehicle.body_style, vehicle.exterior_color, current_app.config['BUSINESS_CITY'],
-        current_app.config['BUSINESS_STATE'], 'used car for sale', title_phrase,
-        'NHTSA safety rating' if vehicle.nhtsa_overall_stars else '',
-        f'{vehicle.nhtsa_overall_stars}-star NHTSA' if vehicle.nhtsa_overall_stars else '',
-        'crash test ratings' if vehicle.nhtsa_overall_rating else '',
-    ]))
+    
+    # Enhanced meta keywords with price tier and condition
+    if vehicle.meta_keywords:
+        meta_keywords = vehicle.meta_keywords
+    else:
+        price_tier = _get_price_tier(vehicle.display_price)
+        condition_kw = _get_condition_keywords(vehicle)
+        
+        meta_keywords = ', '.join(filter(None, [
+            # Price tier keywords
+            price_tier["keywords"][0] if price_tier["keywords"] else None,
+            f"${vehicle.display_price//1000*1000:,.0f}" if vehicle.display_price else None,
+            
+            # Standard vehicle identifiers
+            str(vehicle.year), vehicle.make, vehicle.model, vehicle.trim,
+            vehicle.body_style, vehicle.exterior_color,
+            
+            # Location
+            current_app.config['BUSINESS_CITY'],
+            current_app.config['BUSINESS_STATE'],
+            
+            # Condition and title
+            vehicle.condition.replace('_', ' ') if vehicle.condition else None,
+            title_phrase,
+            ', '.join(condition_kw) if condition_kw else None,
+            
+            # General
+            'used car for sale',
+            'inventory',
+            
+            # Safety if available
+            'NHTSA safety rating' if vehicle.nhtsa_overall_stars else '',
+            f'{vehicle.nhtsa_overall_stars}-star NHTSA' if vehicle.nhtsa_overall_stars else '',
+            'crash test ratings' if vehicle.nhtsa_overall_rating else '',
+        ]))
 
     og_image = vehicle.primary_image_url(absolute=True)
 
@@ -2270,6 +2535,26 @@ def sitemap():
                 'changefreq': 'weekly',
                 'lastmod': inventory_lastmod,
             })
+        
+        # Add price-tier landing pages
+        pages.append({
+            'loc': url_for('main.inventory_cheap_by_city', max_price=15000, city=city_slug, state=state_slug, _external=True),
+            'priority': '0.70',
+            'changefreq': 'daily',
+            'lastmod': inventory_lastmod,
+        })
+        pages.append({
+            'loc': url_for('main.inventory_luxury_by_city', min_price=30000, city=city_slug, state=state_slug, _external=True),
+            'priority': '0.70',
+            'changefreq': 'daily',
+            'lastmod': inventory_lastmod,
+        })
+        pages.append({
+            'loc': url_for('main.inventory_certified_by_city', city=city_slug, state=state_slug, _external=True),
+            'priority': '0.65',
+            'changefreq': 'weekly',
+            'lastmod': inventory_lastmod,
+        })
 
     for vehicle in vehicles:
         if vehicle.is_coming_soon and vehicle.status == 'available':

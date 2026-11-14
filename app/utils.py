@@ -1487,6 +1487,52 @@ def structured_data_vehicle(vehicle):
             }
         }
     }
+    
+    # Add price tier category for SEO keyword signaling
+    def get_price_tier_for_schema(price):
+        if price < 15000:
+            return "Affordable"
+        elif price < 30000:
+            return "Mid-range"
+        else:
+            return "Premium"
+    
+    data['priceCategory'] = get_price_tier_for_schema(vehicle.display_price)
+    
+    # Add affordability and condition keywords as PropertyValue
+    keyword_props = []
+    price_tier = get_price_tier_for_schema(vehicle.display_price)
+    if price_tier == "Affordable":
+        keyword_props.append({
+            '@type': 'PropertyValue',
+            'name': 'affordability',
+            'value': 'affordable'
+        })
+    elif price_tier == "Premium":
+        keyword_props.append({
+            '@type': 'PropertyValue',
+            'name': 'affordability',
+            'value': 'luxury'
+        })
+    
+    # Add condition keywords
+    if vehicle.condition == 'certified':
+        keyword_props.append({
+            '@type': 'PropertyValue',
+            'name': 'certification',
+            'value': 'certified pre-owned'
+        })
+    
+    if vehicle.title_status == 'rebuilt':
+        keyword_props.append({
+            '@type': 'PropertyValue',
+            'name': 'title',
+            'value': 'rebuilt title'
+        })
+    
+    if keyword_props:
+        data['additionalProperty'] = keyword_props
+    
     if vehicle.vin:
         data['vehicleIdentificationNumber'] = vehicle.vin
         data['mpn'] = vehicle.vin
