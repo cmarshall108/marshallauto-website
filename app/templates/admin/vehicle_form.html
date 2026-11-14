@@ -341,6 +341,9 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <label class="form-label mb-0">Manage Images &amp; Photo Highlights</label>
                 <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('admin.vehicle_images_download', id=vehicle.id) }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-download me-1"></i>Download JPEG photos
+                    </a>
                     <button type="submit" form="highlights-analyze-all-form" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-bullseye me-1"></i>Re-analyze all photo highlights
                     </button>

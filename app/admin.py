@@ -5,6 +5,7 @@ import base64
 import binascii
 import secrets
 import calendar
+import zipfile
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -2284,6 +2285,43 @@ def vehicle_images_reorder(id):
     db.session.commit()
     flash('Image order updated.', 'success')
     return redirect(url_for('admin.vehicle_edit', id=id))
+
+
+@admin_bp.get('/vehicles/<int:id>/images/download')
+@login_required
+def vehicle_images_download(id):
+    vehicle = (
+        Vehicle.query
+        .options(selectinload(Vehicle.images))
+        .filter_by(id=id)
+        .first_or_404()
+    )
+    images = [
+        image for image in vehicle.ordered_images()
+        if os.path.splitext(image.filename)[1].lower() in ('.jpg', '.jpeg')
+    ]
+    if not images:
+        flash('This vehicle has no JPEG photos to download.', 'warning')
+        return redirect(url_for('admin.vehicle_edit', id=id))
+
+    archive = BytesIO()
+    directory = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vehicles')
+    try:
+        with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_STORED) as bundle:
+            for index, image in enumerate(images, start=1):
+                filename = os.path.basename(image.filename)
+                bundle.write(os.path.join(directory, filename), f'{index:03d}_{filename}')
+    except OSError:
+        archive.close()
+        current_app.logger.exception('Could not download JPEG photos for vehicle %s', id)
+        flash('Could not download all JPEG photos. A photo may be missing or unreadable.', 'danger')
+        return redirect(url_for('admin.vehicle_edit', id=id))
+
+    archive.seek(0)
+    return send_file(
+        archive, mimetype='application/zip', as_attachment=True,
+        download_name=f'vehicle-{id}-jpeg-photos.zip',
+    )
 
 
 @admin_bp.route('/vehicles/images/<int:id>/delete', methods=['POST'])
