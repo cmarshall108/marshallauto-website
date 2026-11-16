@@ -101,7 +101,7 @@
 }
 
 .public-site .navbar-brand { font-size: 1.35rem; letter-spacing: -0.04em; }
-.public-site .navbar-brand img { width: 36px; height: 36px; }
+.public-site .navbar-brand .brand-logo { width: 220px; height: auto; }
 .public-site .navbar .nav-link {
     color: #465366 !important;
     font-size: 0.84rem;

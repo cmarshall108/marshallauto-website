@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 100" role="img" aria-labelledby="title">
+  <title id="title">Marshall Auto, LLC</title>
+  <path fill="#142238" d="M10 82V18h20l20 26 20-26h20v64H70V47L50 72 30 47v35z"/>
+  <path fill="#ff6b00" d="m47 75 28-35v19L60 76H47z"/>
+  <text x="112" y="58" fill="#142238" font-family="Inter, Arial, sans-serif" font-size="43" font-weight="800" letter-spacing="-1.8">MARSHALL</text>
+  <text x="361" y="58" fill="#ff6b00" font-family="Inter, Arial, sans-serif" font-size="43" font-weight="800" letter-spacing="-1.8">AUTO</text>
+  <text x="364" y="83" fill="#142238" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="5">LLC</text>
+</svg>

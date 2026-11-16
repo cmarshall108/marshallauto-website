@@ -71,6 +71,12 @@ a:hover {
     letter-spacing: -0.5px;
 }
 
+.navbar-brand .brand-logo {
+    display: block;
+    width: 230px;
+    height: auto;
+}
+
 .nav-link {
     font-weight: 500;
     color: #333 !important;
@@ -2636,9 +2642,8 @@ p.vehicle-price .price-drop-now {
         font-size: 1.2rem;
     }
 
-    .navbar-brand img {
-        width: 34px;
-        height: 34px;
+    .navbar-brand .brand-logo {
+        width: 200px;
     }
 
     .form-control,
