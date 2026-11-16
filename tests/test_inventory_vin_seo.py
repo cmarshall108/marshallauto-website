@@ -280,7 +280,9 @@ class InventoryVINSEOTests(unittest.TestCase):
         self.assertIn('Sold', html.title.string)
         self.assertIn(self.sold.vin, html.title.string)
         self.assertNotIn('Buy this car today', html.select_one('meta[name="description"]')['content'])
-        self.assertIn('Last listed price:', html.get_text())
+        self.assertNotIn('Last listed price:', html.get_text())
+        self.assertIsNone(html.select_one('.vehicle-price'))
+        self.assertIsNone(html.select_one('.savings-banner'))
         self.assertIsNotNone(html.select_one('main a[href="/inventory"]'))
         self.assertEqual(self.schema(html, 'Car')['offers']['availability'], 'https://schema.org/SoldOut')
 

@@ -367,6 +367,7 @@ bi-check-circle
                         <a href="{{ url_for('main.inventory') }}" class="alert-link">Browse current used cars for sale in {{ business_city }}, {{ business_state }}</a> or contact us about similar vehicles.
                     </div>
                     {% endif %}
+                    {% if vehicle.status != 'sold' %}
                     {% set savings = vehicle.savings_info() %}
                     {% if vehicle.market_value is not none %}
                     <div class="border rounded p-3 mb-3 bg-light">
@@ -416,6 +417,7 @@ bi-check-circle
                     </div>
                     {% else %}
                     <div class="mb-3"></div>
+                    {% endif %}
                     {% endif %}
 
                     <div class="row g-2 mb-4 text-center vehicle-quick-stats">
