@@ -22,6 +22,9 @@
         <a href="{{ url_for('admin.vehicle_buyers_guide', id=vehicle.id) }}" class="btn btn-outline-success" title="Prefill the FTC Buyers Guide from this vehicle and dealer settings, edit once, then save the filled PDF.">
             <i class="bi bi-file-earmark-text me-1"></i>Buyers Guide
         </a>
+        <a href="{{ url_for('admin.vehicle_details_print', id=vehicle.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-printer me-1"></i>Print Details
+        </a>
         <a href="{{ url_for('admin.vehicle_qr_print', id=vehicle.id) }}" class="btn btn-outline-success">
             <i class="bi bi-qr-code me-1"></i>Print Window QR
         </a>

@@ -111,7 +111,7 @@ class AdminThemeTests(unittest.TestCase):
         self.assertEqual(documents.summary.get('aria-label'), 'Documents for 2022 Honda Civic')
         self.assertEqual(
             {link.get_text(strip=True) for link in documents.select('a')},
-            {'Hold Deposit', 'Bill of Sale', 'MVR-180', 'MVR-181', 'Window QR'},
+            {'Details Sheet', 'Hold Deposit', 'Bill of Sale', 'MVR-180', 'MVR-181', 'Buyers Guide', 'Window QR'},
         )
         for label in ('View 2022 Honda Civic', 'Edit 2022 Honda Civic', 'Delete 2022 Honda Civic'):
             self.assertIsNotNone(actions.select_one(f'[aria-label="{label}"]'))

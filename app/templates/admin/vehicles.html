@@ -73,6 +73,7 @@
                             <details class="vehicle-documents">
                                 <summary aria-label="Documents for {{ vehicle.title }}"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> Documents</summary>
                                 <div class="vehicle-document-links">
+                                    <a href="{{ url_for('admin.vehicle_details_print', id=vehicle.id) }}" aria-label="Print price and details for {{ vehicle.title }}">Details Sheet</a>
                                     <a href="{{ url_for('admin.vehicle_hold_deposit', id=vehicle.id) }}" aria-label="Print hold deposit form for {{ vehicle.title }}">Hold Deposit</a>
                                     <a href="{{ url_for('admin.vehicle_bill_of_sale', id=vehicle.id) }}" aria-label="Print bill of sale for {{ vehicle.title }}">Bill of Sale</a>
                                     <a href="{{ url_for('admin.vehicle_mvr_180', id=vehicle.id) }}" title="Review the form on the official blank, then fill this copy." aria-label="Fill MVR-180 odometer disclosure for {{ vehicle.title }}">MVR-180</a>

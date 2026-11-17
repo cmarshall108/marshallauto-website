@@ -443,6 +443,9 @@ bi-check-circle
                             <input type="checkbox" class="js-compare-checkbox d-none" data-slug="{{ vehicle.slug }}">
                             <i class="bi bi-columns-gap"></i> Compare
                         </label>
+                        <a class="btn btn-outline-secondary flex-fill" href="{{ url_for('main.vehicle_details_print', slug=vehicle.slug) }}">
+                            <i class="bi bi-printer" aria-hidden="true"></i> Print
+                        </a>
                     </div>
                     <details class="mb-3">
                         <summary class="fw-semibold">Share this car</summary>

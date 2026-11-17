@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex">
+    <title>Print {{ vehicle.title }} — {{ dealer_name }}</title>
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            color: #142238;
+            background: #f4f6f8;
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.35;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 1rem 0.5rem 0;
+        }
+        .toolbar a, .toolbar button {
+            font: inherit;
+            font-size: 0.95rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 6px;
+            border: 1px solid #23354a;
+            background: #fff;
+            color: #23354a;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .toolbar button { background: #23354a; color: #fff; }
+        .sheet {
+            max-width: 8.5in;
+            margin: 0.75rem auto 2rem;
+            padding: 0.7in 0.65in;
+            background: #fff;
+            border: 1px solid #d5dbe2;
+        }
+        header.sheet-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-start;
+            border-bottom: 3px solid #23354a;
+            padding-bottom: 0.7rem;
+            margin-bottom: 1rem;
+        }
+        .dealer-name {
+            margin: 0 0 0.2rem;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .dealer-meta { margin: 0; color: #59677a; font-size: 0.9rem; }
+        .logo { width: 92px; height: auto; }
+        .identity {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+        .photo {
+            width: 220px;
+            height: 148px;
+            object-fit: cover;
+            border: 1px solid #e1e6eb;
+            background: #f4f6f8;
+        }
+        h1 { margin: 0 0 0.25rem; font-size: 1.7rem; line-height: 1.15; }
+        .stock { margin: 0; color: #59677a; }
+        .price {
+            margin: 0.45rem 0 0;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .was, .note, .disclaimer { color: #59677a; }
+        .was { margin: 0.1rem 0 0; text-decoration: line-through; }
+        .note { margin: 0.35rem 0 0; max-width: 36rem; }
+        .badge {
+            display: inline-block;
+            margin-right: 0.35rem;
+            padding: 0.1rem 0.4rem;
+            border: 1px solid #23354a;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        h2 {
+            margin: 1.15rem 0 0.4rem;
+            font-size: 0.95rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .spec-grid, .decode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.4rem; }
+        .spec-grid div, .mini-specs div {
+            display: grid;
+            grid-template-columns: 8.6rem 1fr;
+            gap: 0.35rem;
+            border-bottom: 1px solid #e6ebf0;
+            padding: 0.22rem 0;
+        }
+        dt { color: #59677a; font-weight: 700; }
+        dd { margin: 0; }
+        .feature-columns { columns: 2; column-gap: 1.4rem; }
+        .feature-columns section { break-inside: avoid; margin-bottom: 0.8rem; }
+        .feature-columns h3, .decode-grid h3 { margin: 0 0 0.25rem; font-size: 0.92rem; }
+        ul { margin: 0; padding-left: 1.1rem; }
+        .description { white-space: pre-wrap; margin: 0.3rem 0 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        th, td { border-bottom: 1px solid #e6ebf0; padding: 0.28rem 0.4rem; text-align: left; vertical-align: top; }
+        th { color: #59677a; font-weight: 700; }
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1.2rem;
+            padding-top: 0.7rem;
+            border-top: 1px solid #d5dbe2;
+        }
+        .qr { width: 108px; height: auto; }
+        .url { font-size: 0.78rem; overflow-wrap: anywhere; }
+        .disclaimer { margin: 0.7rem 0 0; font-size: 0.78rem; }
+        @page { size: letter; margin: 0.45in; }
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .sheet { max-width: none; margin: 0; padding: 0; border: 0; }
+            a { color: inherit; text-decoration: none; }
+            h2, .feature-columns section, tr, .footer { break-inside: avoid; }
+        }
+        @media (max-width: 720px) {
+            .identity, .sheet-header, .footer, .spec-grid, .decode-grid { display: block; }
+            .photo { width: 100%; height: auto; margin-top: 0.8rem; }
+            .feature-columns { columns: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <a href="{{ back_url }}">Back</a>
+        <button type="button" onclick="window.print()">Print price and details</button>
+    </div>
+
+    <article class="sheet">
+        <header class="sheet-header">
+            <div>
+                <p class="dealer-name">{{ dealer_name }}</p>
+                <p class="dealer-meta">{{ dealer_address }}</p>
+                <p class="dealer-meta">{{ dealer_phone }}{% if dealer_email %} · {{ dealer_email }}{% endif %}</p>
+            </div>
+            <img class="logo" src="{{ url_for('static', filename='images/dealership-logo.jpg') }}" alt="{{ dealer_name }}">
+        </header>
+
+        <div class="identity">
+            <div>
+                <p>
+                    <span class="badge">{{ vehicle.status | replace('_', ' ') | title }}</span>
+                    {% if vehicle.is_coming_soon %}<span class="badge">Coming Soon</span>{% endif %}
+                    <span class="badge">{{ (vehicle.title_status or 'clean') | replace('_', ' ') | title }} title</span>
+                </p>
+                <h1>{{ vehicle.title }}</h1>
+                <p class="stock">
+                    Stock #{{ vehicle.stock_number or vehicle.id }}
+                    {% if vehicle.vin %} · VIN {{ vehicle.vin }}{% endif %}
+                </p>
+                <p class="price">{{ vehicle.display_price | format_price }}</p>
+                {% if price_drop %}
+                <p class="was">Was {{ price_drop.original | format_price }}</p>
+                {% endif %}
+                {% if savings %}
+                <p class="note">Retail clean-title value {{ savings.retail | format_price }}. About {{ savings.savings | format_price }} ({{ savings.percent }}%) below that value.</p>
+                {% elif vehicle.market_value is not none %}
+                <p class="note">Retail clean-title value {{ vehicle.market_value | format_price }}.</p>
+                {% endif %}
+                {% if coming_soon_unpublished %}
+                <p class="note">Coming soon: this price is for the printed staff sheet. It is not shown on the public website yet.</p>
+                {% elif vehicle.status == 'available' %}
+                <p class="note">The advertised price is the out-the-door price. Marshall Auto does not add dealer, documentation, or other extra fees.</p>
+                {% elif vehicle.status == 'sold' %}
+                <p class="note">This vehicle is no longer available. The price shown is the last advertised price.</p>
+                {% elif vehicle.status == 'pending' %}
+                <p class="note">This vehicle is pending. The price shown is the advertised price.</p>
+                {% endif %}
+            </div>
+            <img class="photo" src="{{ vehicle.primary_image_url() }}" alt="{{ vehicle.title }}">
+        </div>
+
+        <h2>Vehicle details</h2>
+        <dl class="spec-grid">
+            <div><dt>Year</dt><dd>{{ vehicle.year }}</dd></div>
+            <div><dt>Make</dt><dd>{{ vehicle.make }}</dd></div>
+            <div><dt>Model</dt><dd>{{ vehicle.model }}</dd></div>
+            <div><dt>Trim</dt><dd>{{ vehicle.trim or 'Not provided' }}</dd></div>
+            <div><dt>Mileage</dt><dd>{{ vehicle.mileage | format_mileage }}</dd></div>
+            <div><dt>Condition</dt><dd>{{ vehicle.condition | replace('_', ' ') | title }}</dd></div>
+            <div><dt>Title</dt><dd>{{ (vehicle.title_status or 'clean') | replace('_', ' ') | title }}</dd></div>
+            <div><dt>Stock #</dt><dd>{{ vehicle.stock_number or vehicle.id }}</dd></div>
+            <div><dt>VIN</dt><dd>{{ vehicle.vin or 'Not on file' }}</dd></div>
+            {% if vehicle.body_style %}<div><dt>Body style</dt><dd>{{ vehicle.body_style }}</dd></div>{% endif %}
+            {% if vehicle.exterior_color %}<div><dt>Exterior</dt><dd>{{ vehicle.exterior_color }}</dd></div>{% endif %}
+            {% if vehicle.interior_color %}<div><dt>Interior</dt><dd>{{ vehicle.interior_color }}</dd></div>{% endif %}
+            {% if vehicle.engine %}<div><dt>Engine</dt><dd>{{ vehicle.engine }}</dd></div>{% endif %}
+            {% if vehicle.transmission %}<div><dt>Transmission</dt><dd>{{ vehicle.transmission }}</dd></div>{% endif %}
+            {% if vehicle.drivetrain %}<div><dt>Drivetrain</dt><dd>{{ vehicle.drivetrain }}</dd></div>{% endif %}
+            {% if vehicle.fuel_type %}<div><dt>Fuel</dt><dd>{{ vehicle.fuel_type }}</dd></div>{% endif %}
+            {% if vehicle.mpg_city or vehicle.mpg_highway or vehicle.mpg_combined %}
+            <div>
+                <dt>MPG</dt>
+                <dd>
+                    {% if vehicle.mpg_city or vehicle.mpg_highway %}{{ vehicle.mpg_city or '—' }} city / {{ vehicle.mpg_highway or '—' }} hwy{% endif %}
+                    {% if vehicle.mpg_combined %}{% if vehicle.mpg_city or vehicle.mpg_highway %} · {% endif %}{{ vehicle.mpg_combined }} combined{% endif %}
+                </dd>
+            </div>
+            {% endif %}
+            {% if vehicle.doors %}<div><dt>Doors</dt><dd>{{ vehicle.doors }}</dd></div>{% endif %}
+            {% if vehicle.passenger_capacity %}<div><dt>Passengers</dt><dd>{{ vehicle.passenger_capacity }}</dd></div>{% endif %}
+            {% if vehicle.gvwr %}<div><dt>GVWR</dt><dd>{{ vehicle.gvwr }}</dd></div>{% endif %}
+            {% if vehicle.days_on_lot is not none %}<div><dt>Days on lot</dt><dd>{{ vehicle.days_on_lot }}</dd></div>{% endif %}
+        </dl>
+
+        {% if vehicle.description %}
+        <h2>Description</h2>
+        <p class="description">{{ vehicle.description }}</p>
+        {% endif %}
+
+        {% if feature_groups %}
+        <h2>Features and equipment</h2>
+        <div class="feature-columns">
+            {% for group in feature_groups %}
+            <section>
+                <h3>{{ group.label }}</h3>
+                <ul>
+                    {% for item in group['items'] %}<li>{{ item }}</li>{% endfor %}
+                </ul>
+            </section>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if extra_specs %}
+        <h2>Additional specifications</h2>
+        <dl class="spec-grid">
+            {% for spec in extra_specs %}
+            <div>
+                <dt>{{ spec.label or 'Note' }}</dt>
+                <dd>{{ spec.value }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+        {% endif %}
+
+        {% if safety_ratings %}
+        <h2>NHTSA safety ratings</h2>
+        {% if safety_ratings.VehicleDescription %}
+        <p>Rated configuration: {{ safety_ratings.VehicleDescription }}</p>
+        {% endif %}
+        <dl class="spec-grid">
+            {% if safety_ratings.OverallStars %}
+            <div><dt>Overall</dt><dd>{{ safety_ratings.OverallStars }}/5</dd></div>
+            {% elif safety_ratings.OverallRating %}
+            <div><dt>Overall</dt><dd>{{ safety_ratings.OverallRating }}</dd></div>
+            {% endif %}
+            {% for test in safety_ratings.CrashTests or [] %}
+            <div>
+                <dt>{{ test.label }}</dt>
+                <dd>{% if test.stars %}{{ test.stars }}/5{% else %}{{ test.raw or 'Not rated' }}{% endif %}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+        {% if safety_ratings.Summary %}<p class="note">{{ safety_ratings.Summary }}</p>{% endif %}
+        {% elif vehicle.nhtsa_overall_rating %}
+        <h2>NHTSA safety ratings</h2>
+        <p>Overall {{ vehicle.nhtsa_overall_rating }}{% if vehicle.nhtsa_safety_description %}. {{ vehicle.nhtsa_safety_description }}{% endif %}</p>
+        {% endif %}
+
+        {% if vin_decode_groups %}
+        <h2>Manufacturer and EPA data</h2>
+        <p class="note">Shown as returned by NHTSA and EPA. Estimates, when present, are labeled and are not a substitute for checking the vehicle.</p>
+        <div class="decode-grid">
+            {% for group in vin_decode_groups %}
+            <section>
+                <h3>{{ group.label }}</h3>
+                <dl class="mini-specs">
+                    {% for field in group.fields %}
+                    <div><dt>{{ field.label }}</dt><dd>{{ field.value }}</dd></div>
+                    {% endfor %}
+                </dl>
+            </section>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if vehicle.service_records %}
+        <h2>Service history</h2>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Service</th><th>Mileage</th><th>Provider</th></tr>
+            </thead>
+            <tbody>
+                {% for record in vehicle.service_records %}
+                <tr>
+                    <td>{{ record.service_date.strftime('%m/%d/%Y') if record.service_date else '—' }}</td>
+                    <td>{{ record.service_type }}{% if record.description %}<br>{{ record.description }}{% endif %}</td>
+                    <td>{{ record.mileage_at_service | format_mileage if record.mileage_at_service else '—' }}</td>
+                    <td>{{ record.provider or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if vehicle.carfax_reports %}
+        <h2>CarFax summary</h2>
+        {% for report in vehicle.carfax_reports %}
+        <p>
+            {% if report.report_date %}Report date {{ report.report_date.strftime('%m/%d/%Y') }}. {% endif %}
+            Accidents reported: {{ report.accidents_reported or 0 }}.
+            Previous owners: {{ report.owners_reported if report.owners_reported is not none else 'Not provided' }}.
+            {% if report.summary %}{{ report.summary }}{% endif %}
+        </p>
+        {% endfor %}
+        {% endif %}
+
+        <p class="disclaimer">
+            Printed {{ printed_at.strftime('%m/%d/%Y %I:%M %p') }} ET.
+            Confirm equipment, mileage, title status, and price on the vehicle before purchase.
+            A trade-in can change what is owed. Financing, if used, is arranged by the lender, not added as a dealer fee.
+        </p>
+
+        <footer class="footer">
+            <div>
+                <p class="dealer-name">Scan for photos and the current listing</p>
+                <p class="url">{{ display_url }}</p>
+            </div>
+            {% if qr_code %}
+            <img class="qr" src="data:image/svg+xml;base64,{{ qr_code }}" alt="QR code for {{ vehicle.title }}">
+            {% endif %}
+        </footer>
+    </article>
+</body>
+</html>

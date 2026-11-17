@@ -46,6 +46,7 @@ from app.financing import (
     _send_textbelt_message, _textbelt_phone,
 )
 from app.shopper import dealership_now
+from app.vehicle_sheet import vehicle_details_print_context
 from app.coming_soon_stock_photos import (
     appearance_details, ensure_stock_photo_for_vehicle, stock_photo_filename,
 )
@@ -985,6 +986,19 @@ def mobile_vehicles():
             'created_at': vehicle.created_at.isoformat(),
         } for vehicle in pagination.items],
         page=pagination.page, pages=pagination.pages, has_next=pagination.has_next,
+    )
+
+
+@admin_bp.get('/vehicles/<int:id>/details-print')
+@login_required
+def vehicle_details_print(id):
+    vehicle = Vehicle.query.filter_by(id=id).first_or_404()
+    return render_template(
+        'vehicle_details_print.html',
+        **vehicle_details_print_context(
+            vehicle,
+            back_url=url_for('admin.vehicle_edit', id=vehicle.id),
+        ),
     )
 
 

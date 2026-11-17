@@ -27,6 +27,7 @@ from app.financing import (
 from app.buyer_guides import published_buyer_guides
 from app.platform import cached_public_response
 from app.spam_filter import check_lead_spam_for_request
+from app.vehicle_sheet import vehicle_details_print_context
 from app.vin_decode import (
     group_vin_decode_data, is_valid_vin, normalize_vin, nhtsa_safety_seo_blurb,
     safety_ratings_from_vehicle,
@@ -1690,6 +1691,30 @@ def vehicle_detail(slug):
             'dateModified': (vehicle.updated_at or vehicle.created_at).isoformat() + 'Z',
             'mainEntity': {'@id': structured_vehicle['url'] + '#vehicle'},
         },
+    )
+
+
+@main.route('/inventory/<slug>/print')
+def vehicle_details_print(slug):
+    """Customer-facing sheet with price and the details already shown on the listing."""
+    vehicle = (
+        Vehicle.query
+        .options(
+            selectinload(Vehicle.images),
+            selectinload(Vehicle.service_records),
+            selectinload(Vehicle.carfax_reports),
+        )
+        .filter_by(slug=slug)
+        .first_or_404()
+    )
+    if vehicle.is_coming_soon and vehicle.status == 'available':
+        abort(404)
+    return render_template(
+        'vehicle_details_print.html',
+        **vehicle_details_print_context(
+            vehicle,
+            back_url=url_for('main.vehicle_detail', slug=vehicle.slug),
+        ),
     )
 
 
