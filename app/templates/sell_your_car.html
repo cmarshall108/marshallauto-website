@@ -66,12 +66,12 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="source" value="sell-your-car">
                         <div class="mb-3">
-                            <label class="form-label">Your Name</label>
+                            <label class="form-label">Your Name *</label>
                             <input type="text" name="name" class="form-control" autocomplete="name" required>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label">Email</label>
+                                <label class="form-label">Email *</label>
                                 <input type="email" name="email" class="form-control" autocomplete="email" inputmode="email" required>
                             </div>
                             <div class="col-6">
@@ -110,11 +110,11 @@
                     <p class="text-muted text-center mb-4">A quick ballpark range based on year, mileage, and condition. Not an official offer — submit the form above for a precise, no-obligation quote.</p>
                     <form id="trade-in-estimator" class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label" for="ti-year">Vehicle Year</label>
+                            <label class="form-label" for="ti-year">Vehicle Year *</label>
                             <input type="number" id="ti-year" class="form-control" inputmode="numeric" min="1990" max="2100" placeholder="e.g. 2018" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label" for="ti-mileage">Mileage</label>
+                            <label class="form-label" for="ti-mileage">Mileage *</label>
                             <input type="number" id="ti-mileage" class="form-control" inputmode="numeric" min="0" placeholder="e.g. 60000" required>
                         </div>
                         <div class="col-md-4">

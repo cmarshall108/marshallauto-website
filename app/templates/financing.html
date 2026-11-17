@@ -76,8 +76,8 @@
     {{ text_field(prefix, 'previous_residence_years', 'Years at previous address', type='integer') }}
     {{ text_field(prefix, 'previous_residence_months', 'Additional months at previous address', type='integer') }}
     {% endif %}
-    {{ text_field(prefix, 'home_phone', 'Home phone', autocomplete='tel') }}
-    {{ text_field(prefix, 'cell_phone', 'Cell phone', autocomplete='tel-national') }}
+    {{ text_field(prefix, 'home_phone', 'Home phone', autocomplete='tel', hint='Required if you do not enter a cell phone.') }}
+    {{ text_field(prefix, 'cell_phone', 'Cell phone', autocomplete='tel-national', hint='Required if you do not enter a home phone.') }}
     {{ text_field(prefix, 'dependents', 'Number of dependents', true, type='integer') }}
     {{ text_field(prefix, 'email', 'Email address', true, type='email', autocomplete='email', maxlength=120) }}
     {{ select_field(prefix, 'housing_status', 'Housing status', [('buy', 'Buy'), ('rent', 'Rent'), ('own', 'Own'), ('other', 'Other')], true) }}
@@ -86,15 +86,15 @@
 
     <div class="col-12"><hr class="my-2"><h4 class="h6 fw-bold mb-0">Employment and income</h4></div>
     {{ select_field(prefix, 'employment_status', 'Employment status', [('employed', 'Employed'), ('self-employed', 'Self-employed'), ('unemployed', 'Not currently employed'), ('retired', 'Retired')], true) }}
-    {{ text_field(prefix, 'employer_name_address', 'Employer name and address', maxlength=128) }}
-    {{ text_field(prefix, 'occupation', 'Occupation', maxlength=64) }}
-    {{ text_field(prefix, 'employment_date', 'Current employment start date', type='date') }}
+    {{ text_field(prefix, 'employer_name_address', 'Employer name and address', maxlength=128, hint='Required if employed or self-employed.') }}
+    {{ text_field(prefix, 'occupation', 'Occupation', maxlength=64, hint='Required if employed or self-employed.') }}
+    {{ text_field(prefix, 'employment_date', 'Current employment start date', type='date', hint='Required if employed or self-employed.') }}
     {{ text_field(prefix, 'work_phone', 'Work phone') }}
     {{ text_field(prefix, 'work_extension', 'Work phone extension', maxlength=8) }}
-    {{ text_field(prefix, 'employment_gross', 'Monthly employer income (gross)', type='money') }}
-    {{ text_field(prefix, 'employment_net', 'Monthly employer income (net)', type='money') }}
-    {{ text_field(prefix, 'previous_employer', 'Previous employer (if current job is under 2 years)', maxlength=128) }}
-    {{ text_field(prefix, 'previous_employment_date', 'Previous employment start date', type='date') }}
+    {{ text_field(prefix, 'employment_gross', 'Monthly employer income (gross)', type='money', hint='Required if employed or self-employed.') }}
+    {{ text_field(prefix, 'employment_net', 'Monthly employer income (net)', type='money', hint='Required if employed or self-employed.') }}
+    {{ text_field(prefix, 'previous_employer', 'Previous employer', maxlength=128, hint='Required when the current job is under 2 years.') }}
+    {{ text_field(prefix, 'previous_employment_date', 'Previous employment start date', type='date', hint='Required when the current job is under 2 years.') }}
     {{ text_field(prefix, 'other_income_gross', 'Other monthly income (gross)', type='money') }}
     {{ text_field(prefix, 'other_income_source', 'Source of other income', maxlength=128) }}
     {{ text_field(prefix, 'total_gross_income', 'Total monthly income (gross)', true, type='money') }}

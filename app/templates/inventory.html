@@ -186,11 +186,11 @@
                             <input type="hidden" name="max_mileage" value="{{ search_alert_form.max_mileage.data or '' }}">
                             <input type="hidden" name="search_query" value="{{ search_alert_form.search_query.data or '' }}">
                             <div class="col-md-4">
-                                <label class="form-label small mb-1" for="search-alert-name">Name</label>
+                                <label class="form-label small mb-1" for="search-alert-name">Name *</label>
                                 {{ search_alert_form.name(class='form-control form-control-sm', id='search-alert-name', autocomplete='name') }}
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small mb-1" for="search-alert-email">Email</label>
+                                <label class="form-label small mb-1" for="search-alert-email">Email *</label>
                                 {{ search_alert_form.email(class='form-control form-control-sm', id='search-alert-email', type='email', autocomplete='email') }}
                             </div>
                             <div class="col-md-3">

@@ -61,14 +61,14 @@
                         {{ form.vehicle_id() }}
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label" for="name">Name</label>
+                                <label class="form-label" for="name">Name *</label>
                                 {{ form.name(class="form-control", placeholder="Your full name", autocomplete="name") }}
                                 {% if form.name.errors %}
                                 <div class="text-danger small">{{ form.name.errors[0] }}</div>
                                 {% endif %}
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="email">Email</label>
+                                <label class="form-label" for="email">Email *</label>
                                 {{ form.email(class="form-control", placeholder="you@example.com", autocomplete="email") }}
                                 {% if form.email.errors %}
                                 <div class="text-danger small">{{ form.email.errors[0] }}</div>

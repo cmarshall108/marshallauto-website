@@ -13,33 +13,33 @@ from wtforms.validators import EqualTo
 
 
 class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(max=64)])
-    password = PasswordField('Password', validators=[DataRequired(), Length(max=128)])
+    username = StringField('Username *', validators=[DataRequired(), Length(max=64)])
+    password = PasswordField('Password *', validators=[DataRequired(), Length(max=128)])
     remember = BooleanField('Remember me')
     submit = SubmitField('Log In')
 
 
 class ChangePasswordForm(FlaskForm):
-    current_password = PasswordField('Current Password', validators=[DataRequired(), Length(max=128)])
+    current_password = PasswordField('Current Password *', validators=[DataRequired(), Length(max=128)])
     new_password = PasswordField(
-        'New Password',
+        'New Password *',
         validators=[DataRequired(), Length(min=10, max=128)],
         description='At least 10 characters. Mix in numbers/symbols for a stronger password.',
     )
     confirm_password = PasswordField(
-        'Confirm New Password',
+        'Confirm New Password *',
         validators=[DataRequired(), EqualTo('new_password', message='Passwords must match.')],
     )
     submit = SubmitField('Change Password')
 
 
 class TwoFactorForm(FlaskForm):
-    code = StringField('Authenticator or Recovery Code', validators=[DataRequired(), Length(max=32)])
+    code = StringField('Authenticator or Recovery Code *', validators=[DataRequired(), Length(max=32)])
     submit = SubmitField('Verify Code')
 
 
 class TwoFactorRecoveryForm(TwoFactorForm):
-    password = PasswordField('Current Password', validators=[DataRequired(), Length(max=128)])
+    password = PasswordField('Current Password *', validators=[DataRequired(), Length(max=128)])
     submit = SubmitField('Replace Recovery Codes')
 
 
@@ -259,7 +259,7 @@ class VehicleSaleReceiptForm(FlaskForm):
     buyer_address = TextAreaField('Customer Address', validators=[Optional(), Length(max=512)])
     salesman = StringField('Salesman', validators=[Optional(), Length(max=128)])
     otd_price = DecimalField(
-        'OTD Sale Price ($)',
+        'OTD Sale Price ($) *',
         validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
         description=(
             'Out-the-door sale price. The bill-of-sale price is '
@@ -316,7 +316,7 @@ class VehicleAcquisitionCostForm(FlaskForm):
 
 class RebuildCostEntryForm(FlaskForm):
     entry_id = HiddenField()
-    category = SelectField('Cost Type', choices=[
+    category = SelectField('Cost Type *', choices=[
         ('parts', 'Parts & Materials'),
         ('labor', 'Labor'),
         ('service', 'Service / Repair'),
@@ -326,18 +326,18 @@ class RebuildCostEntryForm(FlaskForm):
         ('other', 'Other'),
     ], validators=[DataRequired()])
     description = StringField(
-        'Item or service',
+        'Item or service *',
         validators=[DataRequired(), Length(max=180)],
     )
     vendor = StringField('Store / Provider', validators=[Optional(), Length(max=128)])
     purchase_date = DateField('Date', validators=[Optional()])
     quantity = DecimalField(
-        'Quantity',
+        'Quantity *',
         default=1,
         validators=[DataRequired(), NumberRange(min=0.01, max=100000)],
     )
     unit_cost = DecimalField(
-        'Unit Cost',
+        'Unit Cost *',
         validators=[DataRequired(), NumberRange(min=0, max=99999999.99)],
     )
     notes = TextAreaField('Notes', validators=[Optional(), Length(max=2000)])
@@ -414,7 +414,7 @@ class TestDriveEditForm(FlaskForm):
 
 class SiteSettingForm(FlaskForm):
     admin_two_factor_required = BooleanField('Require two-factor authentication for every admin')
-    site_title = StringField('Site Title', validators=[DataRequired(), Length(max=160)])
+    site_title = StringField('Site Title *', validators=[DataRequired(), Length(max=160)])
     site_tagline = StringField('Site Tagline', validators=[Optional(), Length(max=255)])
     meta_description = TextAreaField('Default Meta Description', validators=[Optional(), Length(max=500)])
     meta_keywords = TextAreaField('Meta Keywords', validators=[Optional(), Length(max=500)])
@@ -583,7 +583,7 @@ class ContactForm(FlaskForm):
 
 
 class OutreachStopTextsForm(FlaskForm):
-    phone = StringField('Mobile number', validators=[DataRequired(), Length(max=32)])
+    phone = StringField('Mobile number *', validators=[DataRequired(), Length(max=32)])
     submit = SubmitField('Stop texts')
 
 

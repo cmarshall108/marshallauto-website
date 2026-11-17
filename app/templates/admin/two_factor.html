@@ -29,7 +29,7 @@
 <form method="POST">
     {{ form.hidden_tag() }}
     <div class="mb-3">
-        <label for="code" class="form-label">{{ 'Authenticator Code' if mode == 'setup' else form.code.label.text }}</label>
+        <label for="code" class="form-label">{{ 'Authenticator Code *' if mode == 'setup' else form.code.label.text }}</label>
         {{ form.code(class="form-control", autocomplete="one-time-code", maxlength="32", spellcheck="false", autofocus=True) }}
         {% for error in form.code.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
     </div>

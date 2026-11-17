@@ -20,7 +20,7 @@
             <form method="POST" class="row g-3">
                 {{ form.hidden_tag() }}
                 <div class="col-12">
-                    <label class="form-label" for="phone">Mobile number</label>
+                    <label class="form-label" for="phone">Mobile number *</label>
                     {{ form.phone(class="form-control form-control-lg", placeholder="(919) 555-0100", autocomplete="tel") }}
                     {% if form.phone.errors %}
                     <div class="text-danger small">{{ form.phone.errors[0] }}</div>

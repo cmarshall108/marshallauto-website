@@ -26,7 +26,7 @@
             <div class="form-text">This controls the additional site-wide admin requirement. The financing-application security policy remains in effect if this box is unchecked. Enabling requires a fresh sign-in; admins without an authenticator will be prompted to set one up.</div>
         </div>
         <div class="col-md-6">
-            <label class="form-label">Site Title</label>
+            <label class="form-label">Site Title *</label>
             {{ form.site_title(class="form-control") }}
         </div>
         <div class="col-md-6">
@@ -237,16 +237,16 @@
     <form method="POST" action="{{ url_for('admin.change_password') }}" class="row g-3" autocomplete="off">
         {{ password_form.hidden_tag() }}
         <div class="col-md-4">
-            <label class="form-label">Current Password</label>
+            <label class="form-label">Current Password *</label>
             {{ password_form.current_password(class="form-control", autocomplete="current-password") }}
         </div>
         <div class="col-md-4">
-            <label class="form-label">New Password</label>
+            <label class="form-label">New Password *</label>
             {{ password_form.new_password(class="form-control", autocomplete="new-password") }}
             <div class="form-text">{{ password_form.new_password.description }}</div>
         </div>
         <div class="col-md-4">
-            <label class="form-label">Confirm New Password</label>
+            <label class="form-label">Confirm New Password *</label>
             {{ password_form.confirm_password(class="form-control", autocomplete="new-password") }}
         </div>
         <div class="col-12">
