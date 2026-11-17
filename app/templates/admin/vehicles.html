@@ -65,10 +65,12 @@
                                 {% if vehicle.status == 'sold' %}
                                 <a href="{{ url_for('admin.vehicle_sale', id=vehicle.id) }}" class="btn btn-sm btn-outline-primary">Sale Details</a>
                                 {% endif %}
-                                <form action="{{ url_for('admin.vehicle_delete', id=vehicle.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this vehicle?');">
+                                {% if vehicle.status != 'sold' %}
+                                <form action="{{ url_for('admin.vehicle_delete', id=vehicle.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this vehicle?') &amp;&amp; confirm('Are you absolutely sure you want to delete it? This cannot be undone.');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete {{ vehicle.title }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                 </form>
+                                {% endif %}
                             </div>
                             <details class="vehicle-documents">
                                 <summary aria-label="Documents for {{ vehicle.title }}"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> Documents</summary>

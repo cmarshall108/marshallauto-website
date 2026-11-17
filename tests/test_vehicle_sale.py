@@ -231,6 +231,23 @@ class VehicleSaleTests(unittest.TestCase):
         self.assertEqual(self.client.post(f'{url}/delete').status_code, 302)
         self.assertEqual(len(self.photos()), 1)
         self.assertIsNone(db.session.get(VehicleSaleImage, image_id))
+        delete_response = self.client.post(
+            f'/admin/vehicles/{self.vehicle.id}/delete',
+            follow_redirects=True,
+        )
+        self.assertIn('Sold vehicles cannot be deleted.', delete_response.text)
+        self.assertIsNotNone(db.session.get(Vehicle, self.vehicle.id))
+        self.assertEqual(len(self.photos()), 1)
+        vehicles_page = self.client.get('/admin/vehicles')
+        self.assertNotIn(f'aria-label="Delete {self.vehicle.title}"', vehicles_page.text)
+        self.vehicle.status = 'available'
+        db.session.commit()
+        vehicles_page = self.client.get('/admin/vehicles')
+        self.assertIn(f'aria-label="Delete {self.vehicle.title}"', vehicles_page.text)
+        self.assertIn('Are you sure you want to delete this vehicle?', vehicles_page.text)
+        self.assertIn('Are you absolutely sure you want to delete it?', vehicles_page.text)
+        self.assertEqual(vehicles_page.text.count('confirm('), 2)
+        self.assertIn('This cannot be undone.', vehicles_page.text)
         self.assertEqual(self.client.post(
             f'/admin/vehicles/{self.vehicle.id}/delete',
         ).status_code, 302)
@@ -345,6 +362,8 @@ class SaleDocumentTests(VehicleSaleTests):
         _cv_app.get().g.pop('_login_user', None)
         self.assertEqual(self.client.post(f'{self.path}/documents/{document.id}/delete').status_code, 302)
         self.assertEqual(len(self.vehicle.sale_documents), 4)
+        self.vehicle.status = 'available'
+        db.session.commit()
         self.assertEqual(self.client.post(f'/admin/vehicles/{self.vehicle.id}/delete').status_code, 302)
         self.assertEqual(self.documents(), [])
         self.assertEqual(VehicleSaleDocument.query.count(), 0)

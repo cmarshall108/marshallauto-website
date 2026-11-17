@@ -2279,6 +2279,9 @@ def vehicle_delete(id):
         .filter_by(id=id)
         .first_or_404()
     )
+    if vehicle.status == 'sold':
+        flash('Sold vehicles cannot be deleted.', 'warning')
+        return redirect(url_for('admin.vehicles'))
     for img in list(vehicle.images):
         _delete_vehicle_image_file(img)
     for report in list(vehicle.carfax_reports):
