@@ -321,6 +321,71 @@ class SeoTests(unittest.TestCase):
             self.assertEqual(html.select_one('link[rel="canonical"]')['href'], url)
             self.assertIsNotNone(html.select_one('.vehicle-card'))
 
+    def test_sitemap_price_and_certified_landings_require_matching_stock(self):
+        prefix = 'http://localhost/inventory/'
+        cheap = prefix + 'cheap-used-cars-under-15000-in-sanford-nc'
+        premium = prefix + 'luxury-used-cars-30000-plus-in-sanford-nc'
+        certified = prefix + 'certified-pre-owned-in-sanford-nc'
+        pages = self.sitemap_pages()
+        self.assertIn(cheap, pages)
+        self.assertNotIn(premium, pages)
+        self.assertNotIn(certified, pages)
+        inventory = self.page('/inventory')
+        self.assertIsNotNone(inventory.select_one(f'a[href="{cheap.removeprefix("http://localhost")}"]'))
+        self.assertIsNone(inventory.select_one(f'a[href="{premium.removeprefix("http://localhost")}"]'))
+        self.assertIsNone(inventory.select_one(f'a[href="{certified.removeprefix("http://localhost")}"]'))
+
+        db.session.add_all([
+            Vehicle(slug='budget-sale-price', year=2020, make='BMW', model='X3',
+                    price=31000, sale_price=14000, mileage=40000, status='available'),
+            Vehicle(slug='premium-certified', year=2021, make='BMW', model='X5',
+                    price=32000, mileage=30000, status='available', condition='certified'),
+            Vehicle(slug='hidden-premium', year=2022, make='Audi', model='A4',
+                    price=40000, mileage=20000, status='available', is_coming_soon=True),
+        ])
+        db.session.commit()
+        pages = self.sitemap_pages()
+        inventory = self.page('/inventory')
+        for url in (cheap, premium, certified):
+            self.assertIn(url, pages)
+            self.assertIsNotNone(inventory.select_one(f'a[href="{url.removeprefix("http://localhost")}"]'))
+            html = self.page(url)
+            self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'index, follow')
+            self.assertEqual(html.select_one('link[rel="canonical"]')['href'], url)
+            self.assertIsNotNone(html.select_one('.vehicle-card'))
+        certified_html = self.page(certified)
+        self.assertIsNotNone(certified_html.select_one('a[href="/inventory/premium-certified"]'))
+        self.assertIsNone(certified_html.select_one('a[href="/inventory/budget-sale-price"]'))
+        self.assertIsNone(certified_html.select_one('#inventory-search-alert'))
+        premium_html = self.page(premium)
+        self.assertIsNone(premium_html.select_one('a[href="/inventory/budget-sale-price"]'))
+        self.assertIsNone(premium_html.select_one('a[href="/inventory/hidden-premium"]'))
+        self.assertIsNotNone(self.page(cheap).select_one('a[href="/inventory/budget-sale-price"]'))
+
+        Vehicle.query.filter_by(slug='premium-certified').one().status = 'sold'
+        db.session.commit()
+        pages = self.sitemap_pages()
+        self.assertNotIn(premium, pages)
+        self.assertNotIn(certified, pages)
+        self.assertEqual(self.page(certified).select_one('meta[name="robots"]')['content'],
+                         'noindex, follow')
+        fallback = self.client.get('/inventory/certified-pre-owned-in-unknown-nc', follow_redirects=True)
+        self.assertEqual(fallback.status_code, 200)
+        self.assertEqual(BeautifulSoup(fallback.data, 'html.parser')
+                         .select_one('meta[name="robots"]')['content'], 'noindex, follow')
+
+    def test_sitemap_make_landing_matches_original_make_capitalization(self):
+        db.session.add(Vehicle(
+            slug='bmw-car', year=2020, make='BMW', model='X3',
+            price=20000, mileage=40000, status='available',
+        ))
+        db.session.commit()
+        path = '/inventory/used-bmw-for-sale-in-raleigh-nc'
+        self.assertIn(f'http://localhost{path}', self.sitemap_pages())
+        html = self.page(path)
+        self.assertEqual(html.select_one('meta[name="robots"]')['content'], 'index, follow')
+        self.assertIsNotNone(html.select_one('a[href="/inventory/bmw-car"]'))
+
     def test_stocked_landings_have_crawlable_internal_links(self):
         make_path = '/inventory/used-toyota-for-sale-in-sanford-nc'
         style_path = '/inventory/used-sedans-for-sale-in-sanford-nc'

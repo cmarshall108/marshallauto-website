@@ -20,6 +20,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - LCP-oriented hero assets (WebP + JPEG preload) and compressed showroom images
   - Search-only VIN record pages for valid VINs in current and archived inventory, discoverable through sitemap.xml but omitted from site navigation
   - Local SEO landings for cities, makes, body styles, and rebuilt-title inventory
+  - Stock-backed price and certified-pre-owned landing pages appear in the sitemap only when matching public inventory exists; inventory links to the available Sanford categories
   - Site analytics: GTM (preferred), GA4 fallback, Facebook Pixel, custom event layer
 
 - **Admin Panel** (`/admin`)

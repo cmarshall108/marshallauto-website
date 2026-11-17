@@ -79,7 +79,7 @@
         <div class="row g-4">
             <!-- Filters -->
             <div class="col-lg-3">
-                {% set has_active_filters = request.args.get('q') or request.args.get('make') or request.args.get('body_style') or request.args.get('title_status') or request.args.get('min_price') or request.args.get('max_price') or request.args.get('max_mileage') or (request.args.get('sort') and request.args.get('sort') != 'newest') %}
+                {% set has_active_filters = request.args.get('q') or request.args.get('make') or request.args.get('body_style') or request.args.get('title_status') or request.args.get('condition') or request.args.get('min_price') or request.args.get('max_price') or request.args.get('max_mileage') or (request.args.get('sort') and request.args.get('sort') != 'newest') %}
                 <button class="btn btn-outline-primary inventory-filter-toggle"
                         type="button"
                         data-bs-toggle="collapse"
