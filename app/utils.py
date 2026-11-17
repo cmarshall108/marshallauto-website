@@ -15,6 +15,7 @@ from email.message import EmailMessage
 from zoneinfo import ZoneInfo
 
 import phonenumbers
+import bleach
 from flask import current_app, request
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func
@@ -31,9 +32,26 @@ MAX_PRIVATE_IMAGE_PIXELS = 20_000_000
 
 DEALERSHIP_TIMEZONE = ZoneInfo('America/New_York')
 
+BLOG_ALLOWED_TAGS = {
+    'a', 'blockquote', 'br', 'code', 'em', 'h2', 'h3', 'h4', 'hr',
+    'li', 'ol', 'p', 'pre', 's', 'strong', 'sub', 'sup', 'u', 'ul',
+}
+
 
 def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def sanitize_blog_html(value):
+    """Keep only basic formatting tags and safe link attributes in blog content."""
+    return bleach.clean(
+        str(value or ''),
+        tags=BLOG_ALLOWED_TAGS,
+        attributes={'a': ['href', 'title']},
+        protocols={'http', 'https', 'mailto'},
+        strip=True,
+        strip_comments=True,
+    )
 
 
 def dealership_now():

@@ -44,7 +44,7 @@
                 </div>
                 {% endif %}
                 <div class="blog-post-content">
-                    {{ post.content | safe }}
+                    {{ post.content | sanitize_blog_html }}
                 </div>
                 <aside class="border-top mt-4 pt-4" aria-label="About the publisher">
                     <h2 class="h5 fw-bold">About {{ business_name }}</h2>

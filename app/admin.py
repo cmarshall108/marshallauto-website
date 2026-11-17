@@ -78,7 +78,7 @@ from app.utils import (
     rate_limit_exceeded, save_license_image_data_url,
     save_sale_document_data_url, save_uploaded_image, save_uploaded_license_image,
     save_uploaded_pdf, save_uploaded_receipt_image, save_uploaded_sale_document,
-    delete_sale_document,
+    delete_sale_document, sanitize_blog_html,
 )
 from app.video_jobs import (
     VideoUploadError, cancel_video_jobs, discard_staged_video, stage_video_upload,
@@ -774,7 +774,7 @@ def review_delete(id):
 # ------------------------------ BLOG ------------------------------
 
 @admin_bp.route('/blog')
-@login_required
+@admin_role_required
 def blog_posts():
     page = request.args.get('page', 1, type=int)
     pagination = BlogPost.query.order_by(BlogPost.created_at.desc()).paginate(
@@ -783,14 +783,14 @@ def blog_posts():
 
 
 @admin_bp.route('/blog/new', methods=['GET', 'POST'])
-@login_required
+@admin_role_required
 def blog_post_new():
     form = BlogPostForm()
     if form.validate_on_submit():
         post = BlogPost(
             title=form.title.data.strip(),
             excerpt=(form.excerpt.data or '').strip() or None,
-            content=form.content.data,
+            content=sanitize_blog_html(form.content.data),
             cover_image_url=(form.cover_image_url.data or '').strip() or None,
             author_name=(form.author_name.data or '').strip() or None,
             is_published=bool(form.is_published.data),
@@ -811,7 +811,7 @@ def blog_post_new():
 
 
 @admin_bp.route('/blog/<int:id>/edit', methods=['GET', 'POST'])
-@login_required
+@admin_role_required
 def blog_post_edit(id):
     post = db.session.get(BlogPost, id) or abort(404)
     form = BlogPostForm(obj=post)
@@ -819,7 +819,7 @@ def blog_post_edit(id):
         was_published = post.is_published
         post.title = form.title.data.strip()
         post.excerpt = (form.excerpt.data or '').strip() or None
-        post.content = form.content.data
+        post.content = sanitize_blog_html(form.content.data)
         post.cover_image_url = (form.cover_image_url.data or '').strip() or None
         post.author_name = (form.author_name.data or '').strip() or None
         post.is_published = bool(form.is_published.data)
@@ -836,7 +836,7 @@ def blog_post_edit(id):
 
 
 @admin_bp.route('/blog/<int:id>/delete', methods=['POST'])
-@login_required
+@admin_role_required
 def blog_post_delete(id):
     post = db.session.get(BlogPost, id) or abort(404)
     stale_urls = []

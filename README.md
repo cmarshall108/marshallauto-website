@@ -80,7 +80,13 @@ python3 scripts/install_local_printer_agent.py
 
 Refresh the admin page after installing. The helper listens only on 127.0.0.1
 and uses the first available port from 8765 through 8775. Make sure
-Bonjour/mDNS traffic is allowed on the local network.
+Bonjour/mDNS traffic is allowed on the local network. It creates a private
+per-install token in `~/.marshallauto/local-printer-agent.token` and only
+accepts browser requests from the exact origin in `SITE_URL` (default:
+`https://marshallautosanford.com`). For a different site origin or local
+development, set `MARSHALL_AUTO_SCANNER_ALLOWED_ORIGINS` to a comma-separated
+list of exact HTTP(S) origins, such as `http://localhost:5000`; do not use
+wildcards.
 
 ### Local IAAI Buy Now finder
 

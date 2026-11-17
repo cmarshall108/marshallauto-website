@@ -9,6 +9,7 @@ from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
+from markupsafe import Markup
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -21,6 +22,7 @@ from config import get_config
 from app.utils import (
     format_currency, format_mileage, format_mileage_badge, format_price,
     is_low_mileage,
+    sanitize_blog_html,
     to_dealership_time,
 )
 
@@ -210,6 +212,9 @@ def create_app(config_class=None):
     app.jinja_env.filters['format_mileage_badge'] = format_mileage_badge
     app.jinja_env.filters['to_dealership_time'] = to_dealership_time
     app.jinja_env.filters['is_low_mileage'] = is_low_mileage
+    app.jinja_env.filters['sanitize_blog_html'] = (
+        lambda value: Markup(sanitize_blog_html(value))
+    )
     app.jinja_env.globals['is_low_mileage'] = is_low_mileage
 
     # Cache-busted static asset URLs: static files are cached for a week (immutable)

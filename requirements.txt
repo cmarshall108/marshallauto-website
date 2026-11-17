@@ -23,6 +23,7 @@ py3langid>=0.4,<1
 tldextract>=5.1,<6
 requests>=2.31,<3
 beautifulsoup4>=4.12,<5
+bleach>=6.2,<7
 # Admin authenticator-app two-factor authentication
 pyotp>=2.9,<3
 cryptography>=46,<49

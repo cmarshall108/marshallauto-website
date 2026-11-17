@@ -14,7 +14,7 @@
                 const baseUrl = `http://127.0.0.1:${port}`;
                 let response;
                 try {
-                    response = await fetch(`${baseUrl}/printers`, { cache: 'no-store' });
+                    response = await fetch(`${baseUrl}/token`, { cache: 'no-store' });
                 } catch (fetchError) {
                     continue;
                 }
@@ -24,11 +24,25 @@
                 } catch (parseError) {
                     continue;
                 }
-                if (payload && Array.isArray(payload.printers)) {
-                    if (!response.ok) throw new Error(payload.error || 'Could not list scanners.');
-                    return { baseUrl, printers: payload.printers };
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        throw new Error('The local scanner service does not allow this website origin.');
+                    }
+                    continue;
                 }
-                if (response.status === 503 && payload && payload.error) throw new Error(payload.error);
+                if (payload && typeof payload.token === 'string') {
+                    const printersResponse = await fetch(`${baseUrl}/printers`, {
+                        cache: 'no-store',
+                        headers: { Authorization: `Bearer ${payload.token}` },
+                    });
+                    const printersPayload = await printersResponse.json();
+                    if (!printersResponse.ok) {
+                        throw new Error(printersPayload.error || 'Could not list scanners.');
+                    }
+                    if (Array.isArray(printersPayload.printers)) {
+                        return { baseUrl, token: payload.token, printers: printersPayload.printers };
+                    }
+                }
             }
             throw new Error('Cannot connect to the local scanner service. It starts automatically when you log in to this computer. If it has not been installed yet, run “python3 scripts/install_local_printer_agent.py” once on this computer, then refresh. It uses the next available port if 8765 is already in use.');
         })();
@@ -49,7 +63,10 @@
             const agent = await connect();
             return fetch(`${agent.baseUrl}/scan`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    Authorization: `Bearer ${agent.token}`,
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({ printer_id: printerId, purpose }),
             });
         },
