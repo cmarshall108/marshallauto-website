@@ -1,9 +1,10 @@
 """Administrator financial charts built from sales and rebuild-cost records.
 
 Closed-deal profit is recognized in the Eastern Time month a vehicle sold.
-The advertised and recorded sale amount is out-the-door, so kept vehicle
-revenue is that amount minus the 3% highway-use tax. A saved receipt supplies
-the split; otherwise the same split used by sale receipts is estimated.
+The advertised and recorded sale amount is out-the-door. Kept vehicle
+revenue is the bill-of-sale price: out-the-door minus title and plate fees,
+then divided by 1.03. A saved receipt supplies the split; otherwise the same
+split used by sale receipts and the bill of sale is estimated.
 
 Prep costs reduce profit in the sale month even when the receipt is older.
 Cash-expense charts use each cost item's purchase date and include cars that
@@ -200,7 +201,7 @@ def _kept_revenue(vehicle):
         if receipt['sales_tax'] == 0 and receipt['highway_use_tax'] > 0:
             tax = receipt['highway_use_tax']
         return {
-            'otd': receipt['vehicle_price'] + receipt['sales_tax'],
+            'otd': receipt['vehicle_price'] + receipt['sales_tax'] + receipt['title_fee'],
             'tax': tax,
             'revenue': receipt['vehicle_price'],
             'estimated': False,
@@ -523,7 +524,9 @@ def build_financial_dashboard(args=None, today=None):
         if (
             vehicle.sold_price is not None
             and receipt
-            and abs(money(vehicle.sold_price) - (receipt['vehicle_price'] + receipt['sales_tax'])) >= Decimal('1.00')
+            and abs(money(vehicle.sold_price) - (
+                receipt['vehicle_price'] + receipt['sales_tax'] + receipt.get('title_fee', ZERO)
+            )) >= Decimal('1.00')
         ):
             quality.append({
                 'kind': 'price_mismatch',

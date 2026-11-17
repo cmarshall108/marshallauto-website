@@ -1,9 +1,9 @@
-"""Payment illustrations.
+"""Payment illustrations and the bill-of-sale split.
 
 These figures are shopping aids, not credit offers, approvals, or quotes.
 The public advertised price is the out-the-door price. Marshall Auto does not
-add dealer or other extra fees to it. The highway-use tax helper remains for
-internal calculations and is not added to the customer price.
+add dealer or other extra fees to it. Title, plate, and highway-use tax are
+backed out of that price for the bill of sale; they are not added on top.
 """
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -11,6 +11,10 @@ from flask import current_app
 
 MONEY = Decimal('0.01')
 NC_HIGHWAY_USE_TAX_RATE = Decimal('0.03')
+# Defaults: $66.75 title + $46.25 plate. The handwritten out-the-door formula
+# treats that $113 as fees that are not part of the bill-of-sale price.
+DEFAULT_TITLE_FEE = Decimal('66.75')
+DEFAULT_LICENSE_PLATE_FEE = Decimal('46.25')
 
 
 def money(value):
@@ -22,22 +26,60 @@ def _config_money(key, default):
 
 
 def highway_use_tax(price):
-    """NC 3% highway use tax on the total bill-of-sale value."""
+    """NC 3% highway use tax on the bill-of-sale price, not the out-the-door price."""
     return (money(price) * NC_HIGHWAY_USE_TAX_RATE).quantize(MONEY)
 
 
-def split_otd_sale_price(otd_price):
-    """Split an out-the-door sale price into 3% sales tax and the agreed price.
+def government_fees():
+    """Title and plate fees included in the out-the-door price.
 
-    Sales tax is 3% of the OTD amount. The agreed vehicle price is the OTD
-    amount minus that tax, so the two lines add back to the OTD price.
+    These stay off the bill of sale. Defaults add to $113.00.
+    """
+    title = _config_money('ESTIMATE_TITLE_FEE', DEFAULT_TITLE_FEE)
+    plate = _config_money('ESTIMATE_LICENSE_PLATE_FEE', DEFAULT_LICENSE_PLATE_FEE)
+    return {
+        'title_fee': title,
+        'license_plate_fee': plate,
+        'fees': (title + plate).quantize(MONEY),
+    }
+
+
+def split_otd_sale_price(otd_price):
+    """Split an out-the-door price into sale price, tax, and government fees.
+
+    Out-the-door = 1.03 * bill-of-sale price + title and plate fees.
+    The bill-of-sale price is (out-the-door - fees) / 1.03. Highway-use tax is
+    3% of that sale price. Fees are not part of the sale price. The three parts
+    add back to the out-the-door price.
+
+    If the out-the-door price does not cover the fees, the full amount is the
+    sale price and no fees or tax are invented.
     """
     total = money(otd_price)
-    tax = highway_use_tax(total)
+    fees = government_fees()
+    flat_fees = fees['fees']
+    if total < flat_fees:
+        return {
+            'otd_price': total,
+            'bill_of_sale_price': total,
+            'agreed_vehicle_price': total,
+            'sales_tax': money(0),
+            'title_fee': money(0),
+            'license_plate_fee': money(0),
+            'fees': money(0),
+        }
+    taxable = total - flat_fees
+    rate = Decimal('1') + NC_HIGHWAY_USE_TAX_RATE
+    sale_price = (taxable / rate).quantize(MONEY, rounding=ROUND_HALF_UP)
+    tax = (taxable - sale_price).quantize(MONEY)
     return {
         'otd_price': total,
+        'bill_of_sale_price': sale_price,
+        'agreed_vehicle_price': sale_price,
         'sales_tax': tax,
-        'agreed_vehicle_price': (total - tax).quantize(MONEY),
+        'title_fee': fees['title_fee'],
+        'license_plate_fee': fees['license_plate_fee'],
+        'fees': flat_fees,
     }
 
 

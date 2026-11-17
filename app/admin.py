@@ -68,7 +68,7 @@ from app.mvr_forms import (
     overlay_fields, parse_overlay_submission,
 )
 from app import buyers_guide_form
-from app.pricing import split_otd_sale_price
+from app.pricing import government_fees, split_otd_sale_price
 from app.marketplace_import import (
     MarketplaceError, attach_import, discard_photos, fetch_listing,
     photo_thumbnail, photo_token, preview_token, read_preview, stage_photos,
@@ -1050,6 +1050,7 @@ def vehicle_hold_deposit(id):
 def vehicle_bill_of_sale(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
     amount = vehicle.sold_price if vehicle.sold_price is not None else vehicle.display_price
+    split = split_otd_sale_price(amount) if amount is not None else None
     salesperson = (
         vehicle.salesperson
         or (current_user.salesperson_label if current_user.is_authenticated else '')
@@ -1058,7 +1059,16 @@ def vehicle_bill_of_sale(id):
     return render_template(
         'admin/bill_of_sale_print.html',
         vehicle=vehicle,
-        sale_amount=format_currency(amount) if amount is not None else '',
+        sale_amount=format_currency(split['bill_of_sale_price']) if split else '',
+        price_split={
+            'otd': format_currency(split['otd_price']),
+            'sale': format_currency(split['bill_of_sale_price']),
+            'tax': format_currency(split['sales_tax']),
+            'fees': format_currency(split['fees']),
+            'title': format_currency(split['title_fee']),
+            'plate': format_currency(split['license_plate_fee']),
+            'fees_applied': split['fees'] > 0,
+        } if split else None,
         salesperson=salesperson,
         seller_name=current_app.config['BUSINESS_NAME'],
         seller_address=(
@@ -1954,6 +1964,10 @@ def _parse_sale_receipt_charges(raw):
     return charges
 
 
+def _fee_cents(value):
+    return int((Decimal(str(value)) * 100).to_integral_value())
+
+
 def _render_sale_receipt_form(vehicle, form, status=200):
     split = None
     if form.otd_price.data is not None:
@@ -1961,6 +1975,7 @@ def _render_sale_receipt_form(vehicle, form, status=200):
             split = split_otd_sale_price(form.otd_price.data)
         except (InvalidOperation, TypeError, ValueError):
             split = None
+    fees = government_fees()
     return render_template(
         'admin/sale_receipt_form.html',
         vehicle=vehicle,
@@ -1969,7 +1984,12 @@ def _render_sale_receipt_form(vehicle, form, status=200):
         dealer_tags=_dealer_tag_choices(),
         format_currency=format_currency,
         sales_tax_preview=format_currency(split['sales_tax']) if split else '$0.00',
-        agreed_price_preview=format_currency(split['agreed_vehicle_price']) if split else '$0.00',
+        agreed_price_preview=format_currency(split['bill_of_sale_price']) if split else '$0.00',
+        fees_preview=format_currency(split['fees']) if split else '$0.00',
+        title_fee_preview=format_currency(fees['title_fee']),
+        plate_fee_preview=format_currency(fees['license_plate_fee']),
+        title_fee_cents=_fee_cents(fees['title_fee']),
+        plate_fee_cents=_fee_cents(fees['license_plate_fee']),
     ), status
 
 
@@ -1985,7 +2005,11 @@ def vehicle_sale_receipt(id):
     form = VehicleSaleReceiptForm(obj=receipt)
     if request.method == 'GET':
         if receipt:
-            form.otd_price.data = (receipt.vehicle_price or 0) + (receipt.sales_tax or 0)
+            form.otd_price.data = (
+                (receipt.vehicle_price or 0)
+                + (receipt.sales_tax or 0)
+                + (receipt.title_registration_fee or 0)
+            )
             form.other_charges_data.data = json.dumps([
                 {'description': charge.description, 'amount': str(charge.amount)}
                 for charge in receipt.charges
@@ -2026,7 +2050,7 @@ def vehicle_sale_receipt(id):
         receipt.buyer_name = (form.buyer_name.data or '').strip() or None
         receipt.buyer_address = (form.buyer_address.data or '').strip() or None
         receipt.salesman = (form.salesman.data or '').strip() or None
-        receipt.vehicle_price = split['agreed_vehicle_price']
+        receipt.vehicle_price = split['bill_of_sale_price']
         receipt.sales_tax = split['sales_tax']
         receipt.document_fee = form.document_fee.data or Decimal('0')
         receipt.warranty_fee = form.warranty_fee.data or Decimal('0')
@@ -2034,7 +2058,7 @@ def vehicle_sale_receipt(id):
         receipt.down_payment = form.down_payment.data or Decimal('0')
         receipt.trade_allow = form.trade_allow.data or Decimal('0')
         receipt.highway_use_tax = Decimal('0')
-        receipt.title_registration_fee = Decimal('0')
+        receipt.title_registration_fee = split['fees']
         receipt.credits = Decimal('0')
         receipt.amount_received = cash_due
         receipt.payment_method = form.payment_method.data or None
@@ -2088,13 +2112,18 @@ def vehicle_sale_receipt_print(id):
         payment_method_label=payment_method_labels.get(
             receipt.payment_method, receipt.payment_method or '',
         ),
-        otd_price=format_currency((receipt.vehicle_price or 0) + (receipt.sales_tax or 0)),
+        otd_price=format_currency(
+            (receipt.vehicle_price or 0)
+            + (receipt.sales_tax or 0)
+            + (receipt.title_registration_fee or 0)
+        ),
         line_items=[
-            ('Agreed Vehicle Price', receipt.vehicle_price),
+            ('Bill of Sale Price', receipt.vehicle_price),
             ('Sales Tax', receipt.sales_tax),
+            ('Title & Plate Fees', receipt.title_registration_fee),
             ('Doc Fee', receipt.document_fee),
             ('Warranty Fee', receipt.warranty_fee),
-            ('Tags Fee', receipt.tags_fee),
+            ('Extra Tags Fee', receipt.tags_fee),
             *((charge.description, charge.amount) for charge in receipt.charges),
         ],
         format_currency=format_currency,

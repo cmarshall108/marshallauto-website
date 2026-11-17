@@ -9,6 +9,7 @@
     const otdField = document.getElementById('otd_price');
     const taxDisplay = document.getElementById('receipt-sales-tax');
     const agreedDisplay = document.getElementById('receipt-agreed-price');
+    const feesDisplay = document.getElementById('receipt-government-fees');
     if (!form || !chargesRoot || !addChargeButton || !chargesField || !totalDisplay) return;
 
     const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -77,12 +78,32 @@
         updateTotal();
     }
 
+    function configuredFeeCents() {
+        const title = Number(form.dataset.titleFeeCents);
+        const plate = Number(form.dataset.plateFeeCents);
+        return {
+            title: Number.isFinite(title) ? title : 6675,
+            plate: Number.isFinite(plate) ? plate : 4625,
+        };
+    }
+
+    function splitOtd(otdCents) {
+        const configured = configuredFeeCents();
+        const flat = configured.title + configured.plate;
+        if (otdCents < flat) {
+            return { sale: otdCents, tax: 0, fees: 0 };
+        }
+        const taxable = otdCents - flat;
+        const sale = Math.round(taxable * 100 / 103);
+        return { sale: sale, tax: taxable - sale, fees: flat };
+    }
+
     function updateTotal() {
         const otdCents = Math.max(0, amountInCents(otdField && otdField.value));
-        const taxCents = Math.round(otdCents * 3 / 100);
-        const agreedCents = otdCents - taxCents;
-        if (taxDisplay) taxDisplay.textContent = formatCents(taxCents);
-        if (agreedDisplay) agreedDisplay.textContent = formatCents(agreedCents);
+        const split = splitOtd(otdCents);
+        if (taxDisplay) taxDisplay.textContent = formatCents(split.tax);
+        if (agreedDisplay) agreedDisplay.textContent = formatCents(split.sale);
+        if (feesDisplay) feesDisplay.textContent = formatCents(split.fees);
         let cents = otdCents;
         form.querySelectorAll('.receipt-amount').forEach((field) => {
             cents += amountInCents(field.value);

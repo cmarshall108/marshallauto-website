@@ -231,9 +231,11 @@ class VehicleSaleReceipt(db.Model):
     @property
     def total_due(self):
         charges = sum((charge.amount for charge in self.charges), start=0)
+        # Title and plate fees are inside the out-the-door price, separate from
+        # the bill-of-sale price, so cash due still equals that price plus extra fees.
         return (
-            self.vehicle_price + self.sales_tax + self.document_fee
-            + self.warranty_fee + self.tags_fee + charges
+            self.vehicle_price + self.sales_tax + self.title_registration_fee
+            + self.document_fee + self.warranty_fee + self.tags_fee + charges
             - self.down_payment - self.trade_allow
         )
 

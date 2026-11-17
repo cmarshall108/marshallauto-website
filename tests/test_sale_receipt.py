@@ -55,10 +55,11 @@ class SaleReceiptTests(unittest.TestCase):
     def test_saves_and_prints_manual_itemized_receipt(self):
         editor = self.client.get(self.path)
         self.assertEqual(editor.status_code, 200)
-        self.assertIn(b'3% of that amount', editor.data)
+        self.assertIn(b'bill-of-sale price', editor.data)
         self.assertIn(b'value="18000.00"', editor.data)
-        self.assertIn(b'$540.00', editor.data)
-        self.assertIn(b'$17,460.00', editor.data)
+        self.assertIn(b'$520.98', editor.data)
+        self.assertIn(b'$17,366.02', editor.data)
+        self.assertIn(b'$113.00', editor.data)
         self.assertIn(b'value="Alex Seller"', editor.data)
 
         response = self.client.post(self.path, data={
@@ -82,8 +83,9 @@ class SaleReceiptTests(unittest.TestCase):
         receipt = VehicleSaleReceipt.query.one()
         self.assertEqual(receipt.vehicle_id, self.vehicle.id)
         self.assertEqual(receipt.salesman, 'Alex Seller')
-        self.assertEqual(receipt.vehicle_price, Decimal('17460.00'))
-        self.assertEqual(receipt.sales_tax, Decimal('540.00'))
+        self.assertEqual(receipt.vehicle_price, Decimal('17366.02'))
+        self.assertEqual(receipt.sales_tax, Decimal('520.98'))
+        self.assertEqual(receipt.title_registration_fee, Decimal('113.00'))
         self.assertEqual(receipt.cash_due, Decimal('17175.00'))
         self.assertEqual(receipt.charges[0].description, 'Inspection')
 
@@ -95,15 +97,17 @@ class SaleReceiptTests(unittest.TestCase):
         self.assertIn('Receipt #:', text)
         self.assertIn('Jordan Customer', text)
         self.assertIn('Salesman: Alex Seller', text)
-        self.assertIn('Agreed Vehicle Price', text)
+        self.assertIn('Bill of Sale Price', text)
         self.assertIn('Sales Tax', text)
         self.assertIn('OTD sale price:', text)
         self.assertIn('$18,000.00', text)
-        self.assertIn('$540.00', text)
-        self.assertIn('$17,460.00', text)
+        self.assertIn('$520.98', text)
+        self.assertIn('$17,366.02', text)
+        self.assertIn('Title & Plate Fees', text)
+        self.assertIn('$113.00', text)
         self.assertIn('Doc Fee', text)
         self.assertIn('Warranty Fee', text)
-        self.assertIn('Tags Fee', text)
+        self.assertIn('Extra Tags Fee', text)
         self.assertIn('Down Payment', text)
         self.assertIn('Trade-Allow', text)
         self.assertIn('Cash Due', text)
@@ -136,8 +140,9 @@ class SaleReceiptTests(unittest.TestCase):
         })
         self.assertEqual(updated.status_code, 302)
         self.assertEqual(VehicleSaleReceipt.query.count(), 1)
-        self.assertEqual(receipt.vehicle_price, Decimal('16393.00'))
-        self.assertEqual(receipt.sales_tax, Decimal('507.00'))
+        self.assertEqual(receipt.vehicle_price, Decimal('16298.06'))
+        self.assertEqual(receipt.sales_tax, Decimal('488.94'))
+        self.assertEqual(receipt.title_registration_fee, Decimal('113.00'))
         self.assertEqual(receipt.cash_due, Decimal('16840.00'))
         self.assertEqual(receipt.salesman, 'Pat Sales')
         self.assertEqual([charge.description for charge in receipt.charges], ['Dealer preparation'])
@@ -177,18 +182,29 @@ class SaleReceiptTests(unittest.TestCase):
 
 
 class OtdSaleSplitTests(unittest.TestCase):
-    def test_tax_is_three_percent_and_agreed_price_is_the_remainder(self):
+    def setUp(self):
+        self.app = create_app(TestingConfig)
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_sale_price_is_separate_from_tax_and_fees(self):
         split = split_otd_sale_price('18000.00')
-        self.assertEqual(split['sales_tax'], Decimal('540.00'))
-        self.assertEqual(split['agreed_vehicle_price'], Decimal('17460.00'))
+        self.assertEqual(split['fees'], Decimal('113.00'))
+        self.assertEqual(split['sales_tax'], Decimal('520.98'))
+        self.assertEqual(split['bill_of_sale_price'], Decimal('17366.02'))
+        self.assertEqual(split['agreed_vehicle_price'], split['bill_of_sale_price'])
         self.assertEqual(
-            split['agreed_vehicle_price'] + split['sales_tax'],
+            split['bill_of_sale_price'] + split['sales_tax'] + split['fees'],
             split['otd_price'],
         )
 
-        half_cent = split_otd_sale_price('100.50')
-        self.assertEqual(half_cent['sales_tax'], Decimal('3.02'))
-        self.assertEqual(half_cent['agreed_vehicle_price'], Decimal('97.48'))
+        below_fees = split_otd_sale_price('100.50')
+        self.assertEqual(below_fees['bill_of_sale_price'], Decimal('100.50'))
+        self.assertEqual(below_fees['sales_tax'], Decimal('0.00'))
+        self.assertEqual(below_fees['fees'], Decimal('0.00'))
 
 
 if __name__ == '__main__':

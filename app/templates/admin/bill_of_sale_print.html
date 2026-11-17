@@ -12,6 +12,20 @@
             <i class="bi bi-printer me-1" aria-hidden="true"></i>Print Bill of Sale
         </button>
     </div>
+    {% if price_split %}
+    <div class="alert alert-secondary no-print bos-price-split">
+        {% if price_split.fees_applied %}
+        Out-the-door price {{ price_split.otd }} separates into bill-of-sale price
+        {{ price_split.sale }}, highway use tax {{ price_split.tax }} (3% of the sale price),
+        and title and plate fees {{ price_split.fees }}
+        ({{ price_split.title }} title + {{ price_split.plate }} plate).
+        The printed bill of sale shows only the sale price.
+        {% else %}
+        Out-the-door price {{ price_split.otd }} does not cover the title and plate fees,
+        so the printed bill of sale uses that full amount and no fees are separated.
+        {% endif %}
+    </div>
+    {% endif %}
 
     <article class="bos-sheet">
         <h1>NORTH CAROLINA MOTOR VEHICLE BILL OF SALE</h1>
@@ -25,7 +39,7 @@
 
         <p class="bos-body">
             That I, <span class="bos-fill">{{ seller_name }}</span> (Seller),of <span class="bos-fill">{{ seller_address }}</span>
-            (address),County of <span class="bos-fill">{{ seller_county }}</span>, <span class="bos-fill">{{ sale_amount }}</span> (amount of sale), receipt of payment
+            (address),County of <span class="bos-fill">{{ seller_county }}</span>, <span class="bos-fill bos-sale-amount">{{ sale_amount }}</span> (amount of sale), receipt of payment
             acknowledged, do hereby sell and transfer to <span class="bos-blank bos-blank-buyer"></span> (Buyer), of
             <span class="bos-blank bos-blank-address"></span>(Buyers Address), County of <span class="bos-blank bos-blank-county"></span>, North Carolina,
             his/her successors and assigns, the following motor vehicle (Vehicle), which is located in the County of <span class="bos-fill">{{ vehicle_county }}</span>,

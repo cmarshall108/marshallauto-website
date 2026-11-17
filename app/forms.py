@@ -262,8 +262,8 @@ class VehicleSaleReceiptForm(FlaskForm):
         'OTD Sale Price ($)',
         validators=[InputRequired(), NumberRange(min=0, max=99999999.99)],
         description=(
-            'Out-the-door sale price. Sales tax is 3% of this amount. '
-            'Agreed vehicle price is this amount minus that tax.'
+            'Out-the-door sale price. The bill-of-sale price is '
+            '(this amount − title and plate fees) / 1.03. Tax and those fees are separate.'
         ),
     )
     document_fee = DecimalField(
@@ -277,9 +277,10 @@ class VehicleSaleReceiptForm(FlaskForm):
         default=0,
     )
     tags_fee = DecimalField(
-        'Tags Fee ($)',
+        'Extra Tags Fee ($)',
         validators=[Optional(), NumberRange(min=0, max=99999999.99)],
         default=0,
+        description='Added on top of the out-the-door price. Do not re-enter the plate fee already included in that price.',
     )
     other_charges_data = HiddenField()
     down_payment = DecimalField(

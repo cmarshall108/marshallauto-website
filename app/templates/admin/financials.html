@@ -77,7 +77,7 @@
     <div class="fw-semibold mb-1">How these numbers are counted</div>
     <ul class="small text-muted mb-0 ps-3">
         <li>Closed-deal profit is booked in the month the vehicle sold, using Eastern Time.</li>
-        <li>Sale amounts are out-the-door. Kept revenue removes the 3% highway-use tax, because that tax is remitted. A saved receipt supplies the split; otherwise the same split is estimated from the amount received.</li>
+        <li>Sale amounts are out-the-door. Kept revenue is the bill-of-sale price: title and plate fees are removed, then the 3% highway-use tax on that sale price is removed, because both are remitted. A saved receipt supplies the split; otherwise the same split is estimated from the amount received.</li>
         <li>Acquisition and prep costs of a sold car reduce that sale month, even if the receipts are older. The per-vehicle rebuild tracker still shows profit before this tax split.</li>
         <li>Cash expense bars use the purchase date on each cost item and include cars still in inventory. Undated costs are listed separately.</li>
         <li>Doc, warranty, and tag fees are added only to contribution, not to vehicle gross profit. Trade allowances are shown, but not subtracted, because the trade-in vehicle is not valued here.</li>
@@ -109,7 +109,7 @@
             <p class="text-muted small mb-1">Vehicle Revenue</p>
             <div class="stat-value">{{ money(kpis.revenue) }}</div>
             <div class="small mt-1">{{ delta(kpis.revenue_delta) }}</div>
-            <p class="small text-muted mb-0 mt-2">After 3% tax · customer paid {{ money(kpis.otd) }}</p>
+            <p class="small text-muted mb-0 mt-2">After title, plate, and 3% tax · customer paid {{ money(kpis.otd) }}</p>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-3">

@@ -11,13 +11,13 @@
 </div>
 
 <div class="alert alert-info">
-    Enter the out-the-door sale price. Sales tax is 3% of that amount, and the agreed vehicle price is the OTD amount minus that tax. Fees are entered separately. Cash Due is the OTD price plus fees, minus the down payment and trade allowance.
+    Enter the out-the-door sale price. The bill-of-sale price is (OTD − title and plate fees) / 1.03. Sales tax is 3% of that sale price, and those fees stay separate from the sale price. Extra dealer fees below are added on top of the OTD price. Cash Due is the OTD price plus those extra fees, minus the down payment and trade allowance.
 </div>
 <div class="alert alert-secondary">
     The printed receipt states that the vehicle is sold as-is, that no liability or collision insurance is included, and that title is guaranteed to the purchaser by the seller.
 </div>
 
-<form method="POST" class="card border-0 shadow p-4" id="sale-receipt-form">
+<form method="POST" class="card border-0 shadow p-4" id="sale-receipt-form" data-title-fee-cents="{{ title_fee_cents }}" data-plate-fee-cents="{{ plate_fee_cents }}">
     {{ form.hidden_tag() }}
     <div class="row g-3">
         <div class="col-md-6">
@@ -40,20 +40,25 @@
             {% endif %}
             {% for error in form.salesman.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             {{ form.otd_price.label(class="form-label") }}
             {{ form.otd_price(class="form-control receipt-otd", id="otd_price", min="0", max="99999999.99", step="0.01", required=true) }}
             <div class="form-text">{{ form.otd_price.description }}</div>
             {% for error in form.otd_price.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
-        <div class="col-md-4">
-            <label class="form-label" for="receipt-sales-tax">Sales Tax (3%)</label>
+        <div class="col-md-3">
+            <label class="form-label" for="receipt-government-fees">Title &amp; Plate Fees</label>
+            <div class="form-control bg-body-secondary" id="receipt-government-fees" aria-live="polite">{{ fees_preview }}</div>
+            <div class="form-text">{{ title_fee_preview }} title + {{ plate_fee_preview }} plate. Included in the OTD price, not in the sale price.</div>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="receipt-sales-tax">Sales Tax (3% of sale price)</label>
             <div class="form-control bg-body-secondary" id="receipt-sales-tax" aria-live="polite">{{ sales_tax_preview }}</div>
         </div>
-        <div class="col-md-4">
-            <label class="form-label" for="receipt-agreed-price">Agreed Vehicle Price</label>
+        <div class="col-md-3">
+            <label class="form-label" for="receipt-agreed-price">Bill of Sale Price</label>
             <div class="form-control bg-body-secondary" id="receipt-agreed-price" aria-live="polite">{{ agreed_price_preview }}</div>
-            <div class="form-text">OTD sale price minus the 3% sales tax.</div>
+            <div class="form-text">(OTD − title and plate fees) / 1.03.</div>
         </div>
         <div class="col-md-6">
             {{ form.document_fee.label(class="form-label") }}
@@ -68,6 +73,7 @@
         <div class="col-md-6">
             {{ form.tags_fee.label(class="form-label") }}
             {{ form.tags_fee(class="form-control receipt-amount", min="0", max="99999999.99", step="0.01") }}
+            <div class="form-text">{{ form.tags_fee.description }}</div>
             {% for error in form.tags_fee.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
         <div class="col-12">

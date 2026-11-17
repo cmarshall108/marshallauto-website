@@ -93,7 +93,10 @@ class FinancialReportTests(unittest.TestCase):
         self.assertEqual(october['acquisition'], Decimal('6000.00'))
         self.assertEqual(october['prep'], Decimal('275.00'))
         self.assertEqual(october['gross_profit'], expected_profit)
-        self.assertEqual(october['profit_before_tax'] - october['tax'], october['gross_profit'])
+        self.assertEqual(
+            october['profit_before_tax'] - october['tax'] - split['fees'],
+            october['gross_profit'],
+        )
         self.assertEqual(september['gross_profit'], Decimal('0.00'))
         self.assertEqual(september['expense_spend'], Decimal('200.00'))
         self.assertEqual(october['expense_spend'], Decimal('50.00'))

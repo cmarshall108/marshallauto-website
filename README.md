@@ -704,8 +704,8 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `PUBLIC_CACHE_SECONDS` | Public HTML cache lifetime (default `60`) |
 | `IMAGE_CDN_BASE_URL` | Optional CDN origin for uploaded images |
 | `SENTRY_DSN` | Optional Sentry error-tracking DSN |
-| `ESTIMATE_TITLE_FEE` | Unused by public pages. Kept for the legacy estimate helper (default `66.75`) |
-| `ESTIMATE_LICENSE_PLATE_FEE` | Unused by public pages. Legacy plate-fee default `46.25` |
+| `ESTIMATE_TITLE_FEE` | Title fee backed out of the bill-of-sale price (default `66.75`) |
+| `ESTIMATE_LICENSE_PLATE_FEE` | Plate fee backed out of the bill-of-sale price (default `46.25`; with the title fee this is the $113 in the out-the-door formula) |
 | `ESTIMATE_NOTARY_FEE` | Unused by public pages. Legacy notary-fee default `15.00` |
 | `ESTIMATE_DOC_FEE` | Unused by public pages. Legacy documentation-fee default `0` |
 | `ESTIMATE_PROPERTY_TAX` | Unused by public pages. Legacy property-tax default `0` |

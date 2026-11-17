@@ -3,8 +3,11 @@ from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 
+from decimal import Decimal
+
 from app import create_app, db
 from app.models import User, Vehicle
+from app.pricing import split_otd_sale_price
 from config import TestingConfig
 
 
@@ -64,7 +67,21 @@ class BillOfSaleTests(unittest.TestCase):
         self.assertIn('his/her successors and assigns', text)
         self.assertIn('Marshall Auto, LLC', text)
         self.assertIn('360 Wilson Rd, Sanford, NC 27332', text)
-        self.assertIn('$10,500.00', text)
+        sale_amount = html.select_one('.bos-sale-amount')
+        self.assertIsNotNone(sale_amount)
+        self.assertEqual(sale_amount.get_text(strip=True), '$10,084.47')
+        sheet_text = ' '.join(html.select_one('.bos-sheet').get_text(' ', strip=True).split())
+        self.assertNotIn('$10,500.00', sheet_text)
+        split = html.select_one('.bos-price-split')
+        self.assertIsNotNone(split)
+        self.assertIn('no-print', split.get('class', []))
+        split_text = ' '.join(split.get_text(' ', strip=True).split())
+        self.assertIn('$10,500.00', split_text)
+        self.assertIn('$10,084.47', split_text)
+        self.assertIn('$302.53', split_text)
+        self.assertIn('$113.00', split_text)
+        self.assertIn('$66.75', split_text)
+        self.assertIn('$46.25', split_text)
         self.assertIn('Make: Toyota', text)
         self.assertIn('Model: Camry', text)
         self.assertIn('Body Type: Sedan', text)
@@ -90,3 +107,20 @@ class BillOfSaleTests(unittest.TestCase):
         list_button = listing_html.select_one('a[href="/admin/vehicles/1/bill-of-sale"]')
         self.assertIsNotNone(list_button)
         self.assertIn('Bill of Sale', list_button.get_text())
+
+    def test_bill_of_sale_price_backs_tax_and_fees_out_of_otd(self):
+        split = split_otd_sale_price('10500.00')
+        self.assertEqual(split['fees'], Decimal('113.00'))
+        self.assertEqual(split['title_fee'], Decimal('66.75'))
+        self.assertEqual(split['license_plate_fee'], Decimal('46.25'))
+        self.assertEqual(split['bill_of_sale_price'], Decimal('10084.47'))
+        self.assertEqual(split['sales_tax'], Decimal('302.53'))
+        self.assertEqual(
+            split['bill_of_sale_price'] + split['sales_tax'] + split['fees'],
+            split['otd_price'],
+        )
+
+        below_fees = split_otd_sale_price('100.50')
+        self.assertEqual(below_fees['bill_of_sale_price'], Decimal('100.50'))
+        self.assertEqual(below_fees['sales_tax'], Decimal('0.00'))
+        self.assertEqual(below_fees['fees'], Decimal('0.00'))
