@@ -672,6 +672,7 @@ time for worker exits, out-of-memory kills, disk exhaustion, and connection rese
 | `INDEXNOW_TIMEOUT` | IndexNow HTTP timeout in seconds (default `3`) |
 | `BUSINESS_NAME` | Business name |
 | `BUSINESS_PHONE` | Business phone number |
+| `TYLER_PHONE` | Tyler's phone number shown on the Contact page and site footer |
 | `BUSINESS_EMAIL` | Business email |
 | `BUSINESS_ADDRESS` | Business street address |
 | `GOOGLE_TAG_ID` | Google Tag Manager container ID (optional; preferred over bare GA4) |

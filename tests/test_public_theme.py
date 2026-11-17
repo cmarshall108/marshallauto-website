@@ -93,6 +93,21 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('.public-site .navbar .btn-primary:hover,', css)
         self.assertIn('background-color: #ffd27e;', css)
 
+    def test_contact_page_shows_caleb_and_tyler_phone_numbers(self):
+        self.app.config.update(
+            BUSINESS_PHONE='(919)-215-0702',
+            TYLER_PHONE='(919)-935-7376',
+        )
+        html = self.page('/contact')
+        phones = html.select('.contact-info-card a[href^="tel:"]')
+        self.assertEqual(
+            [phone['href'] for phone in phones],
+            ['tel:9192150702', 'tel:9199357376'],
+        )
+        self.assertIn('Caleb', html.select_one('.contact-info-card').get_text())
+        self.assertIn('Tyler', html.select_one('.contact-info-card').get_text())
+        self.assertIsNotNone(html.select_one('.footer a[href="tel:9199357376"]'))
+
     def test_financing_page_explains_in_person_lendmark_application(self):
         html = self.page('/financing')
         page_text = html.get_text(' ', strip=True)

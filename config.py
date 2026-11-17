@@ -165,6 +165,7 @@ class Config:
     CANONICAL_IP_REDIRECT = False
     BUSINESS_NAME = os.environ.get('BUSINESS_NAME') or 'Marshall Auto, LLC'
     BUSINESS_PHONE = os.environ.get('BUSINESS_PHONE') or '(919)-215-0702'
+    TYLER_PHONE = os.environ.get('TYLER_PHONE') or '(919)-935-7376'
     BUSINESS_EMAIL = os.environ.get('BUSINESS_EMAIL') or 'sales@marshallautosanford.com'
     BUSINESS_ADDRESS = os.environ.get('BUSINESS_ADDRESS') or '360 Wilson Rd'
     BUSINESS_CITY = os.environ.get('BUSINESS_CITY') or 'Sanford'
