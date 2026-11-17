@@ -2,8 +2,9 @@
 
 Creates a tar archive of application data (database dump, private uploads,
 public vehicle/CarFax media), encrypts it with AES-256-GCM using a dedicated
-key, and pushes only ciphertext to a separate private git remote. Restore
-decrypts a chosen artifact and writes files back under controlled paths.
+key, and pushes only ciphertext to a separate private git remote. Artifacts
+at GitHub's 100 MB file limit are stored as numbered parts. Restore decrypts
+a chosen artifact and writes files back under controlled paths.
 """
 
 from __future__ import annotations
@@ -34,7 +35,11 @@ MAGIC = b'MABAK001'
 FORMAT_VERSION = 1
 CHUNK_SIZE = 1024 * 1024
 DEFAULT_RETENTION = 30
+# GitHub rejects a blob over 100.00 MB (decimal). Stay under that on purpose.
+GITHUB_MAX_BLOB_BYTES = 100_000_000
+GIT_PART_BYTES = 90_000_000
 _SAFE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,180}\.mbak$')
+_PART_NAME = re.compile(r'^(?P<base>.+\.mbak)\.part(?P<index>\d{3})$')
 
 
 class BackupError(RuntimeError):
@@ -474,19 +479,168 @@ def _artifact_name(when: datetime | None = None) -> str:
     return f'marshallauto-{stamp}-{host}.mbak'
 
 
+def _logical_artifact_name(filename: str) -> str | None:
+    """Map a repo filename back to its ``*.mbak`` artifact name."""
+    if filename.endswith('.mbak.parts.json'):
+        logical = filename[:-len('.parts.json')]
+    elif '.mbak.part' in filename:
+        logical = filename.split('.mbak.part', 1)[0] + '.mbak'
+    elif filename.endswith('.mbak.json'):
+        logical = filename[:-len('.json')]
+    elif filename.endswith('.mbak'):
+        logical = filename
+    else:
+        return None
+    if not _SAFE_NAME.match(logical):
+        return None
+    return logical
+
+
 def _prune_old_backups(repo_dir: Path, keep: int) -> list[str]:
     keep = max(1, keep)
-    artifacts = sorted(repo_dir.glob('backups/**/*.mbak'))
-    # Sort by filename (UTC timestamp embedded) then mtime.
-    artifacts.sort(key=lambda p: (p.name, p.stat().st_mtime))
+    grouped: dict[str, list[Path]] = {}
+    for path in repo_dir.glob('backups/**/*'):
+        if not path.is_file():
+            continue
+        logical = _logical_artifact_name(path.name)
+        if not logical:
+            continue
+        grouped.setdefault(logical, []).append(path)
+    ordered = sorted(grouped)
+    excess = ordered[:-keep] if len(ordered) > keep else []
     removed = []
-    excess = artifacts[:-keep] if len(artifacts) > keep else []
-    for path in excess:
-        path.unlink(missing_ok=True)
-        meta = path.with_suffix('.mbak.json')
-        meta.unlink(missing_ok=True)
-        removed.append(str(path.relative_to(repo_dir)))
+    for logical in excess:
+        for path in grouped[logical]:
+            removed.append(str(path.relative_to(repo_dir)))
+            path.unlink(missing_ok=True)
     return removed
+
+
+def _publish_ciphertext(encrypted_path: Path, target_dir: Path, name: str) -> dict:
+    """Copy ciphertext into the git repo, splitting when GitHub would reject it."""
+    size = encrypted_path.stat().st_size
+    if size < GITHUB_MAX_BLOB_BYTES:
+        dest = target_dir / name
+        shutil.copy2(encrypted_path, dest)
+        return {'split': False, 'part_count': 1, 'part_bytes': size}
+
+    part_bytes = GIT_PART_BYTES
+    if part_bytes <= 0 or part_bytes >= GITHUB_MAX_BLOB_BYTES:
+        raise BackupError('Git part size must stay below GitHub\'s 100 MB file limit.')
+
+    parts_meta = []
+    split_digest = hashlib.sha256()
+    with encrypted_path.open('rb') as src:
+        index = 1
+        while True:
+            chunk = src.read(part_bytes)
+            if not chunk:
+                break
+            if index > 999:
+                raise BackupError('Backup exceeds the maximum number of git parts.')
+            part_name = f'{name}.part{index:03d}'
+            part_path = target_dir / part_name
+            part_path.write_bytes(chunk)
+            split_digest.update(chunk)
+            parts_meta.append({
+                'name': part_name,
+                'size': len(chunk),
+                'sha256': hashlib.sha256(chunk).hexdigest(),
+            })
+            index += 1
+    if not parts_meta:
+        raise BackupError('Refusing to publish an empty backup artifact.')
+    full_sha = _sha256_file(encrypted_path)
+    if split_digest.hexdigest() != full_sha:
+        raise BackupError('Internal error: split backup checksum mismatch.')
+
+    manifest = {
+        'filename': name,
+        'size_bytes': size,
+        'ciphertext_sha256': full_sha,
+        'part_bytes': part_bytes,
+        'parts': parts_meta,
+    }
+    manifest_path = target_dir / f'{name}.parts.json'
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    return {'split': True, 'part_count': len(parts_meta), 'part_bytes': part_bytes}
+
+
+def _parts_manifest_for(source: Path) -> Path | None:
+    source = Path(source)
+    if source.is_file() and source.name.endswith('.mbak.parts.json'):
+        return source
+    if source.is_file():
+        match = _PART_NAME.match(source.name)
+        if match:
+            candidate = source.parent / f'{match.group("base")}.parts.json'
+            return candidate if candidate.is_file() else None
+        return None
+    if source.is_dir():
+        manifests = sorted(p for p in source.glob('*.mbak.parts.json') if p.is_file())
+        if not manifests:
+            return None
+        if len(manifests) > 1:
+            raise BackupError('Directory contains multiple split backups; pass a .parts.json file.')
+        return manifests[0]
+    return None
+
+
+def _reassemble_parts(manifest_path: Path, destination: Path) -> Path:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BackupError(f'Could not read split backup manifest: {manifest_path}') from exc
+    parts = manifest.get('parts') or []
+    if not isinstance(parts, list) or not parts:
+        raise BackupError('Split backup manifest has no parts.')
+    logical = manifest_path.name[:-len('.parts.json')]
+    expected_sha = str(manifest.get('ciphertext_sha256') or '').strip()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
+    with destination.open('wb') as dst:
+        for info in parts:
+            if not isinstance(info, dict):
+                raise BackupError('Split backup manifest has an invalid part entry.')
+            part_name = str(info.get('name') or '')
+            match = _PART_NAME.match(part_name)
+            if not match or match.group('base') != logical or Path(part_name).name != part_name:
+                raise BackupError(f'Refusing unsafe backup part name: {part_name}')
+            part_path = manifest_path.parent / part_name
+            if not part_path.is_file():
+                raise BackupError(f'Missing backup part: {part_name}')
+            expected_size = info.get('size')
+            if expected_size is not None and part_path.stat().st_size != int(expected_size):
+                raise BackupError(f'Backup part size mismatch: {part_name}')
+            part_digest = hashlib.sha256()
+            with part_path.open('rb') as src:
+                while True:
+                    chunk = src.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    part_digest.update(chunk)
+                    digest.update(chunk)
+                    dst.write(chunk)
+            part_sha = str(info.get('sha256') or '')
+            if part_sha and part_digest.hexdigest() != part_sha:
+                raise BackupError(f'Backup part checksum mismatch: {part_name}')
+    if expected_sha and digest.hexdigest() != expected_sha:
+        raise BackupError('Reassembled backup ciphertext checksum mismatch.')
+    return destination
+
+
+def resolve_encrypted_backup(source: Path, *, destination_dir: Path) -> Path:
+    """Return a single ``.mbak`` file, reassembling GitHub parts when needed."""
+    source = Path(source)
+    if source.is_file() and source.suffix == '.mbak':
+        return source
+    manifest_path = _parts_manifest_for(source)
+    if manifest_path is None:
+        raise BackupError(f'Backup file not found: {source}')
+    logical = manifest_path.name[:-len('.parts.json')]
+    if not _SAFE_NAME.match(logical):
+        raise BackupError('Invalid split backup artifact name.')
+    return _reassemble_parts(manifest_path, destination_dir / logical)
 
 
 def publish_encrypted_backup(encrypted_path: Path, meta: dict) -> dict:
@@ -498,9 +652,8 @@ def publish_encrypted_backup(encrypted_path: Path, meta: dict) -> dict:
         target_dir = repo_dir / rel_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         name = encrypted_path.name if _SAFE_NAME.match(encrypted_path.name) else _artifact_name(when)
-        dest = target_dir / name
-        shutil.copy2(encrypted_path, dest)
-        meta_path = dest.with_suffix('.mbak.json')
+        published_parts = _publish_ciphertext(encrypted_path, target_dir, name)
+        meta_path = (target_dir / name).with_suffix('.mbak.json')
         public_meta = {
             'filename': name,
             'created_at': meta.get('created_at') or when.isoformat(),
@@ -524,7 +677,15 @@ def publish_encrypted_backup(encrypted_path: Path, meta: dict) -> dict:
                 ),
             },
             'encrypted': True,
-            'note': 'Payload is AES-256-GCM ciphertext. BACKUP_ENCRYPTION_KEY is required to restore.',
+            'git_split': published_parts['split'],
+            'git_part_count': published_parts['part_count'],
+            'note': (
+                'Payload is AES-256-GCM ciphertext stored as numbered parts because it '
+                'exceeds GitHub\'s 100 MB file limit. Reassemble with the .parts.json manifest. '
+                'BACKUP_ENCRYPTION_KEY is required to restore.'
+                if published_parts['split']
+                else 'Payload is AES-256-GCM ciphertext. BACKUP_ENCRYPTION_KEY is required to restore.'
+            ),
         }
         meta_path.write_text(json.dumps(public_meta, indent=2, sort_keys=True) + '\n', encoding='utf-8')
 
@@ -551,6 +712,8 @@ def publish_encrypted_backup(encrypted_path: Path, meta: dict) -> dict:
             'removed': removed,
             'branch': branch,
             'ciphertext_sha256': public_meta['ciphertext_sha256'],
+            'split': published_parts['split'],
+            'part_count': published_parts['part_count'],
         }
     finally:
         shutil.rmtree(work_root, ignore_errors=True)
@@ -591,11 +754,7 @@ def create_backup(*, push: bool = True, output_dir: Path | None = None) -> dict:
             **enc_meta,
             'pushed': False,
         }
-        if push:
-            published = publish_encrypted_backup(lasting_path, result)
-            result['pushed'] = bool(published.get('committed'))
-            result['publish'] = published
-        # Persist a copy under BACKUP_LOCAL_DIR when configured.
+        # Keep the on-server copy even when the GitHub push is rejected.
         local_dir = (current_app.config.get('BACKUP_LOCAL_DIR') or '').strip()
         if local_dir:
             dest_dir = Path(local_dir)
@@ -614,7 +773,12 @@ def create_backup(*, push: bool = True, output_dir: Path | None = None) -> dict:
             )
             result['local_retained_path'] = str(retained)
             result['local_path'] = str(retained)
-        elif output_dir is None and not push:
+            lasting_path = retained
+        if push:
+            published = publish_encrypted_backup(lasting_path, result)
+            result['pushed'] = bool(published.get('committed'))
+            result['publish'] = published
+        elif output_dir is None and not local_dir:
             # Keep artifact outside the wiped work tree for the caller.
             hold = Path(tempfile.mkdtemp(prefix='marshallauto-backup-out-'))
             held = hold / name
@@ -720,12 +884,10 @@ def restore_backup(
     work_dir: Path | None = None,
 ) -> dict:
     encrypted_path = Path(encrypted_path)
-    if not encrypted_path.is_file():
-        raise BackupError(f'Backup file not found: {encrypted_path}')
-
     cleanup = work_dir is None
     work = Path(work_dir) if work_dir else Path(tempfile.mkdtemp(prefix='marshallauto-restore-'))
     try:
+        encrypted_path = resolve_encrypted_backup(encrypted_path, destination_dir=work)
         archive = work / 'payload.tar.gz'
         digest = decrypt_file(encrypted_path, archive)
         extracted = work / 'extracted'
@@ -776,37 +938,57 @@ def restore_backup(
             shutil.rmtree(work, ignore_errors=True)
 
 
+def _indexed_backup_artifacts(repo_dir: Path) -> list[tuple[str, Path]]:
+    found: dict[str, Path] = {}
+    for path in repo_dir.glob('backups/**/*.mbak.parts.json'):
+        logical = path.name[:-len('.parts.json')]
+        if _SAFE_NAME.match(logical):
+            found[logical] = path
+    for path in repo_dir.glob('backups/**/*.mbak'):
+        if _SAFE_NAME.match(path.name):
+            found[path.name] = path
+    return sorted(found.items(), key=lambda item: item[0])
+
+
+def _select_backup_artifact(artifacts: list[tuple[str, Path]], artifact: str | None) -> tuple[str, Path]:
+    if not artifact:
+        return artifacts[-1]
+    artifact_name = Path(artifact).name
+    if artifact_name.endswith('.parts.json'):
+        artifact_name = artifact_name[:-len('.parts.json')]
+    if not _SAFE_NAME.match(artifact_name):
+        raise BackupError('Invalid backup artifact name.')
+    matches = [
+        item for item in artifacts
+        if item[0] == artifact_name or item[0] == artifact or str(item[1]).endswith(artifact)
+    ]
+    if not matches:
+        raise BackupError(f'Backup artifact not found in remote repo: {artifact}')
+    return matches[-1]
+
+
 def fetch_remote_backup(artifact: str | None = None, destination_dir: Path | None = None) -> Path:
     """Clone the backup repo and return a local path to the chosen (or latest) .mbak file."""
     work = Path(tempfile.mkdtemp(prefix='marshallauto-backup-fetch-'))
-    repo_dir = _prepare_repo_clone(work)
-    artifacts = sorted(repo_dir.glob('backups/**/*.mbak'), key=lambda p: p.name)
-    if not artifacts:
-        raise BackupError('No encrypted backups found in the remote repository.')
-    if artifact:
-        artifact_name = Path(artifact).name
-        if not _SAFE_NAME.match(artifact_name):
-            raise BackupError('Invalid backup artifact name.')
-        matches = [p for p in artifacts if p.name == artifact_name or str(p).endswith(artifact)]
-        if not matches:
-            raise BackupError(f'Backup artifact not found in remote repo: {artifact}')
-        chosen = matches[-1]
-    else:
-        chosen = artifacts[-1]
-    dest_root = Path(destination_dir) if destination_dir else work
-    dest_root.mkdir(parents=True, exist_ok=True)
-    dest = dest_root / chosen.name
-    shutil.copy2(chosen, dest)
-    # Keep the temp clone only if destination_dir was provided (caller owns cleanup of work otherwise).
-    if destination_dir is None:
-        # Move file out, then delete clone workspace except we already copied to work root.
-        lasting_parent = Path(tempfile.mkdtemp(prefix='marshallauto-backup-artifact-'))
-        lasting = lasting_parent / chosen.name
-        shutil.move(str(dest), str(lasting))
+    try:
+        repo_dir = _prepare_repo_clone(work)
+        artifacts = _indexed_backup_artifacts(repo_dir)
+        if not artifacts:
+            raise BackupError('No encrypted backups found in the remote repository.')
+        chosen_name, chosen_path = _select_backup_artifact(artifacts, artifact)
+        if destination_dir is None:
+            dest_root = Path(tempfile.mkdtemp(prefix='marshallauto-backup-artifact-'))
+        else:
+            dest_root = Path(destination_dir)
+            dest_root.mkdir(parents=True, exist_ok=True)
+        dest = dest_root / chosen_name
+        if chosen_path.suffix == '.mbak':
+            shutil.copy2(chosen_path, dest)
+        else:
+            _reassemble_parts(chosen_path, dest)
+        return dest
+    finally:
         shutil.rmtree(work, ignore_errors=True)
-        return lasting
-    shutil.rmtree(work, ignore_errors=True)
-    return dest
 
 
 def register_commands(app):
@@ -838,7 +1020,13 @@ def register_commands(app):
         if no_push:
             click.echo('Skipped git push (--no-push).')
         elif result.get('pushed'):
-            click.echo(f"Pushed to backup repo path: {result.get('publish', {}).get('artifact')}")
+            publish = result.get('publish') or {}
+            click.echo(f"Pushed to backup repo path: {publish.get('artifact')}")
+            part_count = int(publish.get('part_count') or 1)
+            if part_count > 1:
+                click.echo(
+                    f'Split into {part_count} parts to stay under GitHub\'s 100 MB file limit.'
+                )
         else:
             click.echo(f"Git publish result: {result.get('publish')}")
 
@@ -848,7 +1036,7 @@ def register_commands(app):
         'backup_file',
         type=click.Path(exists=True, dir_okay=False, path_type=Path),
         default=None,
-        help='Local .mbak file to restore.',
+        help='Local .mbak file, or a .mbak.parts.json manifest from a split backup.',
     )
     @click.option(
         '--artifact',

@@ -187,6 +187,46 @@ class BackupTests(unittest.TestCase):
         restore_backup(mbak_files[0], apply=True, restore_public=False, restore_stock=False)
         self.assertEqual((self.private / 'licenses' / 'buyer.bin').read_bytes(), b'secret-license')
 
+    def test_publish_splits_files_over_github_limit(self):
+        remote = Path(self.tmp.name) / 'remote-split.git'
+        subprocess.run(['git', 'init', '--bare', str(remote)], check=True, capture_output=True)
+        names = iter([
+            'marshallauto-20260101T000000Z-test.mbak',
+            'marshallauto-20260101T000001Z-test.mbak',
+        ])
+        with patch.dict(self.app.config, {
+            'BACKUP_GIT_URL': str(remote),
+            'BACKUP_GITHUB_TOKEN': '',
+            'BACKUP_GIT_BRANCH': 'main',
+            'BACKUP_RETENTION_COUNT': 1,
+        }), patch('app.backup.GITHUB_MAX_BLOB_BYTES', 400), patch(
+            'app.backup.GIT_PART_BYTES', 180,
+        ), patch('app.backup._artifact_name', side_effect=lambda when=None: next(names)):
+            first = create_backup(push=True, output_dir=self.output)
+            second = create_backup(push=True, output_dir=self.output)
+
+        self.assertTrue(first['pushed'])
+        self.assertTrue(second['pushed'])
+        self.assertGreater(second['publish']['part_count'], 1)
+        self.assertTrue(second['publish']['split'])
+        self.assertLess(second['size'], 400 * second['publish']['part_count'])
+
+        mirror = Path(self.tmp.name) / 'mirror-split'
+        subprocess.run(['git', 'clone', str(remote), str(mirror)], check=True, capture_output=True)
+        self.assertEqual(list(mirror.glob('backups/**/*.mbak')), [])
+        parts = [path for path in mirror.rglob('*') if path.is_file() and '.mbak.part' in path.name and path.suffix != '.json']
+        self.assertGreaterEqual(len(parts), 2)
+        self.assertTrue(all(part.stat().st_size <= 180 for part in parts))
+        manifests = list(mirror.glob('backups/**/*.mbak.parts.json'))
+        self.assertEqual(len(manifests), 1)
+        self.assertEqual(manifests[0].name, f"{second['artifact_name']}.parts.json")
+        self.assertFalse(any(first['artifact_name'] in path.name for path in mirror.rglob('*') if path.is_file()))
+
+        shutil.rmtree(self.private)
+        self.private.mkdir()
+        restore_backup(manifests[0], apply=True, restore_public=False, restore_stock=False)
+        self.assertEqual((self.private / 'licenses' / 'buyer.bin').read_bytes(), b'secret-license')
+
     def test_wrong_key_fails(self):
         result = create_backup(push=False, output_dir=self.output)
         with patch.dict(self.app.config, {'BACKUP_ENCRYPTION_KEY': 'totally-different-key-value'}):

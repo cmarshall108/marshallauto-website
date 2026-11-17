@@ -488,7 +488,9 @@ Application data (SQLite/Postgres dump, `instance/private_uploads`, vehicle/CarF
 media, and Coming Soon stock images) can be backed up every 24 hours to a
 **separate private GitHub repository**. Only **AES-256-GCM ciphertext** (`.mbak`)
 and a small public JSON sidecar (hashes, counts, timestamp) are committed. The
-encryption key never leaves the application server / secret store.
+encryption key never leaves the application server / secret store. If an artifact
+would exceed GitHub's 100 MB file limit, it is stored as `.mbak.partNNN` pieces
+plus a `.mbak.parts.json` manifest. Restore accepts a single `.mbak` or that manifest.
 
 ### One-time setup
 
