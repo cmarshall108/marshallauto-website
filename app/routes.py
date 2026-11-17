@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
@@ -15,7 +16,7 @@ from app.forms import (
     ContactForm, InventoryAlertForm, InventorySearchAlertForm, TestDriveRequestForm,
 )
 from app.models import (
-    CarfaxReport, FinancingApplication, Lead, Review, SiteSetting, Vehicle,
+    AnalyticsEvent, CarfaxReport, FinancingApplication, Lead, Review, SiteSetting, Vehicle,
 )
 from app.models import BlogPost
 from app.financing import (
@@ -1425,6 +1426,33 @@ def request_search_alert():
     if not next_url.startswith('/') or next_url.startswith('//'):
         next_url = url_for('main.inventory')
     return redirect(next_url + '#inventory-search-alert')
+
+
+@main.route('/qr/<slug>')
+def vehicle_qr_scan(slug):
+    """Log a lot QR scan, then send the shopper to the vehicle's public details."""
+    vehicle = Vehicle.query.filter_by(slug=slug).first_or_404()
+
+    from app.analytics import hash_ip, parse_user_agent
+
+    if parse_user_agent(request.user_agent.string)['device_type'] != 'bot':
+        db.session.add(AnalyticsEvent(
+            visitor_id=hash_ip(),
+            session_id=uuid4().hex,
+            event_name='qr_scan',
+            event_category='interest',
+            label='Lot QR scan',
+            path=f'/qr/{vehicle.slug}',
+            page_type='vehicle_detail',
+            vehicle_id=vehicle.id,
+        ))
+        db.session.commit()
+
+    if vehicle.is_coming_soon and vehicle.status == 'available':
+        destination = f"{url_for('main.coming_soon')}#vehicle-{vehicle.slug}"
+    else:
+        destination = url_for('main.vehicle_detail', slug=vehicle.slug)
+    return redirect(destination)
 
 
 @main.route('/inventory/<slug>')

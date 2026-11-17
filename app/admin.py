@@ -992,10 +992,7 @@ def mobile_vehicles():
 @login_required
 def vehicle_qr_print(id):
     vehicle = Vehicle.query.filter_by(id=id).first_or_404()
-    if vehicle.is_coming_soon and vehicle.status == 'available':
-        public_path = f"{url_for('main.coming_soon')}#vehicle-{vehicle.slug}"
-    else:
-        public_path = url_for('main.vehicle_detail', slug=vehicle.slug)
+    public_path = url_for('main.vehicle_qr_scan', slug=vehicle.slug)
     public_url = f"{current_app.config['SITE_URL'].rstrip('/')}{public_path}"
 
     qr_image = qrcode.make(public_url, image_factory=SvgPathImage)

@@ -60,6 +60,7 @@ EVENT_LABELS = {
     'file_download': 'File Download',
     'gallery_engagement': 'Gallery Engagement',
     'payment_calculated': 'Payment Calculator',
+    'qr_scan': 'Lot QR Scan',
     'select_content': 'Content Click',
     'outbound_click': 'Outbound Click',
     'scroll_depth': 'Scroll Depth',
@@ -81,6 +82,7 @@ EVENT_CATEGORIES = {
     'file_download': 'engagement',
     'gallery_engagement': 'engagement',
     'payment_calculated': 'interest',
+    'qr_scan': 'interest',
     'select_content': 'engagement',
     'outbound_click': 'engagement',
     'scroll_depth': 'engagement',
@@ -1044,14 +1046,34 @@ def build_analytics_dashboard(args):
         .limit(15)
         .all()
     )
-    vehicle_ids = [r.vehicle_id for r in vehicle_rows]
+    page_view_vehicle_ids = {r.vehicle_id for r in vehicle_rows}
+    qr_scan_rows = (
+        _ev_filter(db.session.query(
+            AnalyticsEvent.vehicle_id,
+            func.count(AnalyticsEvent.id).label('scans'),
+        ), start, end)
+        .filter(
+            AnalyticsEvent.event_name == 'qr_scan',
+            AnalyticsEvent.vehicle_id.isnot(None),
+        )
+        .group_by(AnalyticsEvent.vehicle_id)
+        .order_by(func.count(AnalyticsEvent.id).desc())
+        .limit(15)
+        .all()
+    )
+    vehicle_ids = list(dict.fromkeys([
+        *page_view_vehicle_ids,
+        *(r.vehicle_id for r in qr_scan_rows),
+    ]))
     vehicles_by_id = {}
     if vehicle_ids:
         for v in Vehicle.query.filter(Vehicle.id.in_(vehicle_ids)).all():
             vehicles_by_id[v.id] = v
 
     # Interest events per vehicle
-    vehicle_interest = defaultdict(lambda: {'calls': 0, 'leads': 0, 'gallery': 0, 'payments': 0})
+    vehicle_interest = defaultdict(
+        lambda: {'calls': 0, 'leads': 0, 'gallery': 0, 'payments': 0, 'qr_scans': 0},
+    )
     if vehicle_ids:
         interest_rows = (
             _ev_filter(db.session.query(
@@ -1072,6 +1094,8 @@ def build_analytics_dashboard(args):
                 vehicle_interest[vid]['gallery'] += cnt
             elif ename == 'payment_calculated':
                 vehicle_interest[vid]['payments'] += cnt
+            elif ename == 'qr_scan':
+                vehicle_interest[vid]['qr_scans'] += cnt
 
     top_vehicles_data = []
     for r in vehicle_rows:
@@ -1091,6 +1115,28 @@ def build_analytics_dashboard(args):
             'leads': interest.get('leads', 0),
             'gallery': interest.get('gallery', 0),
             'payments': interest.get('payments', 0),
+            'qr_scans': interest.get('qr_scans', 0),
+        })
+
+    for r in qr_scan_rows:
+        if r.vehicle_id in page_view_vehicle_ids:
+            continue
+        v = vehicles_by_id.get(r.vehicle_id)
+        top_vehicles_data.append({
+            'id': r.vehicle_id,
+            'title': v.title if v else f'Vehicle #{r.vehicle_id}',
+            'slug': v.slug if v else None,
+            'status': v.status if v else None,
+            'price': float(v.display_price) if v and v.display_price is not None else None,
+            'views': 0,
+            'visitors': 0,
+            'avg_duration': 0,
+            'avg_scroll': 0,
+            'calls': 0,
+            'leads': 0,
+            'gallery': 0,
+            'payments': 0,
+            'qr_scans': r.scans,
         })
 
     # ---- event breakdown ----

@@ -6,7 +6,7 @@ from unittest.mock import patch
 from bs4 import BeautifulSoup
 
 from app import create_app, db
-from app.models import User, Vehicle
+from app.models import AnalyticsEvent, User, Vehicle
 from config import TestingConfig
 
 
@@ -65,7 +65,7 @@ class AdminVehicleQrTests(unittest.TestCase):
         self.assertNotIn('$17,900', page_text)
         self.assertNotIn('$18,900', page_text)
         self.assertIn('Scan for the current price and vehicle details', page_text)
-        self.assertIn('https://marshallautosanford.com/inventory/qr-test-car',
+        self.assertIn('https://marshallautosanford.com/qr/qr-test-car',
                       html.select_one('.qr-url').get_text())
         self.assertIsNotNone(html.select_one('button[onclick="window.print()"]'))
 
@@ -81,16 +81,36 @@ class AdminVehicleQrTests(unittest.TestCase):
         self.assertIsNone(html.select_one('.qr-price'))
         self.assertIn('Price and full details will be posted when this vehicle is ready.',
                       html.get_text())
-        self.assertIn(
-            'https://marshallautosanford.com/coming-soon#vehicle-qr-coming-soon',
-            html.select_one('.qr-url').get_text(),
-        )
+        self.assertIn('https://marshallautosanford.com/qr/qr-coming-soon',
+                      html.select_one('.qr-url').get_text())
 
         public = self.client.get('/coming-soon')
         public_html = BeautifulSoup(public.data, 'html.parser')
         vehicle_card = public_html.select_one('#vehicle-qr-coming-soon')
         self.assertIsNotNone(vehicle_card)
         self.assertNotIn('$16,500', vehicle_card.get_text())
+
+        scan = self.client.get('/qr/qr-coming-soon')
+        self.assertEqual(scan.status_code, 302)
+        self.assertEqual(scan.headers['Location'], '/coming-soon#vehicle-qr-coming-soon')
+
+    def test_scanning_qr_records_vehicle_interest_and_redirects(self):
+        response = self.client.get('/qr/qr-test-car')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], '/inventory/qr-test-car')
+        event = AnalyticsEvent.query.one()
+        self.assertEqual(event.event_name, 'qr_scan')
+        self.assertEqual(event.event_category, 'interest')
+        self.assertEqual(event.vehicle_id, 1)
+
+        self.login()
+        analytics = BeautifulSoup(self.client.get('/admin/analytics').data, 'html.parser')
+        vehicle_row = next(
+            row for row in analytics.select('tbody tr')
+            if '2022 Toyota Camry' in row.get_text()
+        )
+        self.assertEqual(vehicle_row.select('td')[5].get_text(strip=True), '1')
 
     def test_vehicle_admin_surfaces_link_to_qr_print(self):
         self.login()
