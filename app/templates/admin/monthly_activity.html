@@ -1,0 +1,90 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Monthly Buyer Activity{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Monthly buyer activity</h2>
+        <p class="text-muted mb-0">All recorded history, grouped by Eastern Time</p>
+    </div>
+    <a href="{{ url_for('admin.analytics') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Website analytics
+    </a>
+</div>
+
+<div class="alert alert-light border mb-4 small">
+    <p class="mb-1">These are separate activity signals, not a count of individual buyers. Page views include vehicle views; contact clicks do not confirm a conversation. Leads include all non-spam sources, not only vehicle inquiries. Other tracked events include searches, filters and engagement.</p>
+    <p class="mb-1">Counts begin with the first recorded observation for each signal; earlier months are unknown (—), not zero. Tracking gaps, blocked scripts, bots, staff scans and unrecorded offline activity can affect results. QR tracking requires newly printed tracked codes.</p>
+    <p class="mb-0">Seasonal averages include complete months after each signal's first recorded month; the current month is excluded. Sample counts show how many years contribute. Sales require a stored sale date; {{ undated_sales }} currently sold vehicle(s) have no date and are excluded.</p>
+</div>
+
+{% if months %}
+<div class="table-card p-3 p-md-4 mb-4">
+    <h5 class="fw-bold mb-1">Busiest and slowest seasons</h5>
+    <p class="small text-muted">Compare each signal separately. Averages are per observed complete month, not totals across years.</p>
+    {% if comparisons %}
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Activity</th><th>Slowest average</th><th>Busiest average</th></tr></thead>
+            <tbody>
+                {% for item in comparisons %}
+                <tr>
+                    <td>{{ item.label }}</td>
+                    <td>{{ item.lowest | join(', ') }} ({{ '%.1f' | format(item.low_value) }})</td>
+                    <td>{{ item.highest | join(', ') }} ({{ '%.1f' | format(item.high_value) }})</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">Not enough complete months to compare yet.</p>
+    {% endif %}
+</div>
+
+<div class="table-card p-3 p-md-4 mb-4">
+    <h5 class="fw-bold mb-1">Seasonal averages</h5>
+    <p class="small text-muted">Average per month (number of complete months sampled). Each column may have a different history.</p>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead><tr><th>Month</th>{% for key, label in metrics %}<th class="text-end">{{ label }}</th>{% endfor %}</tr></thead>
+            <tbody>
+                {% for row in seasonal %}
+                <tr>
+                    <th scope="row">{{ row.label }}</th>
+                    {% for key, label in metrics %}
+                    {% set cell = row['values'][key] %}
+                    <td class="text-end text-nowrap">{% if cell.samples %}{{ '%.1f' | format(cell.average) }} ({{ cell.samples }}){% else %}—{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="table-card p-3 p-md-4 mb-4">
+    <h5 class="fw-bold mb-1">Monthly history</h5>
+    <p class="small text-muted">Recorded counts by calendar month. The current month is incomplete.</p>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead><tr><th>Month</th>{% for key, label in metrics %}<th class="text-end">{{ label }}</th>{% endfor %}</tr></thead>
+            <tbody>
+                {% for row in months %}
+                <tr>
+                    <th scope="row" class="text-nowrap">{{ row.month.strftime('%b %Y') }}{% if row.partial %} <span class="text-muted">(partial)</span>{% endif %}</th>
+                    {% for key, label in metrics %}
+                    {% set value = row['values'][key] %}
+                    <td class="text-end">{{ value if value is not none else '—' }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="table-card p-4 text-center text-muted">No recorded activity yet. Monthly history will appear as data is collected.</div>
+{% endif %}
+{% endblock %}

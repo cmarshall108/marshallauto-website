@@ -1,11 +1,12 @@
 """First-party website analytics: collection helpers and admin aggregations."""
 from __future__ import annotations
 
+import calendar
 import hashlib
 import json
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 from flask import current_app, has_request_context, request
@@ -13,7 +14,7 @@ from flask_login import current_user
 from sqlalchemy import case, func
 
 from app import db
-from app.models import AnalyticsEvent, PageView, Vehicle, utcnow
+from app.models import AnalyticsEvent, Lead, PageView, Vehicle, utcnow
 from app.utils import (
     DEALERSHIP_TIMEZONE, client_ip, dealership_local_to_utc,
     rate_limit_exceeded, to_dealership_time,
@@ -564,6 +565,120 @@ def _avg(total, count):
     if not count:
         return 0.0
     return round(total / count, 1)
+
+
+MONTHLY_ACTIVITY_METRICS = (
+    ('page_views', 'Page views'),
+    ('vehicle_views', 'Vehicle views'),
+    ('qr_scans', 'Lot QR scans'),
+    ('contact_clicks', 'Call / text / email clicks'),
+    ('other_events', 'Other tracked events'),
+    ('leads', 'Non-spam leads'),
+    ('sales', 'Vehicles sold'),
+)
+
+
+def build_monthly_activity_report(now=None):
+    """Compare recorded activity by local calendar month, independently of dashboard filters."""
+    now = now or utcnow()
+    current_month = to_dealership_time(now).date().replace(day=1)
+    buckets = defaultdict(lambda: defaultdict(int))
+    first_month = {}
+
+    def add(timestamp, metric):
+        month = to_dealership_time(timestamp).date().replace(day=1)
+        buckets[month][metric] += 1
+        if metric not in first_month or month < first_month[metric]:
+            first_month[metric] = month
+
+    views = db.session.query(PageView.created_at, PageView.page_type).filter(
+        PageView.created_at <= now,
+        PageView.device_type != 'bot',
+    )
+    for timestamp, page_type in views.yield_per(1000):
+        add(timestamp, 'page_views')
+        if page_type == 'vehicle_detail':
+            add(timestamp, 'vehicle_views')
+
+    events = db.session.query(AnalyticsEvent.created_at, AnalyticsEvent.event_name).outerjoin(
+        PageView, AnalyticsEvent.page_view_id == PageView.id,
+    ).filter(
+        AnalyticsEvent.created_at <= now,
+        (PageView.id.is_(None)) | (PageView.device_type != 'bot'),
+    )
+    contact_events = {'click_to_call', 'click_to_sms', 'click_to_email'}
+    for timestamp, name in events.yield_per(1000):
+        if name == 'qr_scan':
+            add(timestamp, 'qr_scans')
+        elif name in contact_events:
+            add(timestamp, 'contact_clicks')
+        elif name not in {'page_view', 'view_item', 'generate_lead'}:
+            add(timestamp, 'other_events')
+
+    leads = db.session.query(Lead.created_at).filter(
+        Lead.created_at <= now, Lead.is_spam.is_(False),
+    )
+    for (timestamp,) in leads.yield_per(1000):
+        add(timestamp, 'leads')
+
+    sales = db.session.query(Vehicle.sold_at).filter(
+        Vehicle.status == 'sold', Vehicle.sold_at.isnot(None), Vehicle.sold_at <= now,
+    )
+    for (timestamp,) in sales.yield_per(1000):
+        add(timestamp, 'sales')
+
+    months = []
+    if first_month:
+        month = min(first_month.values())
+        while month <= current_month:
+            values = {
+                metric: buckets[month][metric]
+                if metric in first_month and month >= first_month[metric] else None
+                for metric, _ in MONTHLY_ACTIVITY_METRICS
+            }
+            months.append({'month': month, 'partial': month == current_month, 'values': values})
+            month = date(month.year + (month.month == 12), month.month % 12 + 1, 1)
+
+    seasonal = []
+    for month_number in range(1, 13):
+        values = {}
+        for metric, _ in MONTHLY_ACTIVITY_METRICS:
+            samples = [
+                row['values'][metric] for row in months
+                if row['month'].month == month_number
+                and not row['partial']
+                and metric in first_month and row['month'] > first_month[metric]
+            ]
+            values[metric] = {
+                'average': sum(samples) / len(samples) if samples else None,
+                'samples': len(samples),
+            }
+        seasonal.append({'label': calendar.month_name[month_number], 'values': values})
+
+    comparisons = []
+    for metric, label in MONTHLY_ACTIVITY_METRICS:
+        available = [row for row in seasonal if row['values'][metric]['samples']]
+        if len(available) < 2:
+            continue
+        lowest = min(row['values'][metric]['average'] for row in available)
+        highest = max(row['values'][metric]['average'] for row in available)
+        comparisons.append({
+            'label': label,
+            'lowest': [row['label'] for row in available if row['values'][metric]['average'] == lowest],
+            'highest': [row['label'] for row in available if row['values'][metric]['average'] == highest],
+            'low_value': lowest,
+            'high_value': highest,
+        })
+
+    return {
+        'metrics': MONTHLY_ACTIVITY_METRICS,
+        'months': list(reversed(months)),
+        'seasonal': seasonal,
+        'comparisons': comparisons,
+        'undated_sales': Vehicle.query.filter(
+            Vehicle.status == 'sold', Vehicle.sold_at.is_(None),
+        ).count(),
+    }
 
 
 def build_acquisition_report(start, end, page_type=None, device=None):

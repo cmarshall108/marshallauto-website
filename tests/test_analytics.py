@@ -6,8 +6,11 @@ from unittest import mock
 
 from config import TestingConfig
 from app import create_app, db
-from app.analytics import _parse_date_range, build_acquisition_report, build_analytics_dashboard
-from app.models import AnalyticsEvent, PageView, User, utcnow
+from app.analytics import (
+    _parse_date_range, build_acquisition_report, build_analytics_dashboard,
+    build_monthly_activity_report,
+)
+from app.models import AnalyticsEvent, Lead, PageView, User, Vehicle, utcnow
 
 
 class AnalyticsTests(unittest.TestCase):
@@ -225,6 +228,81 @@ class AnalyticsTests(unittest.TestCase):
         self.assertIn('Converting sessions', html)
         self.assertIn('(direct) / (none)', html)
         self.assertIn('Homepage shopping actions', html)
+        self.assertIn('/admin/analytics/monthly-activity', html)
+
+    def test_monthly_activity_uses_local_months_and_complete_samples(self):
+        self._page(*self._ids(), datetime(2024, 1, 15), page_type='vehicle_detail')
+        # This UTC timestamp is still January in Eastern Time.
+        self._page(*self._ids(), datetime(2024, 2, 1, 2), page_type='inventory')
+        self._page(*self._ids(), datetime(2024, 2, 15), page_type='vehicle_detail')
+        self._page(*self._ids(), datetime(2025, 2, 15), page_type='vehicle_detail')
+        self._page(*self._ids(), datetime(2025, 2, 16), page_type='vehicle_detail')
+        self._page(*self._ids(), datetime(2025, 2, 17), device_type='bot')
+        visitor, session = self._ids()
+        db.session.add_all([
+            AnalyticsEvent(
+                visitor_id=visitor, session_id=session, event_name='qr_scan',
+                created_at=datetime(2024, 3, 10),
+            ),
+            AnalyticsEvent(
+                visitor_id=visitor, session_id=session, event_name='click_to_call',
+                created_at=datetime(2025, 2, 10),
+            ),
+            Lead(name='Shopper', email='shopper@example.com',
+                 created_at=datetime(2025, 2, 10)),
+            Lead(name='Spam', email='spam@example.com', is_spam=True,
+                 created_at=datetime(2025, 2, 10)),
+            Vehicle(slug='monthly-sale', year=2020, make='Toyota', model='Camry',
+                    price=10000, mileage=50000, status='sold',
+                    sold_at=datetime(2025, 2, 10)),
+            Vehicle(slug='undated-sale', year=2020, make='Honda', model='Civic',
+                    price=10000, mileage=50000, status='sold'),
+        ])
+        db.session.commit()
+
+        report = build_monthly_activity_report(datetime(2025, 3, 15))
+        history = {row['month'].isoformat(): row for row in report['months']}
+        self.assertEqual(history['2024-01-01']['values']['page_views'], 2)
+        self.assertIsNone(history['2024-02-01']['values']['qr_scans'])
+        self.assertEqual(history['2024-04-01']['values']['qr_scans'], 0)
+        self.assertEqual(history['2025-02-01']['values']['page_views'], 2)
+        self.assertEqual(history['2025-02-01']['values']['contact_clicks'], 1)
+        self.assertEqual(history['2025-02-01']['values']['leads'], 1)
+        self.assertEqual(history['2025-02-01']['values']['sales'], 1)
+        self.assertTrue(history['2025-03-01']['partial'])
+        february = report['seasonal'][1]['values']
+        self.assertEqual(february['page_views'], {'average': 1.5, 'samples': 2})
+        self.assertEqual(february['sales'], {'average': None, 'samples': 0})
+        self.assertEqual(report['undated_sales'], 1)
+        views_comparison = next(
+            item for item in report['comparisons'] if item['label'] == 'Page views'
+        )
+        self.assertEqual(views_comparison['highest'], ['February'])
+        self.assertEqual(views_comparison['high_value'], 1.5)
+        self.assertIn('March', views_comparison['lowest'])
+
+        self._login()
+        with mock.patch('app.analytics.utcnow', return_value=datetime(2025, 3, 15)):
+            html = self.client.get('/admin/analytics/monthly-activity').get_data(as_text=True)
+        self.assertIn('February (1.5)', html)
+        self.assertIn('1.5 (2)', html)
+
+    def test_monthly_activity_page_requires_login_and_displays_sales_without_pageviews(self):
+        self.assertEqual(self.client.get('/admin/analytics/monthly-activity').status_code, 302)
+        db.session.add(Vehicle(
+            slug='report-sale', year=2020, make='Toyota', model='Camry',
+            price=10000, mileage=50000, status='sold', sold_at=utcnow(),
+        ))
+        db.session.commit()
+        self._login()
+
+        response = self.client.get('/admin/analytics/monthly-activity')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('Monthly buyer activity', html)
+        self.assertIn('Monthly history', html)
+        self.assertIn('Vehicles sold', html)
+        self.assertIn('(partial)', html)
 
     def test_homepage_shopping_events_are_reported_separately(self):
         created_at = utcnow() - timedelta(minutes=5)

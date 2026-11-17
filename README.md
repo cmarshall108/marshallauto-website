@@ -40,6 +40,7 @@ A complete, SEO-optimized used car dealership website built with Python and Flas
   - Manage service records per vehicle
   - Upload and link CarFax PDF reports
   - View and manage customer leads (with UTM / click-ID attribution)
+  - Monthly buyer activity report comparing recorded shopping signals, leads, and dated sales by month and across years
   - Sales Priorities board for oldest unread non-spam leads, available public listings added at least 60 days ago, and a paginated listing-quality checklist
   - First-party Live Chat inbox with automatic signed-in staff availability, cross-page toast alerts, and offline fallback
   - Edit site settings, SEO defaults, and analytics IDs
@@ -54,6 +55,15 @@ published. The checklist paginates public listings missing photos, a
 description, body style, engine, or transmission. These are prompts for human
 review, not proof of a missed follow-up or a recommendation to invent details.
 The page does not send messages or add customer tracking.
+
+### Monthly buyer activity
+
+Admin → Analytics → Monthly buyer activity shows all-time monthly counts and
+seasonal averages for website views, lot QR scans, contact clicks, other tracked
+events, non-spam leads, and dated sales. These signals overlap and do not count
+unique buyers. Months before each signal's first observation are unknown; seasonal
+averages exclude that first month and the current partial month. Counts can miss
+offline activity, blocked tracking, undated sales, and scans of older QR sheets.
 
 ### Local network scanner
 

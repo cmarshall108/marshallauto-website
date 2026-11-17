@@ -3051,6 +3051,18 @@ def analytics():
     )
 
 
+@admin_bp.route('/analytics/monthly-activity')
+@login_required
+def monthly_activity():
+    """All-time monthly and seasonal activity comparison."""
+    from app.analytics import build_monthly_activity_report
+
+    return render_template(
+        'admin/monthly_activity.html',
+        **build_monthly_activity_report(),
+    )
+
+
 @admin_bp.route('/financials')
 @login_required
 def financials():
