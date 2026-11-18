@@ -28,6 +28,11 @@
                     <a href="tel:{{ business_phone | replace(' ', '') | replace('(', '') | replace(')', '') | replace('-', '') }}" class="btn btn-outline-light btn-lg">
                         <i class="bi bi-telephone-fill me-2"></i>Call Our Cell
                     </a>
+                    <a href="https://www.google.com/maps/dir/?api=1&amp;destination={{ (business_address ~ ', ' ~ business_city ~ ', ' ~ business_state ~ ' ' ~ business_zip) | urlencode }}"
+                       class="btn btn-outline-light btn-lg" target="_blank" rel="noopener"
+                       aria-label="Get directions to {{ business_name }} at {{ business_address }}, {{ business_city }}, {{ business_state }} {{ business_zip }}">
+                        <i class="bi bi-geo-alt-fill me-2" aria-hidden="true"></i>Get Directions
+                    </a>
                 </div>
             </div>
         </div>

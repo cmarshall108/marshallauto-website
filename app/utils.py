@@ -1216,6 +1216,11 @@ def _service_areas_schema():
 def structured_data_local_business():
     social = _business_social_links()
     site = current_app.config['SITE_URL'].rstrip('/')
+    from app.models import SiteSetting
+    google_business_url = (
+        SiteSetting.get('google_business_url')
+        or current_app.config.get('GOOGLE_BUSINESS_URL', '')
+    )
     logo_url = f"{site}/static/images/logo-icon.png"
     data = {
         "@context": "https://schema.org",
@@ -1266,6 +1271,8 @@ def structured_data_local_business():
         # AutoDealer markup. Real sellable inventory is marked up as Car + Offer instead.
         "sameAs": social
     }
+    if google_business_url:
+        data["hasMap"] = google_business_url
     return data
 
 

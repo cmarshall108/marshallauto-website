@@ -958,9 +958,12 @@ existing database model. Sitemap responses may be cached for up to one hour.
 5. Validate rendered vehicle structured data and review indexing/crawl reports.
   Check search impressions and clicks for VIN queries and Sanford-area searches.
 6. Keep the Google Business Profile address, phone, hours, inventory website link,
-  photos, and genuine reviews accurate. Add featured quotes on the website via Admin → Reviews (Source = Google), or set
-  `GOOGLE_PLACE_ID` + `GOOGLE_PLACES_API_KEY` and run `flask sync-google-reviews` (Places returns up to five review texts). Add useful, original Sanford-area buying
-  guides and detailed vehicle descriptions rather than duplicating city pages.
+  photos, and genuine reviews accurate. Verify the website's mobile tap-to-call
+  and Google Maps directions links use the same address. Add featured quotes on
+  the website via Admin → Reviews (Source = Google), or set `GOOGLE_PLACE_ID` +
+  `GOOGLE_PLACES_API_KEY` and run `flask sync-google-reviews` (Places returns up
+  to five review texts). Add useful, original Sanford-area buying guides and
+  detailed vehicle descriptions rather than duplicating city pages.
 
 These changes make pages discoverable and eligible for indexing; they cannot
 force Google or Bing to index every VIN or guarantee rankings, rich results, or

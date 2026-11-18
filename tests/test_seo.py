@@ -2,6 +2,7 @@ import json
 import unittest
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -93,6 +94,20 @@ class SeoTests(unittest.TestCase):
         webp = next(link for link in preloads if link.get('href', '').endswith('.webp'))
         self.assertEqual(webp.get('type'), 'image/webp')
 
+    def test_homepage_has_mobile_friendly_google_maps_directions_link(self):
+        html = self.page('/')
+        directions = next(
+            link for link in html.select('a[href]')
+            if link.get_text(' ', strip=True) == 'Get Directions'
+        )
+        self.assertEqual(urlsplit(directions['href']).netloc, 'www.google.com')
+        self.assertEqual(
+            parse_qs(urlsplit(directions['href']).query)['destination'],
+            ['360 Wilson Rd, Sanford, NC 27332'],
+        )
+        self.assertEqual(directions.get('target'), '_blank')
+        self.assertIn('noopener', directions.get('rel', []))
+
     def test_dealership_schema_omits_self_serving_rating_markup(self):
         db.session.add(Review(
             author_name='Test Customer',
@@ -109,6 +124,10 @@ class SeoTests(unittest.TestCase):
         ]
         dealership = next(schema for schema in schemas if schema.get('@type') == 'AutoDealer')
         self.assertNotIn('aggregateRating', dealership)
+        self.assertEqual(
+            dealership['hasMap'],
+            self.app.config['GOOGLE_BUSINESS_URL'],
+        )
         self.assertIn('A test review.', html.get_text())
         self.assertIn('Rated 5.0 out of 5 stars based on 1 reviews.', html.get_text())
 
