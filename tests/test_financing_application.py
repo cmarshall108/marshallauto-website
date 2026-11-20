@@ -129,6 +129,8 @@ class FinancingApplicationTests(unittest.TestCase):
         self.assertIn(b'Social Security number', response.data)
         self.assertIn(b'City', response.data)
         self.assertIn(b'ZIP code', response.data)
+        self.assertIn(b'Westlake applications are handled manually', response.data)
+        self.assertIn(b'manual delivery to Lendmark Financial Services', response.data)
         self.assertIn(b'data-address-zip', response.data)
         self.assertIn(b'Your information is protected', response.data)
         self.assertNotIn(b'googletagmanager.com', response.data)

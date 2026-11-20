@@ -2139,11 +2139,11 @@ def financing():
     ])
     faqs = [
         (f"Can I get financing at {current_app.config['BUSINESS_NAME']} with bad credit?",
-         "Marshall Auto accepts online applications for vehicles in our inventory and works with Lendmark Financial Services. The lender reviews each application under its underwriting criteria; approval is not guaranteed, and we cannot promise a particular APR, down payment, term, or payment."),
+         "Yes. Marshall Auto works with Lendmark Financial Services and Westlake Financial, and buyers with bad, limited, or no credit can apply. Use the secure online application on this page to apply with Lendmark; Westlake applications are handled manually by our team. Each lender makes its own decision, so approval and terms are not guaranteed."),
         ("What do I need to bring to apply for financing?",
-         "Select an available vehicle and complete the secure application on this page. You will need your Social Security number, contact and residence history, employment and income details, and driver's-license information. Review the lender's credit-report authorization before submitting."),
+         "For Lendmark, select an available vehicle and complete the secure application on this page. You will need your Social Security number, contact and residence history, employment and income details, and driver's-license information. Review the lender's credit-report authorization before submitting. Contact Marshall Auto to discuss a manual application with Westlake Financial."),
         ("Can I start a financing application before choosing a vehicle?",
-         "Choose an available vehicle from our inventory as part of the application. Lendmark Financial Services reviews the completed application; an application is not a final approval or commitment to lend.")
+         "Choose an available vehicle from our inventory as part of the online Lendmark application. To discuss applying manually with Westlake Financial, contact Marshall Auto. An application is not a final approval or commitment to lend.")
     ]
     steps = [
         {"name": "Choose a Vehicle", "text": "Select an available vehicle from our inventory and enter the requested borrower, residence, employment, and income details in the secure online form."},
@@ -2170,15 +2170,15 @@ def financing():
             f"How to Finance a Used Car at {current_app.config['BUSINESS_NAME']}",
             steps,
             description=(
-                f"An overview of applying online for financing through Lendmark Financial Services at "
+                f"An overview of applying online through Lendmark Financial Services at "
                 f"{current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']}, "
                 f"{current_app.config['BUSINESS_STATE']}, for an available vehicle."
             ),
         ),
         meta_title=f"Used Car Financing in {current_app.config['BUSINESS_CITY']} | {current_app.config['BUSINESS_NAME']}",
         meta_description=(
-            f"Yes, {current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']} offers financing through Lendmark Financial Services. "
-            f"Apply securely online for an available vehicle. Approval and terms are determined by the lender."
+            f"{current_app.config['BUSINESS_NAME']} in {current_app.config['BUSINESS_CITY']} works with Lendmark and Westlake Financial. "
+            f"Bad, limited, or no credit? Explore financing options; approval is not guaranteed."
         ),
         page_type='financing',
     )

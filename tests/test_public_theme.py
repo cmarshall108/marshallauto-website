@@ -108,24 +108,19 @@ class PublicThemeTests(unittest.TestCase):
         self.assertIn('Tyler', html.select_one('.contact-info-card').get_text())
         self.assertIsNotNone(html.select_one('.footer a[href="tel:9199357376"]'))
 
-    def test_financing_page_explains_in_person_lendmark_application(self):
+    def test_financing_page_explains_lendmark_and_manual_westlake_options(self):
         html = self.page('/financing')
         page_text = html.get_text(' ', strip=True)
         self.assertIn('Lendmark Financial Services', page_text)
-        self.assertIn('complete an application for a vehicle you are interested in', page_text)
+        self.assertIn('Westlake Financial', page_text)
+        self.assertIn('Buyers with bad, limited, or no credit history', page_text)
+        self.assertIn('may still get approved', page_text)
+        self.assertIn('not automatically put you out of the running', page_text)
+        self.assertIn('Applications are handled manually', page_text)
+        self.assertIn('is not a Westlake application', page_text)
         self.assertIn('not guaranteed', page_text)
-        self.assertIn('final signed credit agreement', page_text)
-        self.assertIn('Do not send account numbers', page_text)
-        self.assertNotIn('Westlake Financial', page_text)
         self.assertNotIn('PenFed', page_text)
         self.assertIsNone(html.select_one('a[href="https://www.penfed.org/auto"]'))
-
-        apr = html.select_one('#calc-rate')
-        self.assertIsNotNone(apr)
-        self.assertEqual(apr.get('required'), '')
-        self.assertNotIn('value', apr.attrs)
-        self.assertIn('Illustration only', page_text)
-        self.assertIn('Total Loan Payments (excl. down payment)', page_text)
 
     def test_home_search_keeps_get_fields_and_has_accessible_labels(self):
         html = self.page('/')

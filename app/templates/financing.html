@@ -125,8 +125,8 @@
 {% block content %}
 <section class="bg-light-brand py-5">
     <div class="container">
-        <h1 class="fw-bold">Secure Vehicle Financing Application</h1>
-        <p class="text-muted mb-0">Choose an available vehicle, complete the lender's credit application online, and submit it to Marshall Auto for secure review.</p>
+        <h1 class="fw-bold">Bad Credit or No Credit? Let's Explore Your Options</h1>
+        <p class="text-muted mb-0">Marshall Auto works with Lendmark Financial Services and Westlake Financial. Buyers with bad, limited, or no credit history may still get approved; a low credit score does not automatically put you out of the running. Each lender reviews applications individually; approval and terms are not guaranteed.</p>
     </div>
 </section>
 
@@ -137,6 +137,12 @@
                 <div class="alert alert-info mb-4" role="note">
                     <strong>Your information is protected:</strong>
                     Submit only over HTTPS. The completed application PDF is encrypted before it is saved; SSN and ID details are not stored in the database, emailed, or sent to analytics or third-party browser scripts. Only authenticated dealership staff with two-step verification can download it. Only administrators can delete it.
+                </div>
+
+                <div class="card border-primary p-3 p-md-4 mb-4">
+                    <h2 class="h5 fw-bold">Choose how to apply</h2>
+                    <p class="mb-2"><strong>Lendmark Financial Services:</strong> Complete the secure online application below for an available vehicle. This keeps our existing Lendmark application process.</p>
+                    <p class="mb-0"><strong>Westlake Financial:</strong> Applications are handled manually by our team. Call or visit us to discuss applying through Westlake; the online form below is for Lendmark and is not a Westlake application.</p>
                 </div>
 
                 {% if not application_available %}
@@ -248,7 +254,7 @@
                             <label class="form-check-label" for="electronic_signature_consent">I agree to submit this application electronically and use my typed name above as my electronic signature. <span class="text-danger">*</span></label>
                             {% if form_errors.get('electronic_signature_consent') %}<div class="text-danger small">{{ form_errors.get('electronic_signature_consent') }}</div>{% endif %}
                         </div>
-                        <p class="small text-muted">Submitting sends the completed application to Marshall Auto for staff review and manual delivery to the lender. It is not a loan approval or commitment to lend. Lendmark determines whether to accept the application and any final terms. Approval is not guaranteed.</p>
+                        <p class="small text-muted">Submitting sends the completed application to Marshall Auto for staff review and manual delivery to Lendmark Financial Services. It is not a loan approval or commitment to lend. Lendmark determines whether to accept the application and any final terms. Approval is not guaranteed.</p>
                         <button class="btn btn-primary btn-lg" type="submit" id="financing-submit">Submit Secure Application</button>
                         <span class="small text-muted ms-2">You can review your entries before submitting.</span>
                     </section>
