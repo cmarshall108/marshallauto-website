@@ -142,7 +142,7 @@
                 <div class="card border-primary p-3 p-md-4 mb-4">
                     <h2 class="h5 fw-bold">Choose how to apply</h2>
                     <p class="mb-2"><strong>Lendmark Financial Services:</strong> Complete the secure online application below for an available vehicle. This keeps our existing Lendmark application process.</p>
-                    <p class="mb-0"><strong>Westlake Financial:</strong> Applications are handled manually by our team. Call or visit us to discuss applying through Westlake; the online form below is for Lendmark and is not a Westlake application.</p>
+                    <p class="mb-0"><strong>Westlake Financial:</strong> You can also use this form to get started. Westlake applications are prepared and submitted manually by our team. Call or visit us and let us know you want to pursue Westlake; we'll obtain any separate authorization required before submitting your information.</p>
                 </div>
 
                 {% if not application_available %}
@@ -254,7 +254,7 @@
                             <label class="form-check-label" for="electronic_signature_consent">I agree to submit this application electronically and use my typed name above as my electronic signature. <span class="text-danger">*</span></label>
                             {% if form_errors.get('electronic_signature_consent') %}<div class="text-danger small">{{ form_errors.get('electronic_signature_consent') }}</div>{% endif %}
                         </div>
-                        <p class="small text-muted">Submitting sends the completed application to Marshall Auto for staff review and manual delivery to Lendmark Financial Services. It is not a loan approval or commitment to lend. Lendmark determines whether to accept the application and any final terms. Approval is not guaranteed.</p>
+                        <p class="small text-muted">Submitting sends the completed application to Marshall Auto for staff review and manual delivery to Lendmark Financial Services; it does not automatically submit a Westlake application. To also pursue Westlake, contact us and we can prepare that application manually using the information you provided, subject to any separate authorization required. Neither application is a loan approval or commitment to lend. Each lender determines whether to accept an application and any final terms; approval is not guaranteed.</p>
                         <button class="btn btn-primary btn-lg" type="submit" id="financing-submit">Submit Secure Application</button>
                         <span class="small text-muted ms-2">You can review your entries before submitting.</span>
                     </section>

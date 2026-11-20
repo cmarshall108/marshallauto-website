@@ -2139,11 +2139,11 @@ def financing():
     ])
     faqs = [
         (f"Can I get financing at {current_app.config['BUSINESS_NAME']} with bad credit?",
-         "Yes. Marshall Auto works with Lendmark Financial Services and Westlake Financial, and buyers with bad, limited, or no credit can apply. Use the secure online application on this page to apply with Lendmark; Westlake applications are handled manually by our team. Each lender makes its own decision, so approval and terms are not guaranteed."),
+         "Yes. Marshall Auto works with Lendmark Financial Services and Westlake Financial, and buyers with bad, limited, or no credit can apply. Use the secure online form to get started; Lendmark applications follow our existing online process, while our team prepares and submits Westlake applications manually. Contact us if you want to pursue Westlake, and we will obtain any separate authorization required before submitting your information. Each lender makes its own decision, so approval and terms are not guaranteed."),
         ("What do I need to bring to apply for financing?",
-         "For Lendmark, select an available vehicle and complete the secure application on this page. You will need your Social Security number, contact and residence history, employment and income details, and driver's-license information. Review the lender's credit-report authorization before submitting. Contact Marshall Auto to discuss a manual application with Westlake Financial."),
+         "Select an available vehicle and complete the secure application on this page to get started. You will need your Social Security number, contact and residence history, employment and income details, and driver's-license information. Review the Lendmark authorization before submitting. Contact Marshall Auto if you also want us to prepare a Westlake Financial application manually; separate authorization may be required."),
         ("Can I start a financing application before choosing a vehicle?",
-         "Choose an available vehicle from our inventory as part of the online Lendmark application. To discuss applying manually with Westlake Financial, contact Marshall Auto. An application is not a final approval or commitment to lend.")
+         "Choose an available vehicle from our inventory as part of the secure online form. It starts our existing Lendmark process and can also provide the information our team needs to prepare a Westlake Financial application manually. Contact Marshall Auto to pursue Westlake; separate authorization may be required. An application is not a final approval or commitment to lend.")
     ]
     steps = [
         {"name": "Choose a Vehicle", "text": "Select an available vehicle from our inventory and enter the requested borrower, residence, employment, and income details in the secure online form."},
