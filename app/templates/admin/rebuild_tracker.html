@@ -30,7 +30,7 @@
     <i class="bi bi-info-circle text-primary mt-1"></i>
     <div>
         <strong>Private cost records.</strong>
-        Track what you paid to acquire and prepare this vehicle. Profit uses the actual sold amount when recorded; otherwise, it shows an estimate from the vehicle's current listed price.
+        Track what you paid to acquire and prepare this vehicle. The cost basis includes a standard $100 detail fee and $100 lot fee. Profit uses the actual sold amount when recorded; otherwise, it shows an estimate from the vehicle's current listed price.
     </div>
 </div>
 
@@ -182,10 +182,9 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                     <h3 class="h5 fw-bold mb-1">Cost breakdown</h3>
-                    <p class="small text-muted mb-0">{{ entries|length }} item{{ '' if entries|length == 1 else 's' }} &middot; Total {{ expense_total | format_currency }}</p>
+                    <p class="small text-muted mb-0">{{ entries|length + standard_vehicle_fees|length }} item{{ '' if entries|length + standard_vehicle_fees|length == 1 else 's' }} &middot; Total {{ cost_breakdown_total | format_currency }}</p>
                 </div>
             </div>
-            {% if entries %}
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
@@ -242,19 +241,22 @@
                             </td>
                         </tr>
                         {% endfor %}
+                        {% for description, amount in standard_vehicle_fees %}
+                        <tr>
+                            <td><strong>{{ description }}</strong></td>
+                            <td><span class="badge text-bg-light">Fixed fee</span></td>
+                            <td class="text-end">1</td>
+                            <td class="text-end">{{ amount | format_currency }}</td>
+                            <td class="text-end fw-semibold">{{ amount | format_currency }}</td>
+                            <td></td>
+                        </tr>
+                        {% endfor %}
                     </tbody>
                     <tfoot>
-                        <tr><th colspan="4" class="text-end">Rebuild &amp; prep total</th><th class="text-end">{{ expense_total | format_currency }}</th><th></th></tr>
+                        <tr><th colspan="4" class="text-end">Cost breakdown total</th><th class="text-end">{{ cost_breakdown_total | format_currency }}</th><th></th></tr>
                     </tfoot>
                 </table>
             </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-receipt-cutoff display-5 text-muted"></i>
-                <h4 class="h6 fw-bold mt-3">No rebuild costs yet</h4>
-                <p class="small text-muted mb-0">Add the first part, repair, or service on the left to start tracking this vehicle's costs.</p>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>

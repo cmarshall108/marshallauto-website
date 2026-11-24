@@ -86,12 +86,13 @@ class FinancialReportTests(unittest.TestCase):
         september = next(row for row in report['months'] if row['label'] == 'Sep 2026')
         august = next(row for row in report['months'] if row['label'] == 'Aug 2026')
         split = split_otd_sale_price(Decimal('10000.00'))
-        expected_profit = split['agreed_vehicle_price'] - Decimal('6275.00')
+        expected_profit = split['agreed_vehicle_price'] - Decimal('6475.00')
 
         self.assertEqual(october['revenue'], split['agreed_vehicle_price'])
         self.assertEqual(october['tax'], split['sales_tax'])
         self.assertEqual(october['acquisition'], Decimal('6000.00'))
-        self.assertEqual(october['prep'], Decimal('275.00'))
+        self.assertEqual(october['prep'], Decimal('475.00'))
+        self.assertEqual(report['deals'][0]['prep_by_category']['fees'], Decimal('200.00'))
         self.assertEqual(october['gross_profit'], expected_profit)
         self.assertEqual(
             october['profit_before_tax'] - october['tax'] - split['fees'],
@@ -213,9 +214,9 @@ class FinancialReportTests(unittest.TestCase):
         november = next(row for row in report['months'] if row['label'] == 'Nov 2026')
         self.assertEqual(november['revenue'], Decimal('9700.00'))
         self.assertEqual(november['tax'], Decimal('300.00'))
-        self.assertEqual(november['gross_profit'], Decimal('9600.00'))
+        self.assertEqual(november['gross_profit'], Decimal('9400.00'))
         self.assertEqual(november['dealer_fees'], Decimal('25.00'))
-        self.assertEqual(november['contribution'], Decimal('9625.00'))
+        self.assertEqual(november['contribution'], Decimal('9425.00'))
         self.assertEqual(november['expense_spend'], Decimal('250.00'))
         self.assertEqual(report['kpis']['units'], 1)
         self.assertEqual(report['deals'][0]['salesperson'], 'Blake')
@@ -223,8 +224,8 @@ class FinancialReportTests(unittest.TestCase):
         self.assertTrue(any(item['kind'] == 'missing_acquisition' for item in report['data_quality']))
         self.assertTrue(any(item['kind'] == 'price_mismatch' for item in report['data_quality']))
         self.assertEqual(report['inventory']['units'], 1)
-        self.assertEqual(report['inventory']['capital'], Decimal('4150.00'))
-        self.assertEqual(report['inventory']['estimated_profit'], split_otd_sale_price(Decimal('9000.00'))['agreed_vehicle_price'] - Decimal('4150.00'))
+        self.assertEqual(report['inventory']['capital'], Decimal('4350.00'))
+        self.assertEqual(report['inventory']['estimated_profit'], split_otd_sale_price(Decimal('9000.00'))['agreed_vehicle_price'] - Decimal('4350.00'))
         self.assertEqual(report['receipts']['down_payment'], Decimal('500.00'))
         self.assertEqual(report['cash_categories'][0]['label'], 'Parts & Materials')
 
@@ -302,7 +303,7 @@ class FinancialPageTests(unittest.TestCase):
             purchase_date=sold_at.date(), quantity=1, unit_cost=Decimal('100.00'),
         ))
         db.session.commit()
-        expected = split_otd_sale_price(Decimal('10000.00'))['agreed_vehicle_price'] - Decimal('6100.00')
+        expected = split_otd_sale_price(Decimal('10000.00'))['agreed_vehicle_price'] - Decimal('6300.00')
 
         anonymous = self.client.get('/admin/financials')
         self.assertEqual(anonymous.status_code, 302)

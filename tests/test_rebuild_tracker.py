@@ -80,10 +80,12 @@ class RebuildCostTrackerTests(unittest.TestCase):
 
         page = self.client.get(self.path)
         self.assertEqual(page.status_code, 200)
-        self.assertIn('$9,600.00', page.text)
-        self.assertIn('$4,400.00', page.text)
-        self.assertIn('31.43%', page.text)
-        self.assertIn('45.83%', page.text)
+        self.assertIn('Detail fee', page.text)
+        self.assertIn('Lot fee', page.text)
+        self.assertIn('$9,800.00', page.text)
+        self.assertIn('$4,200.00', page.text)
+        self.assertIn('30.00%', page.text)
+        self.assertIn('42.86%', page.text)
         self.assertIn('Current Asking Price', page.text)
         db.session.refresh(self.vehicle)
         self.assertEqual(self.vehicle.acquisition_cost, Decimal('9000.00'))
@@ -98,7 +100,9 @@ class RebuildCostTrackerTests(unittest.TestCase):
         page = self.client.get(self.path)
         self.assertIn('Actual Sale Price', page.text)
         self.assertIn('Actual Profit', page.text)
-        self.assertIn('$3,000.00', page.text)
+        self.assertIn('Detail fee', page.text)
+        self.assertIn('Lot fee', page.text)
+        self.assertIn('$2,800.00', page.text)
 
     def test_cost_items_can_be_edited_and_deleted(self):
         entry = RebuildCostEntry(

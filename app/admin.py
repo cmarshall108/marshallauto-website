@@ -41,6 +41,7 @@ from app.models import (
     VehicleImageHighlight, VehicleSaleDocument, VehicleSaleImage, VideoUploadJob, utcnow,
     VehicleSaleReceipt, VehicleSaleReceiptCharge,
 )
+from app.vehicle_costs import STANDARD_VEHICLE_FEES, STANDARD_VEHICLE_FEES_TOTAL
 from app.financing import (
     FinancingEncryptionUnavailable, delete_application_record, load_encrypted_pdf,
     _send_textbelt_message, _textbelt_phone,
@@ -1662,6 +1663,7 @@ def vehicle_rebuild_tracker(id):
     )
     acquisition_cost = vehicle.acquisition_cost or zero
     total_cost = acquisition_cost + expense_total
+    total_cost += STANDARD_VEHICLE_FEES_TOTAL
     service_total = sum(
         (entry.line_total for entry in entries if entry.category == 'service'),
         zero,
@@ -1687,6 +1689,9 @@ def vehicle_rebuild_tracker(id):
         acquisition_cost=acquisition_cost,
         expense_total=expense_total,
         service_total=service_total,
+        standard_vehicle_fees=STANDARD_VEHICLE_FEES,
+        standard_vehicle_fees_total=STANDARD_VEHICLE_FEES_TOTAL,
+        cost_breakdown_total=expense_total + STANDARD_VEHICLE_FEES_TOTAL,
         total_cost=total_cost,
         sale_price=sale_price,
         sale_is_actual=vehicle.sold_price is not None,

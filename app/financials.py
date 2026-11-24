@@ -10,6 +10,8 @@ Prep costs reduce profit in the sale month even when the receipt is older.
 Cash-expense charts use each cost item's purchase date and include cars that
 have not sold. Acquisition cash is estimated from the date the vehicle was
 added, because a separate purchase date is not stored.
+Every vehicle also includes standard $100 detail and $100 lot fees in its cost
+basis; these fees are not treated as dated cash expenses.
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ from sqlalchemy.orm import noload, selectinload
 from app.models import RebuildCostEntry, Vehicle, VehicleSaleReceipt
 from app.pricing import split_otd_sale_price
 from app.utils import DEALERSHIP_TIMEZONE, dealership_today
+from app.vehicle_costs import STANDARD_VEHICLE_FEES
 
 DEALER_TZ = DEALERSHIP_TIMEZONE
 ZERO = Decimal('0.00')
@@ -419,6 +422,10 @@ def build_financial_dashboard(args=None, today=None):
             else:
                 expenses.append(item)
                 earliest_dates.append(item['month'])
+
+        for _, amount in STANDARD_VEHICLE_FEES:
+            prep_total += amount
+            prep_by_category['fees'] += amount
 
         acquisition = vehicle.acquisition_cost
         acquisition_missing = acquisition is None
