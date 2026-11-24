@@ -497,6 +497,32 @@ class FinancingApplicationTests(unittest.TestCase):
         )
         self.assertEqual(FinancingApplication.query.count(), 0)
 
+    def test_validation_errors_highlight_fields_and_keep_consent_checks(self):
+        response = self.submit(applicant_ssn='000-12-1234')
+
+        self.assertEqual(response.status_code, 400)
+        body = response.data
+        self.assertIn(b'data-financing-error-summary', body)
+        self.assertIn(b'Please review the highlighted fields below', body)
+        self.assertRegex(
+            body,
+            rb'<input[^>]*class="[^"]*\bis-invalid\b[^"]*"[^>]*id="applicant-ssn"',
+        )
+        self.assertIn(b'id="applicant-ssn-error"', body)
+        self.assertIn(b'Enter a valid 9-digit Social Security number.', body)
+        self.assertIn(b'href="#applicant-ssn"', body)
+        # Consent checkboxes must stay checked so users are not blocked by
+        # invisible HTML5 required failures after a server-side reject.
+        for field in (
+            'certify_accuracy',
+            'authorize_credit_report',
+            'electronic_signature_consent',
+        ):
+            self.assertRegex(
+                body,
+                rf'id="{field}"[^>]*\bchecked\b'.encode(),
+            )
+
     def test_residence_requires_city_state_and_zip(self):
         response = self.submit(
             applicant_residence_street='360 Wilson Rd',

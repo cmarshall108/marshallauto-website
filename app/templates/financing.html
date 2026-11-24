@@ -6,26 +6,29 @@
 {% macro text_field(prefix, name, label, required=false, type='text', autocomplete='', hint='', maxlength=128, col_class='col-md-6', extra_attrs='') %}
 {% set field_id = prefix ~ '-' ~ name %}
 {% set field_name = prefix ~ '_' ~ name %}
-<div class="{{ col_class }}">
+{% set field_error = form_errors.get(field_name) %}
+{% set invalid_class = ' is-invalid' if field_error else '' %}
+{% set describedby = (field_id ~ '-error ' ~ field_id ~ '-hint') if field_error else (field_id ~ '-hint') %}
+<div class="{{ col_class }}{% if field_error %} has-validation-error{% endif %}">
     <label class="form-label small fw-semibold" for="{{ field_id }}">{{ label }}{% if required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}</label>
     {% if type == 'ssn' %}
-    <div class="input-group">
-        <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="password" inputmode="numeric" pattern="\d{3}-?\d{2}-?\d{4}" maxlength="11" autocomplete="off" autocapitalize="off" spellcheck="false" {% if required %}required{% endif %} aria-describedby="{{ field_id }}-hint">
+    <div class="input-group{% if field_error %} has-validation{% endif %}">
+        <input class="form-control{{ invalid_class }}" id="{{ field_id }}" name="{{ field_name }}" type="password" inputmode="numeric" pattern="\d{3}-?\d{2}-?\d{4}" maxlength="11" autocomplete="off" autocapitalize="off" spellcheck="false" {% if required %}required{% endif %} {% if field_error %}aria-invalid="true"{% endif %} aria-describedby="{{ describedby }}">
         <button class="btn btn-outline-secondary" type="button" data-toggle-secret="{{ field_id }}" aria-label="Show Social Security number">Show</button>
     </div>
     {% elif type == 'date' %}
-    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="date" value="{{ form_values.get(field_name, '') }}" {% if required %}required{% endif %} autocomplete="{{ autocomplete or 'off' }}">
+    <input class="form-control{{ invalid_class }}" id="{{ field_id }}" name="{{ field_name }}" type="date" value="{{ form_values.get(field_name, '') }}" {% if required %}required{% endif %} {% if field_error %}aria-invalid="true"{% endif %} autocomplete="{{ autocomplete or 'off' }}" {% if field_error %}aria-describedby="{{ field_id }}-error"{% endif %}>
     {% elif type == 'money' %}
-    <div class="input-group">
+    <div class="input-group{% if field_error %} has-validation{% endif %}">
         <span class="input-group-text">$</span>
-        <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="10000000" step="0.01" value="{{ form_values.get(field_name, '') }}" inputmode="decimal" {% if required %}required{% endif %} autocomplete="off">
+        <input class="form-control{{ invalid_class }}" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="10000000" step="0.01" value="{{ form_values.get(field_name, '') }}" inputmode="decimal" {% if required %}required{% endif %} {% if field_error %}aria-invalid="true"{% endif %} autocomplete="off" {% if field_error %}aria-describedby="{{ field_id }}-error"{% endif %}>
     </div>
     {% elif type == 'integer' %}
-    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="{{ 120 if 'years' in name else (11 if 'months' in name else 20) }}" step="1" value="{{ form_values.get(field_name, '0' if 'months' in name else '') }}" inputmode="numeric" {% if required %}required{% endif %} autocomplete="off">
+    <input class="form-control{{ invalid_class }}" id="{{ field_id }}" name="{{ field_name }}" type="number" min="0" max="{{ 120 if 'years' in name else (11 if 'months' in name else 20) }}" step="1" value="{{ form_values.get(field_name, '0' if 'months' in name else '') }}" inputmode="numeric" {% if required %}required{% endif %} {% if field_error %}aria-invalid="true"{% endif %} autocomplete="off" {% if field_error %}aria-describedby="{{ field_id }}-error"{% endif %}>
     {% else %}
-    <input class="form-control" id="{{ field_id }}" name="{{ field_name }}" type="{{ type }}" value="{{ form_values.get(field_name, '') }}" maxlength="{{ maxlength }}" {% if required %}required{% endif %} autocomplete="{{ autocomplete or 'off' }}" {{ extra_attrs|safe }}>
+    <input class="form-control{{ invalid_class }}" id="{{ field_id }}" name="{{ field_name }}" type="{{ type }}" value="{{ form_values.get(field_name, '') }}" maxlength="{{ maxlength }}" {% if required %}required{% endif %} {% if field_error %}aria-invalid="true"{% endif %} autocomplete="{{ autocomplete or 'off' }}" {% if field_error %}aria-describedby="{{ field_id }}-error"{% endif %} {{ extra_attrs|safe }}>
     {% endif %}
-    <div class="invalid-feedback d-block">{{ form_errors.get(field_name, '') }}</div>
+    {% if field_error %}<div class="invalid-feedback d-block" id="{{ field_id }}-error">{{ field_error }}</div>{% endif %}
     {% if hint %}<div class="form-text" id="{{ field_id }}-hint">{{ hint }}</div>{% else %}<div class="form-text d-none" id="{{ field_id }}-hint" data-address-hint></div>{% endif %}
 </div>
 {% endmacro %}
@@ -33,15 +36,16 @@
 {% macro select_field(prefix, name, label, options, required=false, hint='') %}
 {% set field_id = prefix ~ '-' ~ name %}
 {% set field_name = prefix ~ '_' ~ name %}
-<div class="col-md-6">
+{% set field_error = form_errors.get(field_name) %}
+<div class="col-md-6{% if field_error %} has-validation-error{% endif %}">
     <label class="form-label small fw-semibold" for="{{ field_id }}">{{ label }}{% if required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}</label>
-    <select class="form-select" id="{{ field_id }}" name="{{ field_name }}" {% if required %}required{% endif %}>
+    <select class="form-select{% if field_error %} is-invalid{% endif %}" id="{{ field_id }}" name="{{ field_name }}" {% if required %}required{% endif %} {% if field_error %}aria-invalid="true" aria-describedby="{{ field_id }}-error"{% endif %}>
         <option value="">Choose one</option>
         {% for value, label_text in options %}
         <option value="{{ value }}" {% if form_values.get(field_name) == value %}selected{% endif %}>{{ label_text }}</option>
         {% endfor %}
     </select>
-    <div class="invalid-feedback d-block">{{ form_errors.get(field_name, '') }}</div>
+    {% if field_error %}<div class="invalid-feedback d-block" id="{{ field_id }}-error">{{ field_error }}</div>{% endif %}
     {% if hint %}<div class="form-text">{{ hint }}</div>{% endif %}
 </div>
 {% endmacro %}
@@ -163,17 +167,30 @@
                         <input type="text" id="financing-website" name="website" tabindex="-1" autocomplete="off">
                     </div>
                     {% if form_errors.get('form') %}
-                    <div class="alert alert-danger" role="alert">{{ form_errors.get('form') }}</div>
+                    <div class="alert alert-danger" role="alert" id="financing-form-errors" tabindex="-1">{{ form_errors.get('form') }}</div>
                     {% elif form_errors %}
-                    <div class="alert alert-danger" role="alert">Please review the highlighted fields. For your protection, Social Security and ID numbers were cleared after submission; re-enter them before trying again.</div>
+                    <div class="alert alert-danger" role="alert" id="financing-form-errors" tabindex="-1" data-financing-error-summary>
+                        <p class="mb-2 fw-semibold">Please review the highlighted fields below. For your protection, Social Security and ID numbers were cleared after submission; re-enter them before trying again.</p>
+                        <ul class="mb-0 small">
+                            {% for field, message in form_errors.items() %}
+                            {% if field.startswith('applicant_') or field.startswith('coapplicant_') %}
+                            {% set parts = field.split('_', 1) %}
+                            {% set anchor = parts[0] ~ '-' ~ parts[1] %}
+                            {% else %}
+                            {% set anchor = field %}
+                            {% endif %}
+                            <li><a class="alert-link" href="#{{ anchor }}">{{ message }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                     {% endif %}
 
                     <section class="card border-0 shadow-sm p-3 p-md-4 mb-3">
                         <h2 class="h5 fw-bold">1. Choose a vehicle and amount</h2>
                         <div class="row g-3">
-                            <div class="col-md-6">
+                            <div class="col-md-6{% if form_errors.get('vehicle_id') %} has-validation-error{% endif %}">
                                 <label for="vehicle_id" class="form-label small fw-semibold">Vehicle of interest <span class="text-danger">*</span></label>
-                                <select class="form-select" id="vehicle_id" name="vehicle_id" required data-vehicle-select>
+                                <select class="form-select{% if form_errors.get('vehicle_id') %} is-invalid{% endif %}" id="vehicle_id" name="vehicle_id" required data-vehicle-select {% if form_errors.get('vehicle_id') %}aria-invalid="true" aria-describedby="vehicle_id-error"{% endif %}>
                                     <option value="">Choose an available vehicle</option>
                                     {% for vehicle in financing_vehicles %}
                                     <option value="{{ vehicle.id }}" data-price="{{ vehicle.display_price }}" {% if selected_vehicle_id == vehicle.id %}selected{% endif %}>
@@ -181,24 +198,24 @@
                                     </option>
                                     {% endfor %}
                                 </select>
-                                {% if form_errors.get('vehicle_id') %}<div class="text-danger small mt-1">{{ form_errors.get('vehicle_id') }}</div>{% endif %}
+                                {% if form_errors.get('vehicle_id') %}<div class="invalid-feedback d-block" id="vehicle_id-error">{{ form_errors.get('vehicle_id') }}</div>{% endif %}
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-3{% if form_errors.get('requested_amount') %} has-validation-error{% endif %}">
                                 <label for="requested_amount" class="form-label small fw-semibold">Amount requested <span class="text-danger">*</span></label>
-                                <div class="input-group">
+                                <div class="input-group{% if form_errors.get('requested_amount') %} has-validation{% endif %}">
                                     <span class="input-group-text">$</span>
-                                    <input class="form-control" id="requested_amount" name="requested_amount" type="number" min="1" max="10000000" step="0.01" inputmode="decimal" value="{{ form_values.get('requested_amount', '') }}" required>
+                                    <input class="form-control{% if form_errors.get('requested_amount') %} is-invalid{% endif %}" id="requested_amount" name="requested_amount" type="number" min="1" max="10000000" step="0.01" inputmode="decimal" value="{{ form_values.get('requested_amount', '') }}" required {% if form_errors.get('requested_amount') %}aria-invalid="true" aria-describedby="requested_amount-error"{% endif %}>
                                 </div>
-                                {% if form_errors.get('requested_amount') %}<div class="text-danger small mt-1">{{ form_errors.get('requested_amount') }}</div>{% endif %}
+                                {% if form_errors.get('requested_amount') %}<div class="invalid-feedback d-block" id="requested_amount-error">{{ form_errors.get('requested_amount') }}</div>{% endif %}
                                 <div class="form-text">Enter the credit amount you are requesting.</div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-3{% if form_errors.get('down_payment') %} has-validation-error{% endif %}">
                                 <label for="down_payment" class="form-label small fw-semibold">Down payment <span class="text-muted fw-normal">(optional)</span></label>
-                                <div class="input-group">
+                                <div class="input-group{% if form_errors.get('down_payment') %} has-validation{% endif %}">
                                     <span class="input-group-text">$</span>
-                                    <input class="form-control" id="down_payment" name="down_payment" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" value="{{ form_values.get('down_payment', '') }}">
+                                    <input class="form-control{% if form_errors.get('down_payment') %} is-invalid{% endif %}" id="down_payment" name="down_payment" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" value="{{ form_values.get('down_payment', '') }}" {% if form_errors.get('down_payment') %}aria-invalid="true" aria-describedby="down_payment-error"{% endif %}>
                                 </div>
-                                {% if form_errors.get('down_payment') %}<div class="text-danger small mt-1">{{ form_errors.get('down_payment') }}</div>{% endif %}
+                                {% if form_errors.get('down_payment') %}<div class="invalid-feedback d-block" id="down_payment-error">{{ form_errors.get('down_payment') }}</div>{% endif %}
                                 <div class="form-text">How much do you plan to put down?</div>
                             </div>
                         </div>
@@ -239,20 +256,20 @@
                                 <p class="mb-0">The attached application includes the lender's full disclosures. Review them before submitting. If you prefer not to provide this information online, contact Marshall Auto to discuss applying in person.</p>
                             </div>
                         </details>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" id="certify_accuracy" name="certify_accuracy" type="checkbox" value="yes" required {% if form_values.get('certify_accuracy') %}checked{% endif %}>
+                        <div class="form-check mb-2{% if form_errors.get('certify_accuracy') %} has-validation-error{% endif %}">
+                            <input class="form-check-input{% if form_errors.get('certify_accuracy') %} is-invalid{% endif %}" id="certify_accuracy" name="certify_accuracy" type="checkbox" value="yes" required {% if form_values.get('certify_accuracy') %}checked{% endif %} {% if form_errors.get('certify_accuracy') %}aria-invalid="true" aria-describedby="certify_accuracy-error"{% endif %}>
                             <label class="form-check-label" for="certify_accuracy">I certify that the information I provided is complete and true to the best of my knowledge. <span class="text-danger">*</span></label>
-                            {% if form_errors.get('certify_accuracy') %}<div class="text-danger small">{{ form_errors.get('certify_accuracy') }}</div>{% endif %}
+                            {% if form_errors.get('certify_accuracy') %}<div class="invalid-feedback d-block" id="certify_accuracy-error">{{ form_errors.get('certify_accuracy') }}</div>{% endif %}
                         </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" id="authorize_credit_report" name="authorize_credit_report" type="checkbox" value="yes" required {% if form_values.get('authorize_credit_report') %}checked{% endif %}>
+                        <div class="form-check mb-3{% if form_errors.get('authorize_credit_report') %} has-validation-error{% endif %}">
+                            <input class="form-check-input{% if form_errors.get('authorize_credit_report') %} is-invalid{% endif %}" id="authorize_credit_report" name="authorize_credit_report" type="checkbox" value="yes" required {% if form_values.get('authorize_credit_report') %}checked{% endif %} {% if form_errors.get('authorize_credit_report') %}aria-invalid="true" aria-describedby="authorize_credit_report-error"{% endif %}>
                             <label class="form-check-label" for="authorize_credit_report">I have reviewed the authorization above and authorize Lendmark Financial Services and the seller to verify this application and obtain my consumer credit report as described. My typed name above is my electronic signature. <span class="text-danger">*</span></label>
-                            {% if form_errors.get('authorize_credit_report') %}<div class="text-danger small">{{ form_errors.get('authorize_credit_report') }}</div>{% endif %}
+                            {% if form_errors.get('authorize_credit_report') %}<div class="invalid-feedback d-block" id="authorize_credit_report-error">{{ form_errors.get('authorize_credit_report') }}</div>{% endif %}
                         </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" id="electronic_signature_consent" name="electronic_signature_consent" type="checkbox" value="yes" required {% if form_values.get('electronic_signature_consent') %}checked{% endif %}>
+                        <div class="form-check mb-3{% if form_errors.get('electronic_signature_consent') %} has-validation-error{% endif %}">
+                            <input class="form-check-input{% if form_errors.get('electronic_signature_consent') %} is-invalid{% endif %}" id="electronic_signature_consent" name="electronic_signature_consent" type="checkbox" value="yes" required {% if form_values.get('electronic_signature_consent') %}checked{% endif %} {% if form_errors.get('electronic_signature_consent') %}aria-invalid="true" aria-describedby="electronic_signature_consent-error"{% endif %}>
                             <label class="form-check-label" for="electronic_signature_consent">I agree to submit this application electronically and use my typed name above as my electronic signature. <span class="text-danger">*</span></label>
-                            {% if form_errors.get('electronic_signature_consent') %}<div class="text-danger small">{{ form_errors.get('electronic_signature_consent') }}</div>{% endif %}
+                            {% if form_errors.get('electronic_signature_consent') %}<div class="invalid-feedback d-block" id="electronic_signature_consent-error">{{ form_errors.get('electronic_signature_consent') }}</div>{% endif %}
                         </div>
                         <p class="small text-muted">Submitting sends the completed application to Marshall Auto for staff review and manual delivery to Lendmark Financial Services; it does not automatically submit a Westlake application. To also pursue Westlake, contact us and we can prepare that application manually using the information you provided, subject to any separate authorization required. Neither application is a loan approval or commitment to lend. Each lender determines whether to accept an application and any final terms; approval is not guaranteed.</p>
                         <button class="btn btn-primary btn-lg" type="submit" id="financing-submit">Submit Secure Application</button>

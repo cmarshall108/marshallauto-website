@@ -604,6 +604,10 @@ def validate_application(form, vehicle):
     values['requested_amount'] = _clean(form.get('requested_amount'), 12)
     values['down_payment'] = _clean(form.get('down_payment'), 12)
     values['joint_credit'] = joint_credit
+    # Preserve consent checkboxes so a failed submit does not silently uncheck them.
+    values['certify_accuracy'] = form.get('certify_accuracy') == 'yes'
+    values['authorize_credit_report'] = form.get('authorize_credit_report') == 'yes'
+    values['electronic_signature_consent'] = form.get('electronic_signature_consent') == 'yes'
 
     if errors:
         return None, errors, values

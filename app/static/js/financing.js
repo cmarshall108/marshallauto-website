@@ -51,6 +51,36 @@
         const applicationForm = document.getElementById('financing-application');
         if (!applicationForm) return;
 
+        const focusFirstInvalidField = () => {
+            const summary = document.getElementById('financing-form-errors');
+            const firstInvalid = applicationForm.querySelector('.is-invalid, [aria-invalid="true"]');
+            if (firstInvalid) {
+                const coapplicantField = firstInvalid.closest('#coapplicant-details');
+                if (coapplicantField && coapplicantDetails) {
+                    coapplicantDetails.open = true;
+                }
+                // Bring the first problem into view; summary stays visible above when possible.
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                try {
+                    firstInvalid.focus({ preventScroll: true });
+                } catch (error) {
+                    firstInvalid.focus();
+                }
+            } else if (summary) {
+                summary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                try {
+                    summary.focus({ preventScroll: true });
+                } catch (error) {
+                    summary.focus();
+                }
+            }
+        };
+        if (applicationForm.querySelector('.is-invalid, [aria-invalid="true"]')
+            || document.querySelector('[data-financing-error-summary]')) {
+            // Wait a tick so layout/details open state is applied first.
+            window.requestAnimationFrame(focusFirstInvalidField);
+        }
+
         const updateRequiredFields = (prefix, enabled) => {
             const employmentStatus = document.getElementById(`${prefix}-employment_status`);
             const activeEmployment = ['employed', 'self-employed'].includes(

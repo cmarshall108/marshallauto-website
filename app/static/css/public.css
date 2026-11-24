@@ -612,6 +612,25 @@
 .public-site .form-control::placeholder { color: #626d7b; }
 .public-site .form-control:focus,
 .public-site .form-select:focus { border-color: #966322; box-shadow: 0 0 0 0.2rem rgba(150, 99, 34, 0.16); }
+.public-site .form-control.is-invalid,
+.public-site .form-select.is-invalid,
+.public-site .form-check-input.is-invalid {
+    border-color: #b42318;
+    background-color: #fff7f6;
+}
+.public-site .form-control.is-invalid:focus,
+.public-site .form-select.is-invalid:focus,
+.public-site .form-check-input.is-invalid:focus {
+    border-color: #b42318;
+    box-shadow: 0 0 0 0.2rem rgba(180, 35, 24, 0.18);
+}
+.public-site .invalid-feedback {
+    color: #b42318;
+    font-weight: 600;
+}
+.public-site .has-validation-error > .form-label {
+    color: #b42318;
+}
 .public-site .form-check-input:checked { background-color: var(--dark); border-color: var(--dark); }
 .public-site .form-control:disabled,
 .public-site .form-select:disabled { background-color: #edf1f5; }
